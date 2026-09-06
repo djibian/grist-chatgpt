@@ -107,8 +107,8 @@ Therefore the bridge is useful specifically for Community deployments, but its p
 - keep the Grist API key only on the local machine;
 - restrict the bridge to explicit synthetic document IDs;
 - protect `/mcp` with an independent inbound bearer token;
-- use JSON-only MCP responses for the simple tool surface;
-- expose localhost temporarily through an HTTPS reverse tunnel;
+- preserve standard MCP HTTP/SSE behavior;
+- expose localhost temporarily through an SSE-capable HTTPS reverse tunnel;
 - validate public read access only against synthetic data.
 
 See [M2-REMOTE-DEMO.md](M2-REMOTE-DEMO.md).
