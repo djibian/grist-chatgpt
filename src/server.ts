@@ -196,9 +196,7 @@ function buildServer(): McpServer {
   return server;
 }
 
-const handler = createMcpHandler(() => buildServer(), {
-  responseMode: "json"
-});
+const handler = createMcpHandler(() => buildServer());
 const nodeHandler = toNodeHandler(handler);
 const app = createMcpExpressApp();
 
