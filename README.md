@@ -77,7 +77,7 @@ The MCP endpoint is:
 http://127.0.0.1:3000/mcp
 ```
 
-The server intentionally binds to localhost. A temporary reverse tunnel may expose it for M2 testing; OAuth and stable public deployment remain separate milestones.
+The server intentionally binds to localhost. An SSE-capable reverse tunnel may expose it for M2 testing; OAuth and stable public deployment remain separate milestones.
 
 ## Design principles
 
