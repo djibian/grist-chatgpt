@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  typecheck:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,3 +18,4 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run check
+      - run: npm test

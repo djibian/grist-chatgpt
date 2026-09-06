@@ -94,11 +94,13 @@ Therefore the bridge is useful specifically for Community deployments, but its p
 - explicit Grist client;
 - four bounded tools.
 
-### M1 — local functional proof
+### M1 — local functional proof — VALIDATED 2026-09-06
 
-- connect to a non-sensitive Grist test document;
-- verify list/read/create/update;
-- add automated tests around validation and REST requests.
+- connected to a synthetic Grist Community DINUM test document;
+- verified list/read/create/update end to end;
+- re-read persisted state after update;
+- added automated regression tests around validation and REST requests;
+- validation evidence: [M1-VALIDATION.md](M1-VALIDATION.md).
 
 ### M2 — safe remote demo
 

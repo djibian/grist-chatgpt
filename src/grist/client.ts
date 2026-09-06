@@ -117,13 +117,17 @@ export class GristClient {
       .map((segment) => decodeURIComponent(segment));
 
     const docIndex = segments.indexOf("doc");
-    if (docIndex >= 0 && segments[docIndex + 1]) {
-      return segments[docIndex + 1];
+    const documentIdFromDocPath =
+      docIndex >= 0 ? segments[docIndex + 1] : undefined;
+    if (documentIdFromDocPath) {
+      return documentIdFromDocPath;
     }
 
     const orgIndex = segments.indexOf("o");
-    if (orgIndex >= 0 && segments[orgIndex + 2]) {
-      return segments[orgIndex + 2];
+    const documentIdFromOrgPath =
+      orgIndex >= 0 ? segments[orgIndex + 2] : undefined;
+    if (documentIdFromOrgPath) {
+      return documentIdFromOrgPath;
     }
 
     throw new Error(

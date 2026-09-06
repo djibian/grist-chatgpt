@@ -5,6 +5,12 @@ Experimental open-source bridge for using Grist data and actions from MCP-compat
 > [!IMPORTANT]
 > This repository is an independent prototype. It is not an official Grist Labs, DINUM / La Suite numérique, or OpenAI integration.
 
+## Status
+
+**M1 validated on 2026-09-06 against Grist Community DINUM:** table discovery, record reads, record creation and record updates all succeeded end to end using synthetic data.
+
+See [M1 validation evidence](docs/M1-VALIDATION.md).
+
 ## Goal
 
 Provide a narrow, auditable MCP surface over the Grist REST API so a conversational assistant can:
