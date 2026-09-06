@@ -7,7 +7,7 @@ Expose the local MCP bridge through a temporary public HTTPS URL without:
 - opening an inbound router port;
 - publishing the Grist API key;
 - allowing the bridge to access arbitrary Grist documents;
-- relying on SSE support in the public tunnel.
+- degrading MCP transport semantics to fit the public tunnel.
 
 M2 is a development/demo milestone, not a production deployment.
 
@@ -70,11 +70,9 @@ Remote access must therefore pass through an explicit reverse tunnel.
 
 ## Response transport
 
-The MCP handler uses JSON response mode.
+The bridge keeps the MCP SDK's standard HTTP behavior. In current compatibility mode, simple tool calls may be returned as Server-Sent Events (SSE), as observed during the local M2 validation.
 
-The current tool surface only needs terminal request/response results and does not use progress notifications, server-to-client requests or subscriptions.
-
-JSON response mode also makes the bridge usable through development tunnels that do not support Server-Sent Events.
+The tunnel used for M2 must therefore forward normal HTTP streaming/SSE without buffering or rewriting it.
 
 ## Environment
 
@@ -99,15 +97,17 @@ Never commit either secret.
 
 ## Temporary HTTPS tunnel
 
-For M2 development, a Cloudflare Quick Tunnel can expose the local server without an account:
+For M2 development, use an ngrok HTTP endpoint:
 
 ```bash
-cloudflared tunnel --url http://localhost:3000
+ngrok http 3000
 ```
 
-It returns a temporary random `https://*.trycloudflare.com` URL.
+ngrok forwards HTTPS traffic to the local HTTP service and supports streamed HTTP/SSE traffic. A free account provides a development domain suitable for this proof.
 
-Quick Tunnels are intentionally temporary and have no SLA. They are not the M3/M4 production hosting solution.
+The ngrok agent needs only its own local authtoken. It does not receive the Grist API key or the inbound MCP bearer token.
+
+This endpoint is a development/demo ingress, not the M3/M4 production hosting solution.
 
 ## Remote verification
 
@@ -132,8 +132,8 @@ M2 is validated when all of the following have been demonstrated:
 2. a non-allowlisted Grist document is rejected before an outbound Grist request;
 3. the public HTTPS tunnel reaches `/healthz`;
 4. an unauthenticated public `/mcp` request returns HTTP 401;
-5. an authenticated public MCP read reaches the synthetic DINUM document;
-6. no secret is committed or supplied to the tunnel provider.
+5. an authenticated public MCP read reaches the synthetic DINUM document over its normal MCP response transport;
+6. no Grist or MCP secret is committed or supplied to the tunnel provider.
 
 ## Not solved by M2
 
