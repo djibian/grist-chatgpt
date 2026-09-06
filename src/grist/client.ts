@@ -24,27 +24,31 @@ export class GristApiError extends Error {
 
 export class GristClient {
   private readonly baseUrl: string;
+  private readonly baseOrigin: string;
   private readonly apiKey: string;
 
   constructor(options: GristClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.baseOrigin = new URL(this.baseUrl).origin;
     this.apiKey = options.apiKey;
   }
 
-  async listTables(documentId: string): Promise<unknown> {
+  async listTables(documentIdOrUrl: string): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables`
     );
   }
 
   async queryRecords(
-    documentId: string,
+    documentIdOrUrl: string,
     tableId: string,
     options: {
       filter?: Record<string, unknown[]>;
       limit?: number;
     } = {}
   ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     const query = new URLSearchParams();
 
     if (options.filter) {
@@ -61,10 +65,11 @@ export class GristClient {
   }
 
   async createRecords(
-    documentId: string,
+    documentIdOrUrl: string,
     tableId: string,
     records: NewGristRecord[]
   ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records`,
       {
@@ -75,16 +80,54 @@ export class GristClient {
   }
 
   async updateRecords(
-    documentId: string,
+    documentIdOrUrl: string,
     tableId: string,
     records: UpdateGristRecord[]
   ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records`,
       {
         method: "PATCH",
         body: JSON.stringify({ records })
       }
+    );
+  }
+
+  private normalizeDocumentId(value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      throw new Error("Grist document ID must not be empty.");
+    }
+
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    const url = new URL(trimmed);
+    if (url.origin !== this.baseOrigin) {
+      throw new Error(
+        "Grist document URL must use the same origin as GRIST_BASE_URL."
+      );
+    }
+
+    const segments = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+
+    const docIndex = segments.indexOf("doc");
+    if (docIndex >= 0 && segments[docIndex + 1]) {
+      return segments[docIndex + 1];
+    }
+
+    const orgIndex = segments.indexOf("o");
+    if (orgIndex >= 0 && segments[orgIndex + 2]) {
+      return segments[orgIndex + 2];
+    }
+
+    throw new Error(
+      "Could not extract a Grist document ID from the supplied URL."
     );
   }
 
