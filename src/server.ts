@@ -3,6 +3,7 @@ import { toNodeHandler } from "@modelcontextprotocol/node";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
+import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import {
   GristApiError,
@@ -59,7 +60,8 @@ function errorResult(error: unknown) {
 function buildServer(): McpServer {
   const grist = new GristClient({
     baseUrl: config.gristBaseUrl,
-    apiKey: config.gristApiKey
+    apiKey: config.gristApiKey,
+    allowedDocumentIds: config.allowedDocumentIds
   });
 
   const server = new McpServer({
@@ -194,7 +196,9 @@ function buildServer(): McpServer {
   return server;
 }
 
-const handler = createMcpHandler(() => buildServer());
+const handler = createMcpHandler(() => buildServer(), {
+  responseMode: "json"
+});
 const nodeHandler = toNodeHandler(handler);
 const app = createMcpExpressApp();
 
@@ -207,6 +211,19 @@ app.get("/healthz", (_req, res) => {
 });
 
 app.all("/mcp", (req, res) => {
+  if (
+    !isAuthorizedBearerHeader(
+      req.get("Authorization"),
+      config.mcpBearerToken
+    )
+  ) {
+    res.setHeader("WWW-Authenticate", "Bearer");
+    res.status(401).json({
+      error: "Unauthorized"
+    });
+    return;
+  }
+
   void nodeHandler(req, res, req.body);
 });
 
