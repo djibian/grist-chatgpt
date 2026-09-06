@@ -45,7 +45,8 @@ function mockFetch(
 function client(): GristClient {
   return new GristClient({
     baseUrl: "https://grist.example.org",
-    apiKey: "test-secret-never-sent"
+    apiKey: "test-secret-never-sent",
+    allowedDocumentIds: ["doc123", "aGUygEv64sRs"]
   });
 }
 
@@ -154,6 +155,20 @@ test("updateRecords accepts an empty successful Grist response", async () => {
       JSON.parse(String(mock.requests[0]?.init.body)),
       { records }
     );
+  } finally {
+    mock.restore();
+  }
+});
+
+
+test("requests for non-allowlisted documents are rejected before fetch", async () => {
+  const mock = mockFetch({ records: [] });
+  try {
+    await assert.rejects(
+      () => client().queryRecords("other-doc", "MCP_Test"),
+      /not allowed/
+    );
+    assert.equal(mock.requests.length, 0);
   } finally {
     mock.restore();
   }

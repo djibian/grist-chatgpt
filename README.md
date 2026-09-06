@@ -44,6 +44,7 @@ See:
 - [Architecture](docs/ARCHITECTURE.md)
 - [Security model](docs/SECURITY.md)
 - [OpenAI distribution study](docs/OPENAI-SUBMISSION.md)
+- [M2 protected remote demo](docs/M2-REMOTE-DEMO.md)
 
 ## Current MCP tools
 
@@ -66,7 +67,9 @@ npm install
 npm run dev
 ```
 
-Set `GRIST_BASE_URL` and, for local development only, `GRIST_API_KEY`.
+Set `GRIST_BASE_URL`, `GRIST_API_KEY`, `GRIST_ALLOWED_DOCUMENT_IDS` and `MCP_BEARER_TOKEN`.
+
+The Grist API key remains local. The bridge accepts requests only for allowlisted document IDs and requires the independent MCP bearer token on `/mcp`.
 
 The MCP endpoint is:
 
@@ -74,7 +77,7 @@ The MCP endpoint is:
 http://127.0.0.1:3000/mcp
 ```
 
-The server intentionally binds to localhost by default. Public deployment, OAuth and ChatGPT-specific metadata are separate milestones.
+The server intentionally binds to localhost. A temporary reverse tunnel may expose it for M2 testing; OAuth and stable public deployment remain separate milestones.
 
 ## Design principles
 

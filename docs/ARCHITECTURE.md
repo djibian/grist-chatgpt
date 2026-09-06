@@ -102,13 +102,16 @@ Therefore the bridge is useful specifically for Community deployments, but its p
 - added automated regression tests around validation and REST requests;
 - validation evidence: [M1-VALIDATION.md](M1-VALIDATION.md).
 
-### M2 — safe remote demo
+### M2 — safe remote demo — IN PROGRESS
 
-- HTTPS deployment;
-- synthetic demo data only;
-- no personal API key;
-- bearer/OAuth boundary suitable for external clients;
-- logging without record contents or credentials.
+- keep the Grist API key only on the local machine;
+- restrict the bridge to explicit synthetic document IDs;
+- protect `/mcp` with an independent inbound bearer token;
+- use JSON-only MCP responses for the simple tool surface;
+- expose localhost temporarily through an HTTPS reverse tunnel;
+- validate public read access only against synthetic data.
+
+See [M2-REMOTE-DEMO.md](M2-REMOTE-DEMO.md).
 
 ### M3 — provider alignment
 
