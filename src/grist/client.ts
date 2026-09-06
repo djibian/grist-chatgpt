@@ -9,6 +9,7 @@ export interface UpdateGristRecord extends NewGristRecord {
 interface GristClientOptions {
   baseUrl: string;
   apiKey: string;
+  allowedDocumentIds: readonly string[];
 }
 
 export class GristApiError extends Error {
@@ -26,15 +27,21 @@ export class GristClient {
   private readonly baseUrl: string;
   private readonly baseOrigin: string;
   private readonly apiKey: string;
+  private readonly allowedDocumentIds: ReadonlySet<string>;
 
   constructor(options: GristClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.baseOrigin = new URL(this.baseUrl).origin;
     this.apiKey = options.apiKey;
+    this.allowedDocumentIds = new Set(options.allowedDocumentIds);
+
+    if (this.allowedDocumentIds.size === 0) {
+      throw new Error("At least one allowed Grist document ID is required.");
+    }
   }
 
   async listTables(documentIdOrUrl: string): Promise<unknown> {
-    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    const documentId = this.resolveDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables`
     );
@@ -48,7 +55,7 @@ export class GristClient {
       limit?: number;
     } = {}
   ): Promise<unknown> {
-    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    const documentId = this.resolveDocumentId(documentIdOrUrl);
     const query = new URLSearchParams();
 
     if (options.filter) {
@@ -69,7 +76,7 @@ export class GristClient {
     tableId: string,
     records: NewGristRecord[]
   ): Promise<unknown> {
-    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    const documentId = this.resolveDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records`,
       {
@@ -84,7 +91,7 @@ export class GristClient {
     tableId: string,
     records: UpdateGristRecord[]
   ): Promise<unknown> {
-    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    const documentId = this.resolveDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records`,
       {
@@ -92,6 +99,18 @@ export class GristClient {
         body: JSON.stringify({ records })
       }
     );
+  }
+
+  private resolveDocumentId(value: string): string {
+    const documentId = this.normalizeDocumentId(value);
+
+    if (!this.allowedDocumentIds.has(documentId)) {
+      throw new Error(
+        `Grist document "${documentId}" is not allowed by this bridge.`
+      );
+    }
+
+    return documentId;
   }
 
   private normalizeDocumentId(value: string): string {
