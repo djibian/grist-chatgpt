@@ -198,7 +198,10 @@ function buildServer(): McpServer {
 
 const handler = createMcpHandler(() => buildServer());
 const nodeHandler = toNodeHandler(handler);
-const app = createMcpExpressApp();
+const app = createMcpExpressApp({
+  host: config.host,
+  allowedHosts: [...config.mcpAllowedHosts]
+});
 
 app.get("/healthz", (_req, res) => {
   res.json({
