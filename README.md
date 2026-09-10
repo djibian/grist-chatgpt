@@ -77,7 +77,9 @@ The MCP endpoint is:
 http://127.0.0.1:3000/mcp
 ```
 
-The server intentionally binds to localhost. An SSE-capable reverse tunnel may expose it for M2 testing; OAuth and stable public deployment remain separate milestones.
+The server intentionally binds to localhost. For a reverse-proxied public deployment, keep `HOST=127.0.0.1` and set `MCP_ALLOWED_HOSTS` to the comma-separated public hostname(s) accepted by the MCP HTTP endpoint, for example `MCP_ALLOWED_HOSTS=mcp.example.org`. Localhost hostnames remain allowed automatically. This preserves the SDK's DNS-rebinding protection while permitting the expected reverse-proxy `Host` header.
+
+An SSE-capable reverse proxy or tunnel may expose the localhost service; OAuth and stable public deployment remain separate milestones.
 
 ## Design principles
 
