@@ -3,6 +3,11 @@ import { toNodeHandler } from "@modelcontextprotocol/node";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
+import {
+  MAX_READ_RECORDS,
+  MAX_WRITE_RECORDS,
+  registerGptActionApi
+} from "./actions/api.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import {
@@ -12,10 +17,12 @@ import {
   type UpdateGristRecord
 } from "./grist/client.js";
 
-const MAX_READ_RECORDS = 200;
-const MAX_WRITE_RECORDS = 50;
-
 const config = loadConfig();
+const grist = new GristClient({
+  baseUrl: config.gristBaseUrl,
+  apiKey: config.gristApiKey,
+  allowedDocumentIds: config.allowedDocumentIds
+});
 
 function textResult(value: unknown) {
   return {
@@ -58,12 +65,6 @@ function errorResult(error: unknown) {
 }
 
 function buildServer(): McpServer {
-  const grist = new GristClient({
-    baseUrl: config.gristBaseUrl,
-    apiKey: config.gristApiKey,
-    allowedDocumentIds: config.allowedDocumentIds
-  });
-
   const server = new McpServer({
     name: "grist-chatgpt",
     version: "0.1.0"
@@ -211,6 +212,11 @@ app.get("/healthz", (_req, res) => {
   });
 });
 
+registerGptActionApi(app, {
+  token: config.gptActionToken,
+  grist
+});
+
 app.all("/mcp", (req, res) => {
   if (
     !isAuthorizedBearerHeader(
@@ -230,6 +236,6 @@ app.all("/mcp", (req, res) => {
 
 app.listen(config.port, config.host, () => {
   console.log(
-    `grist-chatgpt listening on http://${config.host}:${config.port}/mcp`
+    `grist-chatgpt listening on http://${config.host}:${config.port} (MCP /mcp, GPT Actions /api/v1)`
   );
 });
