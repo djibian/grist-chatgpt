@@ -3,6 +3,7 @@ export interface Config {
   gristApiKey: string;
   allowedDocumentIds: readonly string[];
   mcpBearerToken: string;
+  mcpAllowedHosts: readonly string[];
   host: string;
   port: number;
 }
@@ -51,6 +52,29 @@ function parseAllowedDocumentIds(value: string): string[] {
   return [...new Set(ids)];
 }
 
+function parseAllowedHosts(value: string | undefined): string[] {
+  const hosts = ["127.0.0.1", "localhost", "[::1]"];
+
+  if (value?.trim()) {
+    hosts.push(
+      ...value
+        .split(",")
+        .map((host) => host.trim())
+        .filter(Boolean)
+    );
+  }
+
+  for (const host of hosts) {
+    if (/^https?:\/\//i.test(host) || host.includes("/")) {
+      throw new Error(
+        "MCP_ALLOWED_HOSTS must contain hostnames only, not URLs or paths."
+      );
+    }
+  }
+
+  return [...new Set(hosts)];
+}
+
 export function loadConfig(): Config {
   const port = Number(process.env.PORT ?? "3000");
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -60,7 +84,7 @@ export function loadConfig(): Config {
   const host = process.env.HOST?.trim() || "127.0.0.1";
   if (host !== "127.0.0.1" && host !== "localhost") {
     throw new Error(
-      "The bridge intentionally binds only to localhost. Use a reverse tunnel for remote access."
+      "The bridge intentionally binds only to localhost. Use a reverse proxy for remote access."
     );
   }
 
@@ -76,6 +100,7 @@ export function loadConfig(): Config {
       required("GRIST_ALLOWED_DOCUMENT_IDS")
     ),
     mcpBearerToken,
+    mcpAllowedHosts: parseAllowedHosts(process.env.MCP_ALLOWED_HOSTS),
     host,
     port
   };
