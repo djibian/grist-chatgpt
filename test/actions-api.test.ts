@@ -154,3 +154,83 @@ test("query action forwards filters/default limit and rejects limits above 200",
     await stop(server);
   }
 });
+
+test("create and update actions forward bounded writes", async () => {
+  const observed: unknown[] = [];
+  const { baseUrl, server } = await startApi(
+    fakeGrist({
+      createRecords: async (documentId, tableId, records) => {
+        observed.push({ action: "create", documentId, tableId, records });
+        return { records: [{ id: 4 }] };
+      },
+      updateRecords: async (documentId, tableId, records) => {
+        observed.push({ action: "update", documentId, tableId, records });
+        return null;
+      }
+    })
+  );
+
+  const headers = {
+    Authorization: `Bearer ${TOKEN}`,
+    "Content-Type": "application/json"
+  };
+
+  try {
+    const create = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          records: [{ fields: { Nom: "Delta", Nombre: 4 } }]
+        })
+      }
+    );
+    assert.equal(create.status, 200);
+    assert.deepEqual(await create.json(), { records: [{ id: 4 }] });
+
+    const update = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          records: [{ id: 4, fields: { Statut: "Modifié" } }]
+        })
+      }
+    );
+    assert.equal(update.status, 200);
+    assert.equal(await update.text(), "null");
+
+    assert.deepEqual(observed, [
+      {
+        action: "create",
+        documentId: "doc-1",
+        tableId: "MCP_Test",
+        records: [{ fields: { Nom: "Delta", Nombre: 4 } }]
+      },
+      {
+        action: "update",
+        documentId: "doc-1",
+        tableId: "MCP_Test",
+        records: [{ id: 4, fields: { Statut: "Modifié" } }]
+      }
+    ]);
+
+    const tooMany = Array.from({ length: 51 }, (_, index) => ({
+      fields: { Index: index }
+    }));
+    const rejected = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ records: tooMany })
+      }
+    );
+    assert.equal(rejected.status, 400);
+    assert.equal(observed.length, 2);
+  } finally {
+    await stop(server);
+  }
+});
