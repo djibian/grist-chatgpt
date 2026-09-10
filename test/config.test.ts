@@ -27,6 +27,7 @@ const BASE_ENV = {
   GRIST_API_KEY: "test-key",
   GRIST_ALLOWED_DOCUMENT_IDS: "doc-1",
   MCP_BEARER_TOKEN: "0123456789abcdef0123456789abcdef",
+  GPT_ACTION_TOKEN: "abcdef0123456789abcdef0123456789",
   HOST: "127.0.0.1",
   PORT: "3000"
 };
@@ -60,6 +61,34 @@ test("rejects URLs in MCP_ALLOWED_HOSTS", () => {
       assert.throws(
         () => loadConfig(),
         /MCP_ALLOWED_HOSTS must contain hostnames only/
+      );
+    }
+  );
+});
+
+test("requires a strong independent GPT Actions token", () => {
+  withEnv(
+    {
+      ...BASE_ENV,
+      GPT_ACTION_TOKEN: "too-short"
+    },
+    () => {
+      assert.throws(
+        () => loadConfig(),
+        /GPT_ACTION_TOKEN must be at least 32 characters long/
+      );
+    }
+  );
+
+  withEnv(
+    {
+      ...BASE_ENV,
+      GPT_ACTION_TOKEN: BASE_ENV.MCP_BEARER_TOKEN
+    },
+    () => {
+      assert.throws(
+        () => loadConfig(),
+        /GPT_ACTION_TOKEN must differ from MCP_BEARER_TOKEN/
       );
     }
   );
