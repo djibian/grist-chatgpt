@@ -3,6 +3,7 @@ export interface Config {
   gristApiKey: string;
   allowedDocumentIds: readonly string[];
   mcpBearerToken: string;
+  gptActionToken: string;
   mcpAllowedHosts: readonly string[];
   host: string;
   port: number;
@@ -75,6 +76,14 @@ function parseAllowedHosts(value: string | undefined): string[] {
   return [...new Set(hosts)];
 }
 
+function requiredToken(name: string): string {
+  const token = required(name);
+  if (token.length < 32) {
+    throw new Error(`${name} must be at least 32 characters long.`);
+  }
+  return token;
+}
+
 export function loadConfig(): Config {
   const port = Number(process.env.PORT ?? "3000");
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -88,9 +97,10 @@ export function loadConfig(): Config {
     );
   }
 
-  const mcpBearerToken = required("MCP_BEARER_TOKEN");
-  if (mcpBearerToken.length < 32) {
-    throw new Error("MCP_BEARER_TOKEN must be at least 32 characters long.");
+  const mcpBearerToken = requiredToken("MCP_BEARER_TOKEN");
+  const gptActionToken = requiredToken("GPT_ACTION_TOKEN");
+  if (gptActionToken === mcpBearerToken) {
+    throw new Error("GPT_ACTION_TOKEN must differ from MCP_BEARER_TOKEN.");
   }
 
   return {
@@ -100,6 +110,7 @@ export function loadConfig(): Config {
       required("GRIST_ALLOWED_DOCUMENT_IDS")
     ),
     mcpBearerToken,
+    gptActionToken,
     mcpAllowedHosts: parseAllowedHosts(process.env.MCP_ALLOWED_HOSTS),
     host,
     port
