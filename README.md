@@ -9,7 +9,13 @@ Experimental open-source bridge for using Grist data and actions from MCP-compat
 
 **M1 validated on 2026-09-06 against Grist Community DINUM:** table discovery, record reads, record creation and record updates all succeeded end to end using synthetic data.
 
-See [M1 validation evidence](docs/M1-VALIDATION.md).
+**M3 public deployment validated on 2026-09-10:** a public HTTPS MCP endpoint behind Caddy successfully authenticated an MCP client and read the synthetic DINUM Grist document end to end over SSE while the Node.js service remained bound to localhost.
+
+See:
+
+- [M1 validation evidence](docs/M1-VALIDATION.md)
+- [M2 protected remote demo](docs/M2-REMOTE-DEMO.md)
+- [M3 public VPS deployment](docs/M3-PUBLIC-DEPLOYMENT.md)
 
 ## Goal
 
@@ -45,6 +51,7 @@ See:
 - [Security model](docs/SECURITY.md)
 - [OpenAI distribution study](docs/OPENAI-SUBMISSION.md)
 - [M2 protected remote demo](docs/M2-REMOTE-DEMO.md)
+- [M3 public VPS deployment](docs/M3-PUBLIC-DEPLOYMENT.md)
 
 ## Current MCP tools
 
@@ -79,7 +86,7 @@ http://127.0.0.1:3000/mcp
 
 The server intentionally binds to localhost. For a reverse-proxied public deployment, keep `HOST=127.0.0.1` and set `MCP_ALLOWED_HOSTS` to the comma-separated public hostname(s) accepted by the MCP HTTP endpoint, for example `MCP_ALLOWED_HOSTS=mcp.example.org`. Localhost hostnames remain allowed automatically. This preserves the SDK's DNS-rebinding protection while permitting the expected reverse-proxy `Host` header.
 
-An SSE-capable reverse proxy or tunnel may expose the localhost service; OAuth and stable public deployment remain separate milestones.
+An SSE-capable reverse proxy or tunnel may expose the localhost service. The current public VPS deployment is documented separately; OAuth remains the next authentication milestone for ChatGPT integration.
 
 ## Design principles
 
