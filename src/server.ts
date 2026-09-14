@@ -8,8 +8,9 @@ import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { AccessPolicy } from "./grist/accessPolicy.js";
 import { GristApiError, GristClient } from "./grist/client.js";
-import { GristService } from "./grist/service.js";
+import { GristService, PartialBatchError } from "./grist/service.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
+import { VERSION } from "./version.js";
 
 const config = loadConfig();
 const client = new GristClient({
@@ -39,6 +40,25 @@ function textResult(value: unknown) {
 }
 
 function errorResult(error: unknown) {
+  if (error instanceof PartialBatchError) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            error: "Partial Grist operation",
+            operation: error.operation,
+            completedBatches: error.completedBatches,
+            completedItems: error.completedItems,
+            failedBatch: error.failedBatch,
+            retryWholeOperation: false
+          })
+        }
+      ]
+    };
+  }
+
   if (error instanceof GristApiError) {
     return {
       isError: true,
@@ -79,7 +99,7 @@ function boundedArray<T extends z.ZodType>(schema: T, max: number) {
 function buildServer(): McpServer {
   const server = new McpServer({
     name: "grist-chatgpt",
-    version: "0.4.0"
+    version: VERSION
   });
 
   server.registerTool(
@@ -173,7 +193,7 @@ function buildServer(): McpServer {
     "create_records",
     {
       description:
-        "Create records in one allowed Grist table. Large requests are split into internal batches.",
+        "Create records in one allowed Grist table. Large requests are split into internal batches and partial failures are reported explicitly; do not retry the whole operation blindly after partial success.",
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
@@ -202,7 +222,7 @@ function buildServer(): McpServer {
     "update_records",
     {
       description:
-        "Update existing records in one allowed Grist table by numeric record ID. Large requests are split into internal batches.",
+        "Update existing records in one allowed Grist table by numeric record ID. Large requests are split into internal batches and partial failures are reported explicitly.",
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
@@ -227,7 +247,7 @@ function buildServer(): McpServer {
     "delete_records",
     {
       description:
-        "Delete only explicitly identified Grist records by numeric record ID. First identify and present the target rows to the user before invoking this destructive action.",
+        "Delete only explicitly identified Grist records by numeric record ID. First identify and present the target rows to the user before invoking this destructive action. Partial batch failures are reported explicitly.",
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
@@ -269,7 +289,7 @@ app.get("/healthz", (_req, res) => {
   res.json({
     status: "ok",
     service: "grist-chatgpt",
-    version: "0.4.0"
+    version: VERSION
   });
 });
 
