@@ -135,6 +135,21 @@ export class GristClient {
     );
   }
 
+  async deleteRecords(
+    documentIdOrUrl: string,
+    tableId: string,
+    recordIds: number[]
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(
+      `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records/delete`,
+      {
+        method: "POST",
+        body: JSON.stringify(recordIds)
+      }
+    );
+  }
+
   normalizeDocumentId(value: string): string {
     const trimmed = value.trim();
     if (!trimmed) {
