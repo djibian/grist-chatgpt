@@ -1,6 +1,10 @@
 import { AccessPolicy } from "./accessPolicy.js";
 import {
   GristClient,
+  type GristColumnSpec,
+  type GristColumnUpdate,
+  type GristTableSpec,
+  type GristTableUpdate,
   type NewGristRecord,
   type UpdateGristRecord
 } from "./client.js";
@@ -9,6 +13,7 @@ export interface GristServiceOptions {
   maxReadRecords: number;
   maxWriteRecords: number;
   writeBatchRecords: number;
+  maxSchemaItems: number;
 }
 
 export interface QueryRecordsOptions {
@@ -54,6 +59,10 @@ export class GristService {
     return this.options.writeBatchRecords;
   }
 
+  get maxSchemaItems(): number {
+    return this.options.maxSchemaItems;
+  }
+
   async listDocuments(): Promise<unknown> {
     return {
       documents: (await this.accessPolicy.listAllowedDocuments()).map(
@@ -80,6 +89,112 @@ export class GristService {
   ): Promise<unknown> {
     const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
     return this.client.listTables(documentId, options);
+  }
+
+  async createTables(
+    documentIdOrUrl: string,
+    tables: GristTableSpec[]
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertSchemaCount(tables.length);
+    this.assertUniqueStrings(tables.map((table) => table.id), "Table IDs");
+    for (const table of tables) {
+      this.assertIdentifier(table.id, "Table ID");
+      if (table.columns) {
+        this.assertSchemaCount(table.columns.length);
+        this.assertUniqueStrings(table.columns.map((column) => column.id), "Column IDs");
+      }
+    }
+    return this.client.createTables(documentId, tables);
+  }
+
+  async updateTables(
+    documentIdOrUrl: string,
+    tables: GristTableUpdate[]
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertSchemaCount(tables.length);
+    this.assertUniqueStrings(tables.map((table) => table.id), "Table IDs");
+    for (const table of tables) this.assertIdentifier(table.id, "Table ID");
+    return this.client.updateTables(documentId, tables);
+  }
+
+  async deleteTable(documentIdOrUrl: string, tableId: string): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertIdentifier(tableId, "Table ID");
+    return this.client.applyUserActions(documentId, [["RemoveTable", tableId]]);
+  }
+
+  async listColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    options: { hidden?: boolean } = {}
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertIdentifier(tableId, "Table ID");
+    return this.client.listColumns(documentId, tableId, options);
+  }
+
+  async createColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    columns: GristColumnSpec[]
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertIdentifier(tableId, "Table ID");
+    this.assertSchemaCount(columns.length);
+    this.assertUniqueStrings(columns.map((column) => column.id), "Column IDs");
+    for (const column of columns) this.assertIdentifier(column.id, "Column ID");
+    return this.client.createColumns(documentId, tableId, columns);
+  }
+
+  async updateColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    columns: GristColumnUpdate[]
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertIdentifier(tableId, "Table ID");
+    this.assertSchemaCount(columns.length);
+    this.assertUniqueStrings(columns.map((column) => column.id), "Column IDs");
+    for (const column of columns) this.assertIdentifier(column.id, "Column ID");
+    return this.client.updateColumns(documentId, tableId, columns);
+  }
+
+  async renameColumn(
+    documentIdOrUrl: string,
+    tableId: string,
+    oldColumnId: string,
+    newColumnId: string
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertIdentifier(tableId, "Table ID");
+    this.assertIdentifier(oldColumnId, "Old column ID");
+    this.assertIdentifier(newColumnId, "New column ID");
+    if (oldColumnId === newColumnId) {
+      throw new Error("New column ID must differ from the current column ID.");
+    }
+    return this.client.applyUserActions(documentId, [
+      ["RenameColumn", tableId, oldColumnId, newColumnId]
+    ]);
+  }
+
+  async deleteColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    columnIds: string[]
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertIdentifier(tableId, "Table ID");
+    this.assertSchemaCount(columnIds.length);
+    this.assertUniqueStrings(columnIds, "Column IDs");
+    for (const columnId of columnIds) this.assertIdentifier(columnId, "Column ID");
+
+    const results: unknown[] = [];
+    for (const columnId of columnIds) {
+      results.push(await this.client.deleteColumn(documentId, tableId, columnId));
+    }
+    return batchedResult(results);
   }
 
   async queryRecords(
@@ -167,6 +282,27 @@ export class GristService {
       throw new Error(
         `Write count ${count} exceeds configured maximum ${this.options.maxWriteRecords}.`
       );
+    }
+  }
+
+  private assertSchemaCount(count: number): void {
+    if (count < 1) {
+      throw new Error("At least one schema item is required.");
+    }
+    if (this.options.maxSchemaItems > 0 && count > this.options.maxSchemaItems) {
+      throw new Error(
+        `Schema item count ${count} exceeds configured maximum ${this.options.maxSchemaItems}.`
+      );
+    }
+  }
+
+  private assertIdentifier(value: string, label: string): void {
+    if (!value.trim()) throw new Error(`${label} must not be empty.`);
+  }
+
+  private assertUniqueStrings(values: string[], label: string): void {
+    if (new Set(values).size !== values.length) {
+      throw new Error(`${label} must be unique.`);
     }
   }
 
