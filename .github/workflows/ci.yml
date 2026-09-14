@@ -16,12 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install
-      - uses: actions/upload-artifact@v4
-        with:
-          name: generated-package-lock
-          path: package-lock.json
-          if-no-files-found: error
+      - run: npm ci
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run check
       - run: npm test
