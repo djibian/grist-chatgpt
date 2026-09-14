@@ -26,6 +26,9 @@ const BASE_ENV = {
   GRIST_BASE_URL: "https://grist.example.org",
   GRIST_API_KEY: "test-key",
   GRIST_ALLOWED_DOCUMENT_IDS: "doc-1",
+  GRIST_ALLOWED_WORKSPACE_IDS: undefined,
+  GRIST_MAX_READ_RECORDS: undefined,
+  GRIST_MAX_WRITE_RECORDS: undefined,
   MCP_BEARER_TOKEN: "0123456789abcdef0123456789abcdef",
   GPT_ACTION_TOKEN: "abcdef0123456789abcdef0123456789",
   HOST: "127.0.0.1",
@@ -90,6 +93,50 @@ test("requires a strong independent GPT Actions token", () => {
         () => loadConfig(),
         /GPT_ACTION_TOKEN must differ from MCP_BEARER_TOKEN/
       );
+    }
+  );
+});
+
+test("accepts document and/or workspace access scopes", () => {
+  withEnv(
+    {
+      ...BASE_ENV,
+      GRIST_ALLOWED_DOCUMENT_IDS: undefined,
+      GRIST_ALLOWED_WORKSPACE_IDS: "42, 77"
+    },
+    () => {
+      const config = loadConfig();
+      assert.deepEqual(config.allowedDocumentIds, []);
+      assert.deepEqual(config.allowedWorkspaceIds, ["42", "77"]);
+    }
+  );
+
+  withEnv(
+    {
+      ...BASE_ENV,
+      GRIST_ALLOWED_DOCUMENT_IDS: undefined,
+      GRIST_ALLOWED_WORKSPACE_IDS: undefined
+    },
+    () => {
+      assert.throws(
+        () => loadConfig(),
+        /Configure at least one GRIST_ALLOWED_DOCUMENT_IDS or GRIST_ALLOWED_WORKSPACE_IDS/
+      );
+    }
+  );
+});
+
+test("loads configurable record guardrails and supports zero as unlimited", () => {
+  withEnv(
+    {
+      ...BASE_ENV,
+      GRIST_MAX_READ_RECORDS: "12000",
+      GRIST_MAX_WRITE_RECORDS: "0"
+    },
+    () => {
+      const config = loadConfig();
+      assert.equal(config.maxReadRecords, 12000);
+      assert.equal(config.maxWriteRecords, 0);
     }
   );
 });
