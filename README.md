@@ -143,7 +143,7 @@ npm test
 npm run build
 ```
 
-Direct dependency versions are pinned in `package.json`. A generated npm lockfile should be committed when the repository is next installed in an environment with registry access; until then CI continues to use `npm install`.
+A generated npm lockfile is not committed yet, so CI currently resolves the declared dependency ranges with `npm install`. A real `package-lock.json` should be generated and committed from a registry-connected environment rather than fabricated manually.
 
 ## Design principles
 
