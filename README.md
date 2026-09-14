@@ -1,17 +1,16 @@
 # grist-chatgpt
 
-Experimental open-source bridge for using Grist data and actions from conversational clients, with ChatGPT compatibility as the target.
+Experimental open-source bridge for using Grist data and document structure from conversational clients, with ChatGPT compatibility as the target.
 
 > [!IMPORTANT]
 > This repository is an independent prototype. It is not an official Grist Labs, DINUM / La Suite numérique, or OpenAI integration.
 
 ## Status
 
-**M1 validated on 2026-09-06 against Grist Community DINUM:** table discovery, record reads, record creation and record updates all succeeded end to end using synthetic data.
-
-**M3 public deployment validated on 2026-09-10:** a public HTTPS MCP endpoint behind Caddy successfully authenticated an MCP client and read the synthetic DINUM Grist document end to end over SSE while the Node.js service remained bound to localhost.
-
-**GPT Actions compatibility validated on ChatGPT Plus on 2026-09-10:** a custom GPT successfully called the public `/healthz` endpoint. The bridge now exposes an authenticated REST/OpenAPI façade over the same bounded Grist operations for direct GPT Actions use.
+- **M1 validated 2026-09-06:** Grist Community DINUM read/create/update proof of concept.
+- **Public MCP validated 2026-09-10:** HTTPS → Caddy → MCP → Grist DINUM.
+- **ChatGPT Plus GPT Actions validated 2026-09-10:** a custom GPT can read and write Grist through the public bridge without receiving the Grist API key.
+- **Realistic bridge expansion:** configurable document/workspace scope, configurable data guardrails, explicit deletion, bulk batching, and schema management for tables/columns.
 
 See:
 
@@ -19,17 +18,24 @@ See:
 - [M2 protected remote demo](docs/M2-REMOTE-DEMO.md)
 - [M3 public VPS deployment](docs/M3-PUBLIC-DEPLOYMENT.md)
 - [GPT Actions REST interface](docs/GPT-ACTIONS.md)
+- [Security model](docs/SECURITY.md)
 
 ## Goal
 
-Provide narrow, auditable access to the Grist REST API so a conversational assistant can:
+Allow a conversational assistant to perform realistic Grist work on explicitly selected documents while preserving Grist as the data and permission authority.
 
-- inspect a document's tables;
-- read and filter records;
-- create records;
-- update records.
+Current capabilities include:
 
-The first version deliberately excludes deletion, arbitrary HTTP calls, SQL execution, schema mutation, and unrestricted administration.
+- discover allowed documents/workspaces;
+- list tables and columns;
+- read/filter/sort records;
+- create/update/delete records;
+- create/update/delete tables;
+- create/update/rename/delete columns;
+- set Grist column metadata such as types, formulas and `widgetOptions`;
+- configure guardrails for read/write/schema operation sizes.
+
+The bridge deliberately does **not** expose arbitrary HTTP, raw SQL, raw Grist `/apply`, or unrestricted Grist administration.
 
 ## Architecture
 
@@ -44,39 +50,49 @@ grist-chatgpt bridge
    +--------+--------+
             |
             v
-      shared GristClient
+       AccessPolicy
+            |
+            v
+       GristService
+            |
+            v
+       GristClient
             |
             v
        Grist REST API
 ```
 
-The Grist API key is stored only in the bridge environment and is never supplied to ChatGPT or MCP tool inputs. The bridge accepts only explicitly allowlisted Grist document IDs.
+The Grist API key stays server-side. ChatGPT can target only documents explicitly selected by `GRIST_ALLOWED_DOCUMENT_IDS` and/or workspaces selected by `GRIST_ALLOWED_WORKSPACE_IDS`. Grist permissions remain an additional upstream boundary.
 
-## Current MCP tools
+## Main capabilities
 
-| Tool | Access | Purpose |
+### Data
+
+| Capability | GPT Actions | MCP |
 | --- | --- | --- |
-| `list_tables` | read | List tables in one Grist document |
-| `query_records` | read | Read/filter a bounded set of records |
-| `create_records` | write | Add a bounded set of records |
-| `update_records` | write | Modify a bounded set of existing records |
+| list allowed documents | `listGristDocuments` | `list_documents` |
+| list tables | `listGristTables` | `list_tables` |
+| query/filter/sort records | `queryGristRecords` | `query_records` |
+| create records | `createGristRecords` | `create_records` |
+| update records | `updateGristRecords` | `update_records` |
+| delete explicit record IDs | `deleteGristRecords` | `delete_records` |
 
-## GPT Actions REST API
+### Schema
 
-The same four capabilities are exposed for custom GPT Actions:
-
-| Operation ID | Method/path | Access |
+| Capability | GPT Actions | MCP |
 | --- | --- | --- |
-| `listGristTables` | `GET /api/v1/documents/{documentId}/tables` | read |
-| `queryGristRecords` | `POST /api/v1/documents/{documentId}/tables/{tableId}/query` | read |
-| `createGristRecords` | `POST /api/v1/documents/{documentId}/tables/{tableId}/records` | write |
-| `updateGristRecords` | `PATCH /api/v1/documents/{documentId}/tables/{tableId}/records` | write |
+| list columns | `listGristColumns` | `list_columns` |
+| create tables | `createGristTables` | `create_tables` |
+| update/rename tables | `updateGristTables` | `update_tables` |
+| delete explicit table | `deleteGristTable` | `delete_table` |
+| create columns | `createGristColumns` | `create_columns` |
+| update metadata/formulas/types | `updateGristColumns` | `update_columns` |
+| rename column ID | `renameGristColumn` | `rename_column` |
+| delete explicit columns | `deleteGristColumns` | `delete_columns` |
 
-`GET /openapi.json` serves the OpenAPI 3.1 schema used by GPT Actions. The REST API requires a dedicated `GPT_ACTION_TOKEN` bearer token distinct from the MCP token. Read calls are marked non-consequential in the OpenAPI schema; create/update calls are marked consequential.
+`deleteGristTable` and `renameGristColumn` use Grist's low-level `/apply` endpoint internally, but the bridge constructs only the fixed `RemoveTable` or `RenameColumn` action. Raw `/apply` is never model-accessible.
 
-No delete operation is exposed.
-
-## Local development
+## Configuration
 
 Requirements: Node.js 22+.
 
@@ -86,48 +102,45 @@ npm install
 npm run dev
 ```
 
-Set:
+Important variables:
 
 - `GRIST_BASE_URL`
 - `GRIST_API_KEY`
-- `GRIST_ALLOWED_DOCUMENT_IDS`
+- `GRIST_ALLOWED_DOCUMENT_IDS` and/or `GRIST_ALLOWED_WORKSPACE_IDS`
+- `GRIST_MAX_READ_RECORDS` (default `5000`, `0` = unlimited bridge-side)
+- `GRIST_MAX_WRITE_RECORDS` (default `500`, `0` = unlimited bridge-side)
+- `GRIST_WRITE_BATCH_RECORDS` (default `200`)
+- `GRIST_MAX_SCHEMA_ITEMS` (default `100`, `0` = unlimited bridge-side)
 - `MCP_BEARER_TOKEN`
 - `GPT_ACTION_TOKEN`
 
-Both bridge-facing bearer tokens must be at least 32 characters and must be different.
+The MCP and GPT Actions bearer tokens must each be at least 32 characters and must differ.
 
-The MCP endpoint is:
-
-```text
-http://127.0.0.1:3000/mcp
-```
-
-The GPT Actions API starts under:
+Endpoints:
 
 ```text
-http://127.0.0.1:3000/api/v1
+/mcp          MCP
+/api/v1       GPT Actions REST
+/openapi.json GPT Actions OpenAPI 3.1 schema
+/healthz      health check
 ```
 
-The server intentionally binds to localhost. For a reverse-proxied public deployment, keep `HOST=127.0.0.1` and set `MCP_ALLOWED_HOSTS` to the comma-separated public hostname(s), for example `MCP_ALLOWED_HOSTS=mcp.example.org`. Localhost hostnames remain allowed automatically.
+The Node service intentionally binds to localhost. Use a reverse proxy for public HTTPS deployment and configure `MCP_ALLOWED_HOSTS` for the public MCP hostname.
 
 ## Design principles
 
-1. **Least privilege first** — expose only actions needed for the use case.
-2. **One Grist core** — MCP and GPT Actions share the same `GristClient` implementation.
-3. **No arbitrary HTTP proxy** — operations map to explicit Grist actions.
-4. **Writes are explicit** — read and write operations are separated and annotated.
-5. **Bounded operations** — reads are capped at 200 records and writes at 50 records per call.
-6. **No secrets in prompts or repository** — credentials stay outside model-visible inputs.
-7. **Upstream compatibility** — preserve MCP as the future publication path while supporting GPT Actions today.
+1. **Grist remains authoritative** — bridge scope and Grist permissions both apply.
+2. **One business layer** — MCP and GPT Actions share `AccessPolicy`, `GristService` and `GristClient`.
+3. **Powerful but explicit operations** — destructive targets are exact record/table/column IDs.
+4. **Configurable guardrails** — fixed prototype limits are replaced with deployment policy.
+5. **No generic escape hatches** — no arbitrary HTTP, SQL or raw `/apply` tool.
+6. **Secrets remain server-side** — Grist credentials never enter model-visible inputs.
 
 ## Authoritative references
 
 - Grist REST API: https://support.getgrist.com/api/
 - Grist REST API usage: https://support.getgrist.com/rest-api/
-- Grist OAuth apps: https://support.getgrist.com/oauth-apps/
-- Grist MCP server: https://support.getgrist.com/mcp/
 - OpenAI GPT Actions: https://help.openai.com/en/articles/9442513
-- OpenAI Apps SDK overview: https://help.openai.com/en/articles/12515353-build-with-the-apps-sdk
 
 ## License
 
