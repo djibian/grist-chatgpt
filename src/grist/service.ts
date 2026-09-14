@@ -8,6 +8,7 @@ import {
 export interface GristServiceOptions {
   maxReadRecords: number;
   maxWriteRecords: number;
+  writeBatchRecords: number;
 }
 
 export interface QueryRecordsOptions {
@@ -16,6 +17,22 @@ export interface QueryRecordsOptions {
   limit?: number;
   hidden?: boolean;
   cellFormat?: "normal" | "typed";
+}
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function batchedResult(results: unknown[]): unknown {
+  if (results.length === 1) return results[0];
+  return {
+    batches: results.length,
+    results
+  };
 }
 
 export class GristService {
@@ -31,6 +48,10 @@ export class GristService {
 
   get maxWriteRecords(): number {
     return this.options.maxWriteRecords;
+  }
+
+  get writeBatchRecords(): number {
+    return this.options.writeBatchRecords;
   }
 
   async listDocuments(): Promise<unknown> {
@@ -86,7 +107,11 @@ export class GristService {
   ): Promise<unknown> {
     const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
     this.assertWriteCount(records.length);
-    return this.client.createRecords(documentId, tableId, records);
+    const results: unknown[] = [];
+    for (const batch of chunk(records, this.options.writeBatchRecords)) {
+      results.push(await this.client.createRecords(documentId, tableId, batch));
+    }
+    return batchedResult(results);
   }
 
   async updateRecords(
@@ -96,7 +121,26 @@ export class GristService {
   ): Promise<unknown> {
     const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
     this.assertWriteCount(records.length);
-    return this.client.updateRecords(documentId, tableId, records);
+    const results: unknown[] = [];
+    for (const batch of chunk(records, this.options.writeBatchRecords)) {
+      results.push(await this.client.updateRecords(documentId, tableId, batch));
+    }
+    return batchedResult(results);
+  }
+
+  async deleteRecords(
+    documentIdOrUrl: string,
+    tableId: string,
+    recordIds: number[]
+  ): Promise<unknown> {
+    const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
+    this.assertRecordIds(recordIds);
+    this.assertWriteCount(recordIds.length);
+    const results: unknown[] = [];
+    for (const batch of chunk(recordIds, this.options.writeBatchRecords)) {
+      results.push(await this.client.deleteRecords(documentId, tableId, batch));
+    }
+    return batchedResult(results);
   }
 
   private defaultReadLimit(): number {
@@ -123,6 +167,15 @@ export class GristService {
       throw new Error(
         `Write count ${count} exceeds configured maximum ${this.options.maxWriteRecords}.`
       );
+    }
+  }
+
+  private assertRecordIds(recordIds: number[]): void {
+    if (recordIds.some((id) => !Number.isInteger(id) || id < 1)) {
+      throw new Error("Record IDs must be positive integers.");
+    }
+    if (new Set(recordIds).size !== recordIds.length) {
+      throw new Error("Record IDs must be unique.");
     }
   }
 }
