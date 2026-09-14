@@ -1,17 +1,14 @@
 # M2 — Protected remote demo
 
-## Objective
+> **Historical snapshot.** This document records the temporary-tunnel milestone that preceded the public VPS deployment. It is retained as validation evidence, not as current deployment guidance. See `README.md`, `docs/ARCHITECTURE.md` and `docs/M3-PUBLIC-DEPLOYMENT.md` for the current architecture and later deployment state.
 
-Expose the local MCP bridge through a temporary public HTTPS URL without:
+## Objective at the time
 
-- opening an inbound router port;
-- publishing the Grist API key;
-- allowing the bridge to access arbitrary Grist documents;
-- degrading MCP transport semantics to fit the public tunnel.
+Expose the local MCP bridge through a temporary public HTTPS URL without opening an inbound router port, publishing the Grist API key, allowing arbitrary document access, or degrading MCP transport semantics.
 
-M2 is a development/demo milestone, not a production deployment.
+M2 was a development/demo milestone, not a production deployment.
 
-## Architecture
+## Architecture validated at that milestone
 
 ```text
 remote MCP client
@@ -34,114 +31,34 @@ Grist REST client
 Grist Community DINUM
 ```
 
-## Security boundaries
+## Security boundaries validated
 
-### Grist credential
+- `GRIST_API_KEY` remained local to the bridge process;
+- `/mcp` required `Authorization: Bearer <MCP_BEARER_TOKEN>`;
+- the bearer token was compared in constant time;
+- `/healthz` remained unauthenticated and exposed no Grist data or credentials;
+- only explicitly allowlisted synthetic documents were reachable;
+- the Node service remained bound to loopback.
 
-`GRIST_API_KEY` remains in the local `.env` file only.
+At this milestone the resource policy was document-only. v0.4.0 later generalized it to explicit document IDs and/or workspace IDs.
 
-The tunnel process does not need the Grist API key.
+## Transport validation
 
-### Inbound MCP authentication
+The bridge preserved the MCP SDK's normal HTTP/SSE behavior. The temporary tunnel therefore had to forward streamed HTTP/SSE without rewriting it.
 
-Every request to `/mcp` must provide:
-
-```http
-Authorization: Bearer <MCP_BEARER_TOKEN>
-```
-
-The token is compared in constant time.
-
-`/healthz` remains unauthenticated and reveals no Grist data or credentials.
-
-### Document allowlist
-
-`GRIST_ALLOWED_DOCUMENT_IDS` is a comma-separated list of document IDs.
-
-Every Grist tool resolves the requested document ID and rejects the request before any Grist HTTP call unless the document is on that allowlist.
-
-For the current demo the allowlist should contain only the synthetic test document.
-
-### Local binding
-
-The bridge still binds only to `127.0.0.1` / `localhost`.
-
-Remote access must therefore pass through an explicit reverse tunnel.
-
-## Response transport
-
-The bridge keeps the MCP SDK's standard HTTP behavior. In current compatibility mode, simple tool calls may be returned as Server-Sent Events (SSE), as observed during the local M2 validation.
-
-The tunnel used for M2 must therefore forward normal HTTP streaming/SSE without buffering or rewriting it.
-
-## Environment
-
-Example:
-
-```text
-GRIST_BASE_URL=https://grist.numerique.gouv.fr
-GRIST_API_KEY=<local secret>
-GRIST_ALLOWED_DOCUMENT_IDS=aGUygEv64sRs
-MCP_BEARER_TOKEN=<random local secret, at least 32 characters>
-PORT=3000
-HOST=127.0.0.1
-```
-
-Generate the inbound demo token locally, for example:
-
-```bash
-openssl rand -hex 32
-```
-
-Never commit either secret.
-
-## Temporary HTTPS tunnel
-
-For M2 development, use an ngrok HTTP endpoint:
-
-```bash
-ngrok http 3000
-```
-
-ngrok forwards HTTPS traffic to the local HTTP service and supports streamed HTTP/SSE traffic. A free account provides a development domain suitable for this proof.
-
-The ngrok agent needs only its own local authtoken. It does not receive the Grist API key or the inbound MCP bearer token.
-
-This endpoint is a development/demo ingress, not the M3/M4 production hosting solution.
-
-## Remote verification
-
-Given:
-
-```text
-PUBLIC_URL=https://example.trycloudflare.com
-MCP_BEARER_TOKEN=<local secret>
-```
-
-A remote MCP request must include the inbound bearer token.
-
-Requests with no token, a wrong token or a non-allowlisted document must fail.
-
-A request with the correct token and the synthetic document ID must succeed.
+An ngrok development endpoint was used for this proof. It was never intended as the stable hosting model.
 
 ## Exit criteria
 
-M2 is validated when all of the following have been demonstrated:
+M2 was considered validated when:
 
-1. local MCP calls require the inbound bearer token;
-2. a non-allowlisted Grist document is rejected before an outbound Grist request;
-3. the public HTTPS tunnel reaches `/healthz`;
-4. an unauthenticated public `/mcp` request returns HTTP 401;
-5. an authenticated public MCP read reaches the synthetic DINUM document over its normal MCP response transport;
-6. no Grist or MCP secret is committed or supplied to the tunnel provider.
+1. local MCP calls required the bearer token;
+2. a non-allowlisted document was rejected before an outbound Grist request;
+3. the public tunnel reached `/healthz`;
+4. unauthenticated public `/mcp` returned HTTP 401;
+5. an authenticated public MCP read reached the synthetic DINUM document;
+6. no Grist or MCP secret was committed or supplied to the tunnel provider.
 
 ## Not solved by M2
 
-- OAuth;
-- per-user Grist identity;
-- public app submission;
-- stable production hosting;
-- service-account isolation;
-- audit logging and rate limiting.
-
-Those remain later milestones.
+M2 did not solve per-user institutional identity, stable production hosting, public plugin distribution, service-account isolation, or institutional audit policy. Later milestones replaced the tunnel with the public VPS deployment and substantially expanded the bridge capabilities.

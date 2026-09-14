@@ -51,6 +51,8 @@ GET /openapi.json
 
 A deployed bridge may be imported directly by URL, e.g. `https://bridge.example.org/openapi.json`. Re-import or refresh this schema in the custom GPT after bridge upgrades that add operations.
 
+The OpenAPI version advertised by the bridge is shared with the MCP and health-check runtime version.
+
 ## Document scope
 
 ChatGPT does not automatically inherit every document accessible to the Grist API key. The bridge adds its own resource boundary:
@@ -71,6 +73,8 @@ At least one scope entry is required. `listGristDocuments` returns only document
 
 Read size is controlled by `GRIST_MAX_READ_RECORDS`. Write size is controlled by `GRIST_MAX_WRITE_RECORDS`; large writes are internally split according to `GRIST_WRITE_BATCH_RECORDS`.
 
+Internal batches are **not atomic as a group**. If a later batch fails after previous batches succeeded, the API returns an explicit partial-operation error with the operation name, completed batch count, completed item count and failed batch number. A client must reconcile the already-applied items and must not retry the complete operation blindly.
+
 There is intentionally no pagination abstraction over Grist. Reads use Grist's native filter/sort/limit model.
 
 ## Schema operations
@@ -84,7 +88,9 @@ There is intentionally no pagination abstraction over Grist. Reads use Grist's n
 - `renameGristColumn` — rename one column ID.
 - `deleteGristColumns` — delete exact column IDs.
 
-Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`.
+Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`. It is a total per-operation guardrail. For `createGristTables`, each table and each nested initial column counts toward the same maximum.
+
+Column deletion is sequential and may therefore also report a partial operation if a later column deletion fails.
 
 `widgetOptions` must be supplied in the JSON-string representation expected by Grist.
 

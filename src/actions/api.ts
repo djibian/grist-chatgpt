@@ -3,7 +3,8 @@ import * as z from "zod/v4";
 
 import { isAuthorizedBearerHeader } from "../auth/staticBearer.js";
 import { GristApiError } from "../grist/client.js";
-import type { GristService } from "../grist/service.js";
+import { PartialBatchError, type GristService } from "../grist/service.js";
+import { VERSION } from "../version.js";
 import {
   buildSchemaOpenApiPaths,
   registerSchemaActionApi,
@@ -62,6 +63,18 @@ function actionAuth(token: string) {
 }
 
 export function sendApiError(res: Response, error: unknown): void {
+  if (error instanceof PartialBatchError) {
+    res.status(502).json({
+      error: "Partial Grist operation",
+      operation: error.operation,
+      completedBatches: error.completedBatches,
+      completedItems: error.completedItems,
+      failedBatch: error.failedBatch,
+      retryWholeOperation: false
+    });
+    return;
+  }
+
   if (error instanceof z.ZodError) {
     res.status(400).json({
       error: "Invalid request",
@@ -138,7 +151,7 @@ export function buildOpenApiDocument(
     "400": { description: "Invalid request or configured guardrail exceeded" },
     "401": { description: "Missing or invalid GPT Actions bearer token" },
     "403": { description: "Document is outside the ChatGPT access policy" },
-    "502": { description: "Grist upstream API error" }
+    "502": { description: "Grist upstream error or partial batched operation" }
   };
 
   const readLimitSchema: Record<string, unknown> = {
@@ -286,7 +299,7 @@ export function buildOpenApiDocument(
       post: {
         operationId: "createGristRecords",
         summary: "Create records in a Grist table",
-        description: `Write action. ${limitDescription(limits.maxWriteRecords)}`,
+        description: `Write action. Large requests may be split into non-atomic internal batches; partial failures are reported explicitly. ${limitDescription(limits.maxWriteRecords)}`,
         "x-openai-isConsequential": true,
         parameters: [
           {
@@ -325,7 +338,7 @@ export function buildOpenApiDocument(
       patch: {
         operationId: "updateGristRecords",
         summary: "Update existing Grist records",
-        description: `Write action. ${limitDescription(limits.maxWriteRecords)}`,
+        description: `Write action. Large requests may be split into non-atomic internal batches; partial failures are reported explicitly. ${limitDescription(limits.maxWriteRecords)}`,
         "x-openai-isConsequential": true,
         parameters: [
           {
@@ -367,7 +380,7 @@ export function buildOpenApiDocument(
         operationId: "deleteGristRecords",
         summary: "Delete explicitly identified Grist records",
         description:
-          `Destructive write action. Deletes only the exact numeric record IDs supplied. First identify and present the target rows to the user. ${limitDescription(limits.maxWriteRecords)}`,
+          `Destructive write action. Deletes only the exact numeric record IDs supplied. First identify and present the target rows to the user. Large requests may be split into non-atomic internal batches; partial failures are reported explicitly. ${limitDescription(limits.maxWriteRecords)}`,
         "x-openai-isConsequential": true,
         parameters: [
           {
@@ -408,7 +421,7 @@ export function buildOpenApiDocument(
     openapi: "3.1.0",
     info: {
       title: "Grist ChatGPT Bridge",
-      version: "0.4.0",
+      version: VERSION,
       description:
         "Data and schema access to Grist documents selected by a server-side document/workspace policy. Supports records, tables, columns, types, formulas and widget metadata while never exposing raw SQL, arbitrary HTTP or raw Grist User Actions."
     },

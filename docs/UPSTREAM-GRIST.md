@@ -1,62 +1,36 @@
 # Upstream Grist MCP reconnaissance
 
+> **Historical reconnaissance.** This file records the upstream Grist investigation that informed the initial bridge architecture. The current implementation is documented in `README.md` and `docs/ARCHITECTURE.md`.
+
 Status: preliminary repository reconnaissance performed against the public `gristlabs/grist-core` tree.
 
-## What is present in public grist-core
+## What was observed
 
-The public Community repository contains MCP-related configuration hooks.
+The public Community repository exposed MCP-related configuration hooks such as `GRIST_MCP_ENABLED`, and conditional MCP protocol headers were visible in the public server code.
 
-### Feature flag
+The actual native MCP/OIDC implementation was not found in the public Community code inspected at that time, which was consistent with Grist documentation describing those capabilities as part of the Full self-hosted offering.
 
-`app/server/lib/gristSettings.ts` reads:
-
-```text
-GRIST_MCP_ENABLED
-```
-
-with a default value of `false`.
-
-### HTTP/CORS support
-
-`app/server/lib/FlexServer.ts` conditionally allows the MCP protocol headers when that flag is enabled:
-
-```text
-mcp-protocol-version
-mcp-session-id
-```
-
-The public README also documents `GRIST_MCP_ENABLED` and the OIDC/MCP-related environment variables used by the full product.
-
-## What was not found
-
-A search of the public `gristlabs/grist-core` codebase did not locate the actual MCP endpoint/server implementation or the OIDC server implementation corresponding to those documented flags.
-
-This is consistent with Grist documentation describing the native self-hosted MCP/OAuth capability as a Full-edition feature.
-
-It is not proof that no reusable implementation exists elsewhere. The next upstream step is to determine, with Grist Labs/DINUM:
-
-1. whether the MCP implementation lives in non-public Full-edition modules;
-2. whether those modules can be reused or upstreamed for the DINUM deployment;
-3. whether a Community-compatible authorization adapter would be acceptable upstream;
-4. whether `grist-chatgpt` should remain an external MCP-to-REST bridge or converge with the native Grist endpoint.
+This investigation established an important constraint for this project: the bridge must not depend on private or unavailable Grist implementation details when targeting a Community deployment.
 
 ## Architectural consequence
 
-For now, `grist-chatgpt` must not depend on private or unavailable Grist implementation details.
-
-The V0 remains:
+The project therefore uses explicit bridge operations backed by the public Grist REST API:
 
 ```text
-MCP
- |
- v
-explicit grist-chatgpt tools
- |
- v
+GPT Actions / MCP
+        |
+        v
+explicit grist-chatgpt operations
+        |
+        v
 public Grist REST API
 ```
 
-while keeping its tool semantics narrow enough to converge later with the official Grist MCP model.
+Since this reconnaissance, the bridge has grown well beyond the initial four-tool V0. The current v0.4.0 implementation includes document/workspace policy, record deletion, bulk handling and schema management while preserving the same architectural principle: every exposed operation is named and bounded.
+
+## Institutional consequence
+
+For the target DINUM Grist Community deployment, the preferred future architecture is not to depend on Full-edition native MCP. Instead, the institutional question is whether DINUM can host the bridge and preserve/delegate the authenticated user's identity to Grist Community so existing Grist permissions remain authoritative.
 
 ## Public source pointers
 
@@ -64,3 +38,4 @@ while keeping its tool semantics narrow enough to converge later with the offici
 - `app/server/lib/FlexServer.ts`
 - Grist MCP documentation: https://support.getgrist.com/mcp/
 - Grist OAuth apps documentation: https://support.getgrist.com/oauth-apps/
+- Grist REST API documentation: https://support.getgrist.com/api/

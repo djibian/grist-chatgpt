@@ -9,6 +9,8 @@ import {
   registerGptActionApi,
   type GristOperations
 } from "../src/actions/api.js";
+import { PartialBatchError } from "../src/grist/service.js";
+import { VERSION } from "../src/version.js";
 
 const TOKEN = "abcdef0123456789abcdef0123456789";
 const MAX_READ = 1000;
@@ -65,13 +67,14 @@ async function stop(server: Server): Promise<void> {
   });
 }
 
-test("OpenAPI exposes data and consequential schema management actions", () => {
+test("OpenAPI exposes the runtime version and consequential schema management actions", () => {
   const document = buildOpenApiDocument("https://bridge.example.org", {
     maxReadRecords: MAX_READ,
     maxWriteRecords: MAX_WRITE,
     maxSchemaItems: MAX_SCHEMA
   }) as any;
 
+  assert.equal(document.info.version, VERSION);
   assert.equal(document.servers[0].url, "https://bridge.example.org");
   assert.equal(
     document.paths["/api/v1/documents"].get.operationId,
@@ -163,6 +166,42 @@ test("query action enforces configured read limit", async () => {
       }
     );
     assert.equal(rejected.status, 400);
+  } finally {
+    await stop(server);
+  }
+});
+
+test("partial batched write is returned as an explicit non-retryable REST error", async () => {
+  const { baseUrl, server } = await startApi(
+    fakeGrist({
+      createRecords: async () => {
+        throw new PartialBatchError("createRecords", 2, 400, 3, new Error("boom"));
+      }
+    })
+  );
+  const headers = {
+    Authorization: `Bearer ${TOKEN}`,
+    "Content-Type": "application/json"
+  };
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ records: [{ fields: { Nom: "Delta" } }] })
+      }
+    );
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), {
+      error: "Partial Grist operation",
+      operation: "createRecords",
+      completedBatches: 2,
+      completedItems: 400,
+      failedBatch: 3,
+      retryWholeOperation: false
+    });
   } finally {
     await stop(server);
   }

@@ -1,135 +1,84 @@
-# Architecture V0
+# Architecture v0.4.0
 
 ## Objective
 
-Create the smallest useful and reviewable bridge between MCP and Grist Community's REST API.
+`grist-chatgpt` is a bridge between conversational clients and the Grist Community REST API. It exposes named Grist operations through GPT Actions and MCP while keeping authorization and business rules server-side.
 
-The project must prove that a conversational client can safely perform useful read/write work on Grist without turning the MCP server into an unrestricted HTTP proxy.
-
-## V0 data path
+## Current architecture
 
 ```text
-MCP client
-   |
-   | explicit tool call
-   v
-MCP tool layer
-   |
-   | validated arguments
-   v
-GristClient
-   |
-   | HTTPS + Bearer credential
-   v
-Grist REST API
+ChatGPT custom GPT / MCP client
+             |
+             v
+      GPT Actions / MCP
+             |
+             v
+        AccessPolicy
+             |
+             v
+        GristService
+             |
+             v
+        GristClient
+             |
+             v
+        Grist REST API
 ```
 
-The MCP layer knows the semantics of each operation. The Grist client only performs explicit REST operations.
+`GristClient` owns explicit REST calls. `AccessPolicy` limits ChatGPT to configured document IDs and/or workspace IDs. `GristService` applies shared read/write/schema guardrails and exact-target rules for both interfaces.
 
-## V0 tool surface
+## Capabilities
 
-### Read
+The current bridge can:
 
-- `list_tables(documentId)`
-- `query_records(documentId, tableId, filter?, limit?)`
+- discover allowed documents and workspaces;
+- list tables and columns;
+- read, filter and sort records;
+- create, update and delete records;
+- create, update and delete tables;
+- create, update, rename and delete columns;
+- manage column types, formulas and `widgetOptions`.
 
-### Write
+Record writes may be split into sequential internal batches. These batches are not atomic as a group. If a later batch fails after earlier batches succeeded, the bridge reports how many batches and items were already applied and warns the client not to retry the complete operation blindly.
 
-- `create_records(documentId, tableId, records)`
-- `update_records(documentId, tableId, records)`
+`GRIST_MAX_SCHEMA_ITEMS` is a total per-operation guardrail. When creating tables, both tables and their nested initial columns count toward the same maximum.
 
-## Explicit non-goals
+## Low-level Grist boundary
 
-V0 does not expose:
+The low-level Grist `/apply` endpoint is never exposed directly to a model. It is used internally only for two fixed operations:
 
-- record deletion;
-- arbitrary URL fetching;
-- arbitrary Grist API paths;
-- arbitrary SQL;
-- table or column creation/modification;
-- document administration;
-- user or permission administration;
-- webhooks;
-- attachments.
+- `renameColumn` emits `RenameColumn`;
+- `deleteTable` emits `RemoveTable`.
 
-These can be considered later as separate, reviewable capabilities.
+The model cannot choose an arbitrary low-level action.
 
-## Authentication
+## Deliberately unsupported generic capabilities
 
-### Development
+The bridge does not provide generic HTTP forwarding, raw SQL, raw `/apply`, unrestricted instance administration, or user/permission administration.
 
-A local process may use:
+## Authentication and authorization
 
-```text
-GRIST_BASE_URL
-GRIST_API_KEY
-```
+The current personal/development deployment uses:
 
-The key is never accepted as a tool argument and must never appear in model-visible content.
+- server-side `GRIST_API_KEY` for Grist;
+- `MCP_BEARER_TOKEN` for `/mcp`;
+- `GPT_ACTION_TOKEN` for `/api/v1`;
+- `GRIST_ALLOWED_DOCUMENT_IDS` and/or `GRIST_ALLOWED_WORKSPACE_IDS` for the ChatGPT resource boundary.
 
-### Production
+Grist permissions remain authoritative upstream.
 
-API-key authentication is not a satisfactory public-user model because a Grist API key carries the permissions of its owner.
+For an institutional multi-user deployment, the preferred design is a DINUM-hosted bridge that authenticates each user and calls Grist Community with that user's identity so existing Grist permissions remain authoritative. A shared technical account with bridge-managed authorization is only a fallback.
 
-The production design must preserve user identity, scope and revocability. Preferred paths, in order:
+## Validated milestones
 
-1. use Grist OAuth / connected-app semantics where available;
-2. use Grist's official MCP server when the target deployment supports it;
-3. for Community deployments without OAuth, use an institutionally controlled authorization gateway that maps authenticated users to narrowly scoped Grist access.
+- **M1 — 2026-09-06:** local Grist Community read/create/update proof against synthetic data.
+- **M2:** protected remote MCP transport with bearer authentication.
+- **M3 — 2026-09-10:** public HTTPS deployment through Caddy with a loopback-only Node listener.
+- **GPT Actions — 2026-09-10:** custom GPT read/write path through `/api/v1` and `/openapi.json`.
+- **v0.4.0:** document/workspace policy, realistic data operations, explicit deletion, bulk handling and schema management.
 
-A single wide-permission shared account is not a target architecture.
-
-## Grist Community compatibility
-
-Community exposes the REST API needed for V0. The upstream Grist documentation currently places OAuth apps and the native self-hosted MCP server in the full self-hosted edition.
-
-Therefore the bridge is useful specifically for Community deployments, but its production authentication layer cannot simply copy the full-edition architecture without additional server-side support.
-
-## Deployment milestones
-
-### M0 — repository bootstrap
-
-- architecture and security model;
-- local MCP server;
-- explicit Grist client;
-- four bounded tools.
-
-### M1 — local functional proof — VALIDATED 2026-09-06
-
-- connected to a synthetic Grist Community DINUM test document;
-- verified list/read/create/update end to end;
-- re-read persisted state after update;
-- added automated regression tests around validation and REST requests;
-- validation evidence: [M1-VALIDATION.md](M1-VALIDATION.md).
-
-### M2 — safe remote demo — IN PROGRESS
-
-- keep the Grist API key only on the local machine;
-- restrict the bridge to explicit synthetic document IDs;
-- protect `/mcp` with an independent inbound bearer token;
-- preserve standard MCP HTTP/SSE behavior;
-- expose localhost temporarily through an SSE-capable HTTPS reverse tunnel;
-- validate public read access only against synthetic data.
-
-See [M2-REMOTE-DEMO.md](M2-REMOTE-DEMO.md).
-
-### M3 — provider alignment
-
-- validate branding and distribution with Grist Labs and/or DINUM;
-- decide whether to upstream, integrate with, or remain compatible with Grist's official MCP implementation;
-- settle the Community authentication model.
-
-### M4 — ChatGPT submission candidate
-
-- production domain;
-- privacy policy and terms;
-- reviewer-safe demo account/data;
-- tool metadata and write annotations;
-- conformance and adversarial tests;
-- submission package following current OpenAI requirements.
+Historical milestone files under `docs/M1-*`, `docs/M2-*` and `docs/M3-*` describe the state that existed at the time of each validation. `README.md`, this document and `SECURITY.md` describe the current implementation.
 
 ## Architectural invariant
 
-No feature may weaken this rule:
-
-> Every capability exposed to the model must correspond to a named, bounded Grist operation with explicit authorization and predictable effects.
+> Every capability exposed to a model must correspond to a named, bounded Grist operation with explicit server-side authorization and predictable effects.
