@@ -162,3 +162,81 @@ test("updateRecords accepts an empty successful Grist response", async () => {
     mock.restore();
   }
 });
+
+test("deleteRecords uses Grist records/delete with a raw ID array", async () => {
+  const mock = mockFetch(null, 200);
+  try {
+    await client().deleteRecords("doc123", "MCP_Test", [4, 7]);
+    assert.equal(
+      mock.requests[0]?.url,
+      "https://grist.example.org/api/docs/doc123/tables/MCP_Test/records/delete"
+    );
+    assert.equal(mock.requests[0]?.init.method, "POST");
+    assert.deepEqual(JSON.parse(String(mock.requests[0]?.init.body)), [4, 7]);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("table schema methods use the official tables endpoint", async () => {
+  const mock = mockFetch({ tables: [] });
+  try {
+    await client().createTables("doc123", [
+      { id: "People", columns: [{ id: "Name", fields: { type: "Text" } }] }
+    ]);
+    await client().updateTables("doc123", [
+      { id: "People", fields: { tableId: "Persons" } }
+    ]);
+
+    assert.equal(mock.requests[0]?.init.method, "POST");
+    assert.equal(mock.requests[1]?.init.method, "PATCH");
+    assert.equal(
+      mock.requests[0]?.url,
+      "https://grist.example.org/api/docs/doc123/tables"
+    );
+    assert.equal(mock.requests[1]?.url, mock.requests[0]?.url);
+  } finally {
+    mock.restore();
+  }
+});
+
+test("column schema methods use the expected Grist REST contracts", async () => {
+  const mock = mockFetch({ columns: [] });
+  try {
+    await client().listColumns("doc123", "People", { hidden: true });
+    await client().createColumns("doc123", "People", [
+      { id: "Age", fields: { type: "Int" } }
+    ]);
+    await client().updateColumns("doc123", "People", [
+      { id: "Age", fields: { label: "Âge" } }
+    ]);
+    await client().deleteColumn("doc123", "People", "Age");
+
+    const base = "https://grist.example.org/api/docs/doc123/tables/People/columns";
+    assert.equal(mock.requests[0]?.url, `${base}?hidden=true`);
+    assert.equal(mock.requests[1]?.url, base);
+    assert.equal(mock.requests[1]?.init.method, "POST");
+    assert.equal(mock.requests[2]?.url, base);
+    assert.equal(mock.requests[2]?.init.method, "PATCH");
+    assert.equal(mock.requests[3]?.url, `${base}/Age`);
+    assert.equal(mock.requests[3]?.init.method, "DELETE");
+  } finally {
+    mock.restore();
+  }
+});
+
+test("applyUserActions posts only the action array supplied by the service", async () => {
+  const mock = mockFetch({ actionNum: 1 });
+  try {
+    const actions = [["RenameColumn", "People", "Name", "FullName"]];
+    await client().applyUserActions("doc123", actions);
+    assert.equal(
+      mock.requests[0]?.url,
+      "https://grist.example.org/api/docs/doc123/apply"
+    );
+    assert.equal(mock.requests[0]?.init.method, "POST");
+    assert.deepEqual(JSON.parse(String(mock.requests[0]?.init.body)), actions);
+  } finally {
+    mock.restore();
+  }
+});
