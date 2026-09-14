@@ -10,15 +10,18 @@ Experimental open-source bridge for using Grist data and document structure from
 - **M1 validated 2026-09-06:** Grist Community DINUM read/create/update proof of concept.
 - **Public MCP validated 2026-09-10:** HTTPS → Caddy → MCP → Grist DINUM.
 - **ChatGPT Plus GPT Actions validated 2026-09-10:** a custom GPT can read and write Grist through the public bridge without receiving the Grist API key.
-- **Realistic bridge expansion:** configurable document/workspace scope, configurable data guardrails, explicit deletion, bulk batching, and schema management for tables/columns.
+- **v0.4.0 consolidation:** configurable document/workspace scope, realistic data operations, explicit deletion, bulk batching, schema management, coherent versioning and hardened partial-failure reporting.
 
 See:
 
+- [Current architecture](docs/ARCHITECTURE.md)
 - [M1 validation evidence](docs/M1-VALIDATION.md)
 - [M2 protected remote demo](docs/M2-REMOTE-DEMO.md)
 - [M3 public VPS deployment](docs/M3-PUBLIC-DEPLOYMENT.md)
 - [GPT Actions REST interface](docs/GPT-ACTIONS.md)
 - [Security model](docs/SECURITY.md)
+
+Historical milestone documents describe the implementation that existed at the time of each validation. `README.md`, `docs/ARCHITECTURE.md` and `docs/SECURITY.md` describe the current implementation.
 
 ## Goal
 
@@ -77,6 +80,8 @@ The Grist API key stays server-side. ChatGPT can target only documents explicitl
 | update records | `updateGristRecords` | `update_records` |
 | delete explicit record IDs | `deleteGristRecords` | `delete_records` |
 
+Large create/update/delete requests are split into sequential internal batches. Those batches are **not atomic as a group**. If a later batch fails after earlier batches succeeded, the bridge reports the partial success and clients must not retry the complete operation blindly.
+
 ### Schema
 
 | Capability | GPT Actions | MCP |
@@ -114,6 +119,8 @@ Important variables:
 - `MCP_BEARER_TOKEN`
 - `GPT_ACTION_TOKEN`
 
+`GRIST_MAX_SCHEMA_ITEMS` is a **total per-operation** guardrail. When creating tables, both each table and each nested initial column count toward the same maximum.
+
 The MCP and GPT Actions bearer tokens must each be at least 32 characters and must differ.
 
 Endpoints:
@@ -127,14 +134,26 @@ Endpoints:
 
 The Node service intentionally binds to localhost. Use a reverse proxy for public HTTPS deployment and configure `MCP_ALLOWED_HOSTS` for the public MCP hostname.
 
+## Development and validation
+
+```bash
+npm install
+npm run check
+npm test
+npm run build
+```
+
+The repository pins the deployed dependency graph with `package-lock.json`; CI uses `npm ci` for reproducible installs.
+
 ## Design principles
 
 1. **Grist remains authoritative** — bridge scope and Grist permissions both apply.
 2. **One business layer** — MCP and GPT Actions share `AccessPolicy`, `GristService` and `GristClient`.
 3. **Powerful but explicit operations** — destructive targets are exact record/table/column IDs.
 4. **Configurable guardrails** — fixed prototype limits are replaced with deployment policy.
-5. **No generic escape hatches** — no arbitrary HTTP, SQL or raw `/apply` tool.
-6. **Secrets remain server-side** — Grist credentials never enter model-visible inputs.
+5. **Partial writes are explicit** — non-atomic batch failures report already-applied items and forbid blind whole-operation retry.
+6. **No generic escape hatches** — no arbitrary HTTP, SQL or raw `/apply` tool.
+7. **Secrets remain server-side** — Grist credentials never enter model-visible inputs.
 
 ## Authoritative references
 
