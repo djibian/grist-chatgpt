@@ -1,12 +1,14 @@
 # M3 — Public VPS deployment
 
+> **Historical snapshot.** This document records the bridge state validated on **2026-09-10**. Capabilities have expanded since then. For the current implementation, use `README.md`, `docs/ARCHITECTURE.md` and `docs/SECURITY.md`.
+
 ## Objective
 
 Validate a stable public HTTPS deployment of `grist-chatgpt` without exposing the Node.js listener directly to the Internet and without committing Grist or MCP secrets.
 
-This milestone validates transport and deployment. It does **not** yet provide the OAuth 2.1 user authentication required for direct ChatGPT integration.
+This milestone validated transport and deployment. It did not yet provide the multi-user institutional authentication model targeted for a future DINUM deployment.
 
-## Validated architecture
+## Validated architecture at that milestone
 
 ```text
 remote MCP client
@@ -35,11 +37,11 @@ Development/demo endpoint validated on 2026-09-10:
 https://grist-chatgpt.loeildumaitre.fr/mcp
 ```
 
-The hostname identifies the current development instance, not a guaranteed long-term institutional production endpoint.
+The hostname identifies the development instance, not a guaranteed long-term institutional production endpoint.
 
 ## Host platform
 
-The validated deployment runs on:
+The validated deployment used:
 
 - Debian 13;
 - Node.js 24;
@@ -48,74 +50,39 @@ The validated deployment runs on:
 - nftables firewall;
 - application bound to `127.0.0.1:3000` only.
 
-Secrets are stored outside the Git checkout in a root-managed environment file under `/etc/grist-chatgpt/`.
+Secrets were stored outside the Git checkout in a root-managed environment file under `/etc/grist-chatgpt/`.
 
 ## DNS rebinding protection
 
-The MCP Express application keeps host validation enabled. Public reverse-proxy hostnames are configured through:
+The MCP Express application kept host validation enabled. Public reverse-proxy hostnames were configured through:
 
 ```text
 MCP_ALLOWED_HOSTS=<comma-separated hostnames>
 ```
 
-The application continues to allow localhost automatically. Public hostnames must be explicit hostnames, not URLs or paths.
-
-For this development deployment:
+Localhost entries were added automatically. For the development deployment:
 
 ```text
 MCP_ALLOWED_HOSTS=grist-chatgpt.loeildumaitre.fr
 ```
 
-## Validation performed
+## Validation performed on 2026-09-10
 
-The following checks succeeded on 2026-09-10.
+The following checks succeeded:
 
-### Public health endpoint
+- `GET /healthz` over public HTTPS returned HTTP 200;
+- unauthenticated `/mcp` returned HTTP 401 with `WWW-Authenticate: Bearer`;
+- authenticated MCP `tools/list` succeeded over the normal MCP SSE transport;
+- authenticated `query_records` reached the DINUM Grist Community instance and returned only synthetic test records.
 
-`GET /healthz` over the public HTTPS hostname returned HTTP 200.
-
-### Unauthenticated MCP request
-
-A public MCP request without the inbound bearer token returned HTTP 401 with a `WWW-Authenticate: Bearer` challenge.
-
-### Authenticated MCP discovery
-
-An authenticated public `tools/list` call succeeded over the normal MCP SSE response transport and exposed the four bounded tools:
+At that time, the MCP surface contained four tools:
 
 - `list_tables`;
 - `query_records`;
 - `create_records`;
 - `update_records`.
 
-### End-to-end Grist read
-
-An authenticated public `query_records` call traversed the complete public path and returned the synthetic `MCP_Test` records from the DINUM Grist Community instance.
-
-The response contained the previously validated synthetic records `Alpha`, `Beta` and `Gamma`. No real user, pupil, contact or production data was used.
-
-This validates:
-
-```text
-Internet MCP client
-      |
-      v
-public HTTPS endpoint
-      |
-      v
-Caddy
-      |
-      v
-MCP authentication
-      |
-      v
-grist-chatgpt
-      |
-      v
-Grist REST API
-      |
-      v
-synthetic DINUM Grist document
-```
+The current v0.4.0 surface is intentionally broader and is documented elsewhere.
 
 ## DINUM outage observed during validation
 
@@ -125,34 +92,28 @@ During validation, direct Grist API calls temporarily returned HTTP 500 with:
 Exceeded 10 attempts to lock the resource "workers-lock".
 ```
 
-The Grist web interface also showed HTTP 502 during the same infrastructure incident. A subsequent MCP request and direct API request succeeded without changing the bridge, confirming that this failure was upstream and transient.
+The Grist web interface also showed HTTP 502 during the same infrastructure incident. A later MCP request and direct API request succeeded without changing the bridge, confirming that the failure was upstream and transient.
 
-This incident is useful reliability evidence. Future resilience work may add bounded retries for safe read operations only. Write operations must not be retried automatically without an idempotency strategy because a network or upstream failure can occur after a write has already been applied.
+This remains useful reliability evidence: safe reads may eventually use bounded retry logic, while writes must not be retried automatically without an idempotency strategy because an upstream/network failure can occur after a write has already been applied.
 
-## Security boundaries still in force
+## Security boundaries validated at that milestone
 
-- the Grist API key is never supplied as an MCP tool argument;
-- the Grist document allowlist is enforced before outbound requests;
-- the application listener remains loopback-only;
-- Caddy is the only public HTTP ingress;
-- no delete, SQL, arbitrary HTTP or schema-mutation tool is exposed;
-- the public MCP hostname is explicitly allowlisted;
-- test data is synthetic.
+At the time of M3 validation:
+
+- the Grist API key was never supplied as an MCP tool argument;
+- the configured document allowlist was enforced before outbound requests;
+- the application listener remained loopback-only;
+- Caddy was the only public HTTP ingress;
+- the public MCP hostname was explicitly allowlisted;
+- test data was synthetic;
+- deletion and schema mutation had not yet been added to the bridge.
+
+Those last capability limitations are historical and no longer describe v0.4.0.
 
 ## Exit criteria
 
-M3 public deployment is considered validated because:
+M3 was considered validated because DNS, HTTPS, loopback binding, host validation, bearer authentication, MCP discovery and an end-to-end Grist read all succeeded on the public deployment.
 
-1. DNS resolves the public hostname to the VPS;
-2. HTTPS terminates successfully at Caddy;
-3. the application remains bound to loopback;
-4. public host validation remains enabled;
-5. unauthenticated MCP calls are rejected;
-6. authenticated MCP discovery succeeds;
-7. an authenticated public read reaches the DINUM Grist Community document end to end.
+## Subsequent evolution
 
-## Next milestone
-
-The static inbound bearer token is suitable for controlled development but is not the target ChatGPT authentication model.
-
-The next milestone is an OAuth 2.1 authorization boundary compatible with the MCP authorization specification and ChatGPT, including protected-resource metadata, authorization-server metadata, PKCE, access-token validation, scopes and revocation/refresh strategy.
+Later milestones added GPT Actions, document/workspace policy, configurable guardrails, explicit record deletion, bulk batching and schema management. See the current architecture and security documents for the authoritative state.
