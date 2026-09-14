@@ -6,6 +6,7 @@ export interface Config {
   maxReadRecords: number;
   maxWriteRecords: number;
   writeBatchRecords: number;
+  maxSchemaItems: number;
   mcpBearerToken: string;
   gptActionToken: string;
   mcpAllowedHosts: readonly string[];
@@ -134,6 +135,7 @@ export function loadConfig(): Config {
     maxReadRecords: parseLimit("GRIST_MAX_READ_RECORDS", 5000),
     maxWriteRecords: parseLimit("GRIST_MAX_WRITE_RECORDS", 500),
     writeBatchRecords: parsePositiveInt("GRIST_WRITE_BATCH_RECORDS", 200),
+    maxSchemaItems: parseLimit("GRIST_MAX_SCHEMA_ITEMS", 100),
     mcpBearerToken,
     gptActionToken,
     mcpAllowedHosts: parseAllowedHosts(process.env.MCP_ALLOWED_HOSTS),
