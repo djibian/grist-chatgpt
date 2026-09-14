@@ -3,13 +3,14 @@ import test from "node:test";
 
 import type { AccessPolicy } from "../src/grist/accessPolicy.js";
 import type { GristClient } from "../src/grist/client.js";
-import { GristService } from "../src/grist/service.js";
+import { GristService, PartialBatchError } from "../src/grist/service.js";
 
 function service(
   maxReadRecords = 1000,
   maxWriteRecords = 100,
   writeBatchRecords = 2,
-  maxSchemaItems = 10
+  maxSchemaItems = 10,
+  overrides: Record<string, unknown> = {}
 ) {
   const observed: unknown[] = [];
   const client = {
@@ -57,7 +58,8 @@ function service(
     applyUserActions: async (documentId: string, actions: unknown) => {
       observed.push({ action: "apply", documentId, actions });
       return { actionNum: 1 };
-    }
+    },
+    ...overrides
   } as unknown as GristClient;
   const accessPolicy = {
     assertDocumentAllowed: async (documentId: string) => documentId,
@@ -118,6 +120,35 @@ test("large writes are split into sequential internal batches", async () => {
   assert.deepEqual(
     observed.map((entry: any) => entry.records.length),
     [2, 2, 1]
+  );
+});
+
+test("partial batch failure reports already applied items and forbids blind retry", async () => {
+  let calls = 0;
+  const { grist } = service(1000, 10, 2, 10, {
+    createRecords: async () => {
+      calls += 1;
+      if (calls === 2) throw new Error("upstream failure");
+      return { records: [] };
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      grist.createRecords("doc", "Table1", [
+        { fields: { n: 1 } },
+        { fields: { n: 2 } },
+        { fields: { n: 3 } }
+      ]),
+    (error: unknown) => {
+      assert.ok(error instanceof PartialBatchError);
+      assert.equal(error.operation, "createRecords");
+      assert.equal(error.completedBatches, 1);
+      assert.equal(error.completedItems, 2);
+      assert.equal(error.failedBatch, 2);
+      assert.match(error.message, /Do not retry the whole operation blindly/);
+      return true;
+    }
   );
 });
 
@@ -184,6 +215,19 @@ test("schema operations support formula/type/widget metadata and enforce guardra
         { id: "C" }
       ]),
     /Schema item count 3 exceeds configured maximum 2/
+  );
+});
+
+test("createTables counts tables and nested columns against one schema guardrail", async () => {
+  const { grist } = service(1000, 100, 20, 3);
+
+  await assert.rejects(
+    () =>
+      grist.createTables("doc", [
+        { id: "A", columns: [{ id: "A1" }, { id: "A2" }] },
+        { id: "B" }
+      ]),
+    /Schema item count 4 exceeds configured maximum 3/
   );
 });
 
