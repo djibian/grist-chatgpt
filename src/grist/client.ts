@@ -8,7 +8,7 @@ export interface UpdateGristRecord extends NewGristRecord {
 
 export interface GristColumnSpec {
   id: string;
-  fields?: Record<string, unknown>;
+  fields?: Record<string, unknown> | undefined;
 }
 
 export interface GristColumnUpdate {
@@ -18,7 +18,7 @@ export interface GristColumnUpdate {
 
 export interface GristTableSpec {
   id: string;
-  columns?: GristColumnSpec[];
+  columns?: GristColumnSpec[] | undefined;
 }
 
 export interface GristTableUpdate {
