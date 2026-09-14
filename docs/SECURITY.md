@@ -34,11 +34,23 @@ Create/update/delete operations are supported. Deletion accepts only explicit un
 
 Large create/update/delete requests are subject to `GRIST_MAX_WRITE_RECORDS` and are split into sequential internal batches configured by `GRIST_WRITE_BATCH_RECORDS`.
 
+These batches are **not atomic as a group**. If a later batch fails after earlier batches succeeded, the bridge raises an explicit partial-operation error containing:
+
+- operation name;
+- completed batch count;
+- completed item count;
+- failed batch number;
+- an explicit indication that the whole operation must not be retried blindly.
+
+This is particularly important for record creation, where replaying a complete partially successful request could duplicate rows.
+
 ### Schema mutation
 
 The bridge supports table and column creation/update/deletion, column ID renaming, types, formulas, `widgetOptions`, and other metadata accepted by the official Grist endpoints.
 
-Schema requests are guarded by `GRIST_MAX_SCHEMA_ITEMS`.
+Schema requests are guarded by `GRIST_MAX_SCHEMA_ITEMS`. This is a **total per-operation** guardrail. For table creation, each table and each nested initial column counts toward the same maximum.
+
+Column deletion is sequential and may also fail after earlier columns were already deleted. The same partial-operation reporting applies.
 
 Destructive schema actions require explicit table/column IDs and are annotated as consequential/destructive.
 
@@ -91,6 +103,8 @@ Grist cell contents are untrusted data, not instructions. Tool descriptions stat
 ## Logging and privacy
 
 Production logging should record operation names, request IDs, status and latency rather than credentials or full row contents. A multi-user/institutional deployment should add structured audit events for writes and privacy review for any personal data crossing the bridge boundary.
+
+Partial-operation events should be logged distinctly because they require reconciliation rather than automatic whole-request retry.
 
 ## Institutional deployment target
 
