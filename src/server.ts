@@ -24,7 +24,8 @@ const accessPolicy = new AccessPolicy(client, {
 });
 const grist = new GristService(client, accessPolicy, {
   maxReadRecords: config.maxReadRecords,
-  maxWriteRecords: config.maxWriteRecords
+  maxWriteRecords: config.maxWriteRecords,
+  writeBatchRecords: config.writeBatchRecords
 });
 
 function textResult(value: unknown) {
@@ -73,7 +74,7 @@ function boundedPositiveInt(max: number, defaultValue: number) {
   return schema.default(defaultValue);
 }
 
-function boundedRecordArray<T extends z.ZodType>(schema: T, max: number) {
+function boundedArray<T extends z.ZodType>(schema: T, max: number) {
   let result = z.array(schema).min(1);
   if (max > 0) result = result.max(max);
   return result;
@@ -82,7 +83,7 @@ function boundedRecordArray<T extends z.ZodType>(schema: T, max: number) {
 function buildServer(): McpServer {
   const server = new McpServer({
     name: "grist-chatgpt",
-    version: "0.2.0"
+    version: "0.3.0"
   });
 
   server.registerTool(
@@ -180,11 +181,11 @@ function buildServer(): McpServer {
     "create_records",
     {
       description:
-        "Create records in one allowed Grist table. This is a write action and never deletes existing records.",
+        "Create records in one allowed Grist table. Large requests are split into internal batches.",
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
-        records: boundedRecordArray(newRecordSchema, config.maxWriteRecords)
+        records: boundedArray(newRecordSchema, config.maxWriteRecords)
       }),
       annotations: {
         readOnlyHint: false,
@@ -210,11 +211,11 @@ function buildServer(): McpServer {
     "update_records",
     {
       description:
-        "Update existing records in one allowed Grist table by numeric record ID.",
+        "Update existing records in one allowed Grist table by numeric record ID. Large requests are split into internal batches.",
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
-        records: boundedRecordArray(updateRecordSchema, config.maxWriteRecords)
+        records: boundedArray(updateRecordSchema, config.maxWriteRecords)
       }),
       annotations: {
         readOnlyHint: false,
@@ -225,6 +226,32 @@ function buildServer(): McpServer {
     async ({ documentId, tableId, records }) => {
       try {
         return textResult(await grist.updateRecords(documentId, tableId, records));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "delete_records",
+    {
+      description:
+        "Delete only explicitly identified Grist records by numeric record ID. First identify and present the target rows to the user before invoking this destructive action.",
+      inputSchema: z.object({
+        documentId: z.string().min(1),
+        tableId: z.string().min(1),
+        recordIds: boundedArray(z.number().int().positive(), config.maxWriteRecords)
+          .refine((ids) => new Set(ids).size === ids.length, "Record IDs must be unique.")
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ documentId, tableId, recordIds }) => {
+      try {
+        return textResult(await grist.deleteRecords(documentId, tableId, recordIds));
       } catch (error) {
         return errorResult(error);
       }
@@ -245,7 +272,7 @@ app.get("/healthz", (_req, res) => {
   res.json({
     status: "ok",
     service: "grist-chatgpt",
-    version: "0.2.0"
+    version: "0.3.0"
   });
 });
 

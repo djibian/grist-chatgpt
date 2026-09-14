@@ -5,6 +5,7 @@ export interface Config {
   allowedWorkspaceIds: readonly string[];
   maxReadRecords: number;
   maxWriteRecords: number;
+  writeBatchRecords: number;
   mcpBearerToken: string;
   gptActionToken: string;
   mcpAllowedHosts: readonly string[];
@@ -57,6 +58,15 @@ function parseLimit(name: string, defaultValue: number): number {
   const value = raw === undefined || raw === "" ? defaultValue : Number(raw);
   if (!Number.isInteger(value) || value < 0) {
     throw new Error(`${name} must be a non-negative integer (0 means unlimited).`);
+  }
+  return value;
+}
+
+function parsePositiveInt(name: string, defaultValue: number): number {
+  const raw = process.env[name]?.trim();
+  const value = raw === undefined || raw === "" ? defaultValue : Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer.`);
   }
   return value;
 }
@@ -123,6 +133,7 @@ export function loadConfig(): Config {
     allowedWorkspaceIds,
     maxReadRecords: parseLimit("GRIST_MAX_READ_RECORDS", 5000),
     maxWriteRecords: parseLimit("GRIST_MAX_WRITE_RECORDS", 500),
+    writeBatchRecords: parsePositiveInt("GRIST_WRITE_BATCH_RECORDS", 200),
     mcpBearerToken,
     gptActionToken,
     mcpAllowedHosts: parseAllowedHosts(process.env.MCP_ALLOWED_HOSTS),

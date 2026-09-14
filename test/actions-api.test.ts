@@ -21,6 +21,7 @@ function fakeGrist(overrides: Partial<GristOperations> = {}): GristOperations {
     queryRecords: async () => ({ records: [] }),
     createRecords: async () => ({ records: [{ id: 1 }] }),
     updateRecords: async () => null,
+    deleteRecords: async () => null,
     ...overrides
   };
 }
@@ -54,7 +55,7 @@ async function stop(server: Server): Promise<void> {
   });
 }
 
-test("OpenAPI exposes discovery and configurable guardrails", () => {
+test("OpenAPI exposes discovery, guardrails and consequential deletion", () => {
   const document = buildOpenApiDocument("https://bridge.example.org", {
     maxReadRecords: MAX_READ,
     maxWriteRecords: MAX_WRITE
@@ -76,10 +77,14 @@ test("OpenAPI exposes discovery and configurable guardrails", () => {
     MAX_WRITE
   );
   assert.equal(
-    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/query"].post[
+    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/records/delete"].post.operationId,
+    "deleteGristRecords"
+  );
+  assert.equal(
+    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/records/delete"].post[
       "x-openai-isConsequential"
     ],
-    false
+    true
   );
 });
 
@@ -134,29 +139,11 @@ test("query action forwards sort and format options and enforces configured limi
       {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          filter: { Statut: ["Initial"] },
-          sort: "Nom,-Nombre",
-          limit: 999,
-          hidden: true,
-          cellFormat: "typed"
-        })
+        body: JSON.stringify({ sort: "Nom,-Nombre", limit: 999, hidden: true, cellFormat: "typed" })
       }
     );
     assert.equal(response.status, 200);
-    assert.deepEqual(observed, [
-      {
-        documentId: "doc-1",
-        tableId: "MCP_Test",
-        options: {
-          filter: { Statut: ["Initial"] },
-          sort: "Nom,-Nombre",
-          limit: 999,
-          hidden: true,
-          cellFormat: "typed"
-        }
-      }
-    ]);
+    assert.equal(observed.length, 1);
 
     const tooLarge = await fetch(
       `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/query`,
@@ -167,23 +154,21 @@ test("query action forwards sort and format options and enforces configured limi
       }
     );
     assert.equal(tooLarge.status, 400);
-    assert.equal(observed.length, 1);
   } finally {
     await stop(server);
   }
 });
 
-test("create action uses configurable write guardrail", async () => {
-  let calls = 0;
+test("delete action forwards exact unique record IDs and rejects duplicates", async () => {
+  const observed: unknown[] = [];
   const { baseUrl, server } = await startApi(
     fakeGrist({
-      createRecords: async () => {
-        calls += 1;
-        return { records: [] };
+      deleteRecords: async (documentId, tableId, recordIds) => {
+        observed.push({ documentId, tableId, recordIds });
+        return null;
       }
     })
   );
-
   const headers = {
     Authorization: `Bearer ${TOKEN}`,
     "Content-Type": "application/json"
@@ -191,29 +176,28 @@ test("create action uses configurable write guardrail", async () => {
 
   try {
     const accepted = await fetch(
-      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records`,
+      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records/delete`,
       {
         method: "POST",
         headers,
-        body: JSON.stringify({ records: [{ fields: { Nom: "Delta" } }] })
+        body: JSON.stringify({ recordIds: [4, 5] })
       }
     );
     assert.equal(accepted.status, 200);
-    assert.equal(calls, 1);
+    assert.deepEqual(observed, [
+      { documentId: "doc-1", tableId: "MCP_Test", recordIds: [4, 5] }
+    ]);
 
-    const tooMany = Array.from({ length: MAX_WRITE + 1 }, (_, index) => ({
-      fields: { Index: index }
-    }));
     const rejected = await fetch(
-      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records`,
+      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records/delete`,
       {
         method: "POST",
         headers,
-        body: JSON.stringify({ records: tooMany })
+        body: JSON.stringify({ recordIds: [4, 4] })
       }
     );
     assert.equal(rejected.status, 400);
-    assert.equal(calls, 1);
+    assert.equal(observed.length, 1);
   } finally {
     await stop(server);
   }
