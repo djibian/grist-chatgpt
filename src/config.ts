@@ -2,6 +2,9 @@ export interface Config {
   gristBaseUrl: string;
   gristApiKey: string;
   allowedDocumentIds: readonly string[];
+  allowedWorkspaceIds: readonly string[];
+  maxReadRecords: number;
+  maxWriteRecords: number;
   mcpBearerToken: string;
   gptActionToken: string;
   mcpAllowedHosts: readonly string[];
@@ -32,16 +35,13 @@ function normalizeBaseUrl(value: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
-function parseAllowedDocumentIds(value: string): string[] {
-  const ids = value
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
+function parseCsv(value: string | undefined): string[] {
+  if (!value?.trim()) return [];
+  return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+}
 
-  if (ids.length === 0) {
-    throw new Error("GRIST_ALLOWED_DOCUMENT_IDS must contain at least one document ID.");
-  }
-
+function parseAllowedDocumentIds(value: string | undefined): string[] {
+  const ids = parseCsv(value);
   for (const id of ids) {
     if (/^https?:\/\//i.test(id)) {
       throw new Error(
@@ -49,20 +49,23 @@ function parseAllowedDocumentIds(value: string): string[] {
       );
     }
   }
+  return ids;
+}
 
-  return [...new Set(ids)];
+function parseLimit(name: string, defaultValue: number): number {
+  const raw = process.env[name]?.trim();
+  const value = raw === undefined || raw === "" ? defaultValue : Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative integer (0 means unlimited).`);
+  }
+  return value;
 }
 
 function parseAllowedHosts(value: string | undefined): string[] {
   const hosts = ["127.0.0.1", "localhost", "[::1]"];
 
   if (value?.trim()) {
-    hosts.push(
-      ...value
-        .split(",")
-        .map((host) => host.trim())
-        .filter(Boolean)
-    );
+    hosts.push(...parseCsv(value));
   }
 
   for (const host of hosts) {
@@ -97,6 +100,16 @@ export function loadConfig(): Config {
     );
   }
 
+  const allowedDocumentIds = parseAllowedDocumentIds(
+    process.env.GRIST_ALLOWED_DOCUMENT_IDS
+  );
+  const allowedWorkspaceIds = parseCsv(process.env.GRIST_ALLOWED_WORKSPACE_IDS);
+  if (allowedDocumentIds.length === 0 && allowedWorkspaceIds.length === 0) {
+    throw new Error(
+      "Configure at least one GRIST_ALLOWED_DOCUMENT_IDS or GRIST_ALLOWED_WORKSPACE_IDS entry."
+    );
+  }
+
   const mcpBearerToken = requiredToken("MCP_BEARER_TOKEN");
   const gptActionToken = requiredToken("GPT_ACTION_TOKEN");
   if (gptActionToken === mcpBearerToken) {
@@ -106,9 +119,10 @@ export function loadConfig(): Config {
   return {
     gristBaseUrl: normalizeBaseUrl(required("GRIST_BASE_URL")),
     gristApiKey: required("GRIST_API_KEY"),
-    allowedDocumentIds: parseAllowedDocumentIds(
-      required("GRIST_ALLOWED_DOCUMENT_IDS")
-    ),
+    allowedDocumentIds,
+    allowedWorkspaceIds,
+    maxReadRecords: parseLimit("GRIST_MAX_READ_RECORDS", 5000),
+    maxWriteRecords: parseLimit("GRIST_MAX_WRITE_RECORDS", 500),
     mcpBearerToken,
     gptActionToken,
     mcpAllowedHosts: parseAllowedHosts(process.env.MCP_ALLOWED_HOSTS),

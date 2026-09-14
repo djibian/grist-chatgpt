@@ -25,9 +25,7 @@ function mockFetch(
       init: init ?? {}
     });
 
-    const body =
-      responseBody === null ? null : JSON.stringify(responseBody);
-
+    const body = responseBody === null ? null : JSON.stringify(responseBody);
     return new Response(body, {
       status,
       headers: body === null ? undefined : { "Content-Type": "application/json" }
@@ -45,18 +43,32 @@ function mockFetch(
 function client(): GristClient {
   return new GristClient({
     baseUrl: "https://grist.example.org",
-    apiKey: "test-secret-never-sent",
-    allowedDocumentIds: ["doc123", "aGUygEv64sRs"]
+    apiKey: "test-secret-never-sent"
   });
 }
+
+test("lists orgs and workspaces for discovery", async () => {
+  const mock = mockFetch([]);
+  try {
+    await client().listOrgs();
+    await client().listWorkspaces(42);
+    assert.equal(mock.requests[0]?.url, "https://grist.example.org/api/orgs");
+    assert.equal(
+      mock.requests[1]?.url,
+      "https://grist.example.org/api/orgs/42/workspaces"
+    );
+  } finally {
+    mock.restore();
+  }
+});
 
 test("listTables builds the expected Grist REST URL", async () => {
   const mock = mockFetch({ tables: [] });
   try {
-    await client().listTables("doc123");
+    await client().listTables("doc123", { expandColumns: true });
     assert.equal(
       mock.requests[0]?.url,
-      "https://grist.example.org/api/docs/doc123/tables"
+      "https://grist.example.org/api/docs/doc123/tables?expand=column"
     );
     assert.equal(
       new Headers(mock.requests[0]?.init.headers).get("Authorization"),
@@ -86,10 +98,7 @@ test("document URLs from another origin are rejected before fetch", async () => 
   const mock = mockFetch({ tables: [] });
   try {
     await assert.rejects(
-      () =>
-        client().listTables(
-          "https://attacker.example/doc/aGUygEv64sRs/Test"
-        ),
+      () => client().listTables("https://attacker.example/doc/aGUygEv64sRs/Test"),
       /same origin/
     );
     assert.equal(mock.requests.length, 0);
@@ -98,21 +107,26 @@ test("document URLs from another origin are rejected before fetch", async () => 
   }
 });
 
-test("queryRecords forwards filter and limit", async () => {
+test("queryRecords forwards filter, sort, limit and format options", async () => {
   const mock = mockFetch({ records: [] });
   try {
     await client().queryRecords("doc123", "MCP_Test", {
       filter: { Statut: ["Initial"] },
-      limit: 10
+      sort: "Nom,-Nombre",
+      limit: 1000,
+      hidden: true,
+      cellFormat: "typed"
     });
 
     const url = new URL(mock.requests[0]!.url);
     assert.equal(url.pathname, "/api/docs/doc123/tables/MCP_Test/records");
-    assert.equal(url.searchParams.get("limit"), "10");
-    assert.deepEqual(
-      JSON.parse(url.searchParams.get("filter") ?? "{}"),
-      { Statut: ["Initial"] }
-    );
+    assert.equal(url.searchParams.get("limit"), "1000");
+    assert.equal(url.searchParams.get("sort"), "Nom,-Nombre");
+    assert.equal(url.searchParams.get("hidden"), "true");
+    assert.equal(url.searchParams.get("cellFormat"), "typed");
+    assert.deepEqual(JSON.parse(url.searchParams.get("filter") ?? "{}"), {
+      Statut: ["Initial"]
+    });
   } finally {
     mock.restore();
   }
@@ -127,10 +141,7 @@ test("createRecords uses POST with Grist record payload", async () => {
     await client().createRecords("doc123", "MCP_Test", records);
 
     assert.equal(mock.requests[0]?.init.method, "POST");
-    assert.deepEqual(
-      JSON.parse(String(mock.requests[0]?.init.body)),
-      { records }
-    );
+    assert.deepEqual(JSON.parse(String(mock.requests[0]?.init.body)), { records });
   } finally {
     mock.restore();
   }
@@ -142,33 +153,11 @@ test("updateRecords accepts an empty successful Grist response", async () => {
     const records: UpdateGristRecord[] = [
       { id: 3, fields: { Nombre: 30, Statut: "Modifié par MCP" } }
     ];
-
-    const result = await client().updateRecords(
-      "doc123",
-      "MCP_Test",
-      records
-    );
+    const result = await client().updateRecords("doc123", "MCP_Test", records);
 
     assert.equal(result, null);
     assert.equal(mock.requests[0]?.init.method, "PATCH");
-    assert.deepEqual(
-      JSON.parse(String(mock.requests[0]?.init.body)),
-      { records }
-    );
-  } finally {
-    mock.restore();
-  }
-});
-
-
-test("requests for non-allowlisted documents are rejected before fetch", async () => {
-  const mock = mockFetch({ records: [] });
-  try {
-    await assert.rejects(
-      () => client().queryRecords("other-doc", "MCP_Test"),
-      /not allowed/
-    );
-    assert.equal(mock.requests.length, 0);
+    assert.deepEqual(JSON.parse(String(mock.requests[0]?.init.body)), { records });
   } finally {
     mock.restore();
   }

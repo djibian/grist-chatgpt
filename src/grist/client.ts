@@ -6,10 +6,34 @@ export interface UpdateGristRecord extends NewGristRecord {
   id: number;
 }
 
+export interface GristOrgSummary {
+  id: string | number;
+  name?: string;
+  domain?: string | null;
+  access?: string;
+  [key: string]: unknown;
+}
+
+export interface GristDocumentSummary {
+  id: string | number;
+  name?: string;
+  urlId?: string | null;
+  access?: string;
+  [key: string]: unknown;
+}
+
+export interface GristWorkspaceSummary {
+  id: string | number;
+  name?: string;
+  access?: string;
+  docs?: GristDocumentSummary[];
+  orgDomain?: string;
+  [key: string]: unknown;
+}
+
 interface GristClientOptions {
   baseUrl: string;
   apiKey: string;
-  allowedDocumentIds: readonly string[];
 }
 
 export class GristApiError extends Error {
@@ -27,23 +51,31 @@ export class GristClient {
   private readonly baseUrl: string;
   private readonly baseOrigin: string;
   private readonly apiKey: string;
-  private readonly allowedDocumentIds: ReadonlySet<string>;
 
   constructor(options: GristClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.baseOrigin = new URL(this.baseUrl).origin;
     this.apiKey = options.apiKey;
-    this.allowedDocumentIds = new Set(options.allowedDocumentIds);
-
-    if (this.allowedDocumentIds.size === 0) {
-      throw new Error("At least one allowed Grist document ID is required.");
-    }
   }
 
-  async listTables(documentIdOrUrl: string): Promise<unknown> {
-    const documentId = this.resolveDocumentId(documentIdOrUrl);
+  async listOrgs(): Promise<GristOrgSummary[]> {
+    return (await this.request("/api/orgs")) as GristOrgSummary[];
+  }
+
+  async listWorkspaces(orgId: string | number): Promise<GristWorkspaceSummary[]> {
+    return (await this.request(
+      `/api/orgs/${encodeURIComponent(String(orgId))}/workspaces`
+    )) as GristWorkspaceSummary[];
+  }
+
+  async listTables(
+    documentIdOrUrl: string,
+    options: { expandColumns?: boolean } = {}
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    const suffix = options.expandColumns ? "?expand=column" : "";
     return this.request(
-      `/api/docs/${encodeURIComponent(documentId)}/tables`
+      `/api/docs/${encodeURIComponent(documentId)}/tables${suffix}`
     );
   }
 
@@ -52,18 +84,20 @@ export class GristClient {
     tableId: string,
     options: {
       filter?: Record<string, unknown[]>;
+      sort?: string;
       limit?: number;
+      hidden?: boolean;
+      cellFormat?: "normal" | "typed";
     } = {}
   ): Promise<unknown> {
-    const documentId = this.resolveDocumentId(documentIdOrUrl);
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     const query = new URLSearchParams();
 
-    if (options.filter) {
-      query.set("filter", JSON.stringify(options.filter));
-    }
-    if (options.limit !== undefined) {
-      query.set("limit", String(options.limit));
-    }
+    if (options.filter) query.set("filter", JSON.stringify(options.filter));
+    if (options.sort) query.set("sort", options.sort);
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    if (options.hidden !== undefined) query.set("hidden", String(options.hidden));
+    if (options.cellFormat) query.set("cellFormat", options.cellFormat);
 
     const suffix = query.size ? `?${query.toString()}` : "";
     return this.request(
@@ -76,7 +110,7 @@ export class GristClient {
     tableId: string,
     records: NewGristRecord[]
   ): Promise<unknown> {
-    const documentId = this.resolveDocumentId(documentIdOrUrl);
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records`,
       {
@@ -91,7 +125,7 @@ export class GristClient {
     tableId: string,
     records: UpdateGristRecord[]
   ): Promise<unknown> {
-    const documentId = this.resolveDocumentId(documentIdOrUrl);
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/records`,
       {
@@ -101,19 +135,7 @@ export class GristClient {
     );
   }
 
-  private resolveDocumentId(value: string): string {
-    const documentId = this.normalizeDocumentId(value);
-
-    if (!this.allowedDocumentIds.has(documentId)) {
-      throw new Error(
-        `Grist document "${documentId}" is not allowed by this bridge.`
-      );
-    }
-
-    return documentId;
-  }
-
-  private normalizeDocumentId(value: string): string {
+  normalizeDocumentId(value: string): string {
     const trimmed = value.trim();
     if (!trimmed) {
       throw new Error("Grist document ID must not be empty.");
