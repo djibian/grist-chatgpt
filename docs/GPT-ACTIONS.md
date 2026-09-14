@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Provide a ChatGPT Plus-compatible path to Grist through a custom GPT Action while preserving the MCP endpoint for future distribution.
+Provide a ChatGPT Plus-compatible path to Grist through a custom GPT while preserving the MCP endpoint as the future plugin/public integration path.
 
-The GPT never receives the Grist API key. It authenticates to the bridge with an independent bearer token.
+The GPT authenticates only to the bridge with `GPT_ACTION_TOKEN`. The Grist API key remains server-side.
 
 ```text
 ChatGPT custom GPT
@@ -13,10 +13,14 @@ ChatGPT custom GPT
        v
 grist-chatgpt /api/v1
        |
-       | shared GristClient
-       | GRIST_ALLOWED_DOCUMENT_IDS
        v
-Grist REST API
+   AccessPolicy
+       |
+       v
+   GristService
+       |
+       v
+   GristClient
        |
        | GRIST_API_KEY (server-side only)
        v
@@ -25,133 +29,101 @@ Grist Community
 
 ## Authentication
 
-Configure a random `GPT_ACTION_TOKEN` of at least 32 characters. It must differ from `MCP_BEARER_TOKEN`.
-
-Example generation:
+Configure a random `GPT_ACTION_TOKEN` of at least 32 characters, distinct from `MCP_BEARER_TOKEN`.
 
 ```bash
 openssl rand -hex 32
 ```
 
-Do not commit or paste the generated value into documentation or issues.
-
-In the custom GPT Action editor, configure authentication as:
+In the custom GPT Action editor:
 
 - Authentication type: API key
 - Auth type: Bearer
-- Secret: the value of `GPT_ACTION_TOKEN`
+- Secret: `GPT_ACTION_TOKEN`
 
 ## OpenAPI schema
 
-The bridge serves its OpenAPI 3.1 document at:
+The bridge serves the complete OpenAPI 3.1 document at:
 
 ```text
 GET /openapi.json
 ```
 
-For a public deployment this can be imported directly by URL, for example:
+A deployed bridge may be imported directly by URL, e.g. `https://bridge.example.org/openapi.json`. Re-import or refresh this schema in the custom GPT after bridge upgrades that add operations.
 
-```text
-https://bridge.example.org/openapi.json
-```
+## Document scope
 
-The schema contains no credentials.
+ChatGPT does not automatically inherit every document accessible to the Grist API key. The bridge adds its own resource boundary:
 
-## Operations
+- `GRIST_ALLOWED_DOCUMENT_IDS`: explicit document IDs;
+- `GRIST_ALLOWED_WORKSPACE_IDS`: all documents currently present in selected workspaces.
 
-### `listGristTables`
+At least one scope entry is required. `listGristDocuments` returns only documents included in this bridge policy and accessible upstream in Grist.
 
-```text
-GET /api/v1/documents/{documentId}/tables
-```
+## Data operations
 
-Read-only. Lists the Grist tables available in one allowlisted document.
+- `listGristDocuments` — discover allowed documents/workspaces.
+- `listGristTables` — list tables, optionally expanding column metadata.
+- `queryGristRecords` — read/filter/sort records; supports `hidden` and `cellFormat`.
+- `createGristRecords` — create records.
+- `updateGristRecords` — update records by numeric ID.
+- `deleteGristRecords` — delete exact unique numeric IDs only.
 
-### `queryGristRecords`
+Read size is controlled by `GRIST_MAX_READ_RECORDS`. Write size is controlled by `GRIST_MAX_WRITE_RECORDS`; large writes are internally split according to `GRIST_WRITE_BATCH_RECORDS`.
 
-```text
-POST /api/v1/documents/{documentId}/tables/{tableId}/query
-```
+There is intentionally no pagination abstraction over Grist. Reads use Grist's native filter/sort/limit model.
 
-Read-only despite using POST. Optional JSON body:
+## Schema operations
 
-```json
-{
-  "filter": {
-    "Statut": ["Initial"]
-  },
-  "limit": 50
-}
-```
+- `listGristColumns` — inspect IDs, labels, types, formulas and widget metadata.
+- `createGristTables` — create tables with optional initial columns.
+- `updateGristTables` — update table metadata; `fields.tableId` renames a table and `fields.onDemand` changes on-demand loading.
+- `deleteGristTable` — delete one exact table ID.
+- `createGristColumns` — create columns.
+- `updateGristColumns` — modify metadata such as `label`, `type`, `formula`, `isFormula`, `visibleCol`, `widgetOptions`, etc.
+- `renameGristColumn` — rename one column ID.
+- `deleteGristColumns` — delete exact column IDs.
 
-`limit` defaults to 50 and cannot exceed 200.
+Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`.
 
-The operation is explicitly marked `x-openai-isConsequential: false` because it performs no write.
+`widgetOptions` must be supplied in the JSON-string representation expected by Grist.
 
-### `createGristRecords`
+## Consequential actions
 
-```text
-POST /api/v1/documents/{documentId}/tables/{tableId}/records
-```
+Read operations are marked `x-openai-isConsequential: false`.
 
-Body:
+Create/update/delete data and every schema mutation are marked consequential. Destructive actions also require exact record/table/column identifiers rather than broad delete filters.
 
-```json
-{
-  "records": [
-    {
-      "fields": {
-        "Nom": "Delta",
-        "Nombre": 4,
-        "Statut": "Créé par GPT Action"
-      }
-    }
-  ]
-}
-```
+## Low-level Grist API boundary
 
-At most 50 records per request. Marked consequential.
+The bridge never exposes raw `/api/docs/{docId}/apply` to ChatGPT.
 
-### `updateGristRecords`
+Two high-level actions use it internally because they need Grist User Actions:
 
-```text
-PATCH /api/v1/documents/{documentId}/tables/{tableId}/records
-```
+- `renameGristColumn` → fixed `RenameColumn` action;
+- `deleteGristTable` → fixed `RemoveTable` action.
 
-Body:
+The model never supplies the User Action name or arbitrary action array.
 
-```json
-{
-  "records": [
-    {
-      "id": 4,
-      "fields": {
-        "Statut": "Modifié par GPT Action"
-      }
-    }
-  ]
-}
-```
+## Deliberately unsupported generic capabilities
 
-At most 50 records per request. Marked consequential.
+The GPT Actions interface does not expose:
 
-## Server-side authorization
+- arbitrary HTTP requests;
+- raw SQL;
+- raw Grist `/apply` actions;
+- unrestricted instance administration.
 
-`documentId` is model-supplied input, but it is not an authorization boundary. Every REST request uses the same `GristClient` as MCP, and the client refuses document IDs not present in `GRIST_ALLOWED_DOCUMENT_IDS` before making a Grist HTTP request.
+## Validation approach
 
-The REST API exposes no delete, schema mutation, SQL, or arbitrary HTTP operation.
+Use a synthetic allowed document when validating new destructive/schema actions. A useful sequence is:
 
-## Initial validation sequence
+1. `listGristDocuments`;
+2. inspect tables/columns;
+3. create a temporary table;
+4. add a typed column and a formula column;
+5. update/rename a column;
+6. create/update/delete synthetic records;
+7. delete the temporary columns/table after explicit confirmation.
 
-Use only a synthetic allowlisted document for the first tests.
-
-1. Import `/openapi.json` into the custom GPT Action editor.
-2. Configure `GPT_ACTION_TOKEN` as a Bearer API key.
-3. Ask the GPT to list tables.
-4. Ask it to read the synthetic test table.
-5. Create one synthetic record and confirm the consequential action prompt.
-6. Re-read and verify the new record.
-7. Update only that synthetic record and confirm again.
-8. Re-read and verify the update.
-
-Do not add real personal or student data to the allowlist until the authorization and privacy model for that use case has been explicitly reviewed.
+This exercises the same business layer used by MCP without exposing production data.
