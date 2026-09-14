@@ -7,11 +7,9 @@ import { registerGptActionApi } from "./actions/api.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { AccessPolicy } from "./grist/accessPolicy.js";
-import {
-  GristApiError,
-  GristClient
-} from "./grist/client.js";
+import { GristApiError, GristClient } from "./grist/client.js";
 import { GristService } from "./grist/service.js";
+import { registerSchemaTools } from "./mcp/schemaTools.js";
 
 const config = loadConfig();
 const client = new GristClient({
@@ -25,7 +23,8 @@ const accessPolicy = new AccessPolicy(client, {
 const grist = new GristService(client, accessPolicy, {
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
-  writeBatchRecords: config.writeBatchRecords
+  writeBatchRecords: config.writeBatchRecords,
+  maxSchemaItems: config.maxSchemaItems
 });
 
 function textResult(value: unknown) {
@@ -46,10 +45,7 @@ function errorResult(error: unknown) {
       content: [
         {
           type: "text" as const,
-          text: JSON.stringify({
-            error: error.message,
-            status: error.status
-          })
+          text: JSON.stringify({ error: error.message, status: error.status })
         }
       ]
     };
@@ -83,7 +79,7 @@ function boundedArray<T extends z.ZodType>(schema: T, max: number) {
 function buildServer(): McpServer {
   const server = new McpServer({
     name: "grist-chatgpt",
-    version: "0.3.0"
+    version: "0.4.0"
   });
 
   server.registerTool(
@@ -123,18 +119,15 @@ function buildServer(): McpServer {
     },
     async ({ documentId, expandColumns }) => {
       try {
-        return textResult(
-          await grist.listTables(documentId, { expandColumns })
-        );
+        return textResult(await grist.listTables(documentId, { expandColumns }));
       } catch (error) {
         return errorResult(error);
       }
     }
   );
 
-  const defaultReadLimit = config.maxReadRecords > 0
-    ? Math.min(50, config.maxReadRecords)
-    : 50;
+  const defaultReadLimit =
+    config.maxReadRecords > 0 ? Math.min(50, config.maxReadRecords) : 50;
 
   server.registerTool(
     "query_records",
@@ -176,7 +169,6 @@ function buildServer(): McpServer {
   const newRecordSchema = z.object({
     fields: z.record(z.string(), z.unknown())
   });
-
   server.registerTool(
     "create_records",
     {
@@ -206,7 +198,6 @@ function buildServer(): McpServer {
     id: z.number().int().positive(),
     fields: z.record(z.string(), z.unknown())
   });
-
   server.registerTool(
     "update_records",
     {
@@ -240,8 +231,13 @@ function buildServer(): McpServer {
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
-        recordIds: boundedArray(z.number().int().positive(), config.maxWriteRecords)
-          .refine((ids) => new Set(ids).size === ids.length, "Record IDs must be unique.")
+        recordIds: boundedArray(
+          z.number().int().positive(),
+          config.maxWriteRecords
+        ).refine(
+          (ids) => new Set(ids).size === ids.length,
+          "Record IDs must be unique."
+        )
       }),
       annotations: {
         readOnlyHint: false,
@@ -258,6 +254,7 @@ function buildServer(): McpServer {
     }
   );
 
+  registerSchemaTools(server, grist, config.maxSchemaItems);
   return server;
 }
 
@@ -272,7 +269,7 @@ app.get("/healthz", (_req, res) => {
   res.json({
     status: "ok",
     service: "grist-chatgpt",
-    version: "0.3.0"
+    version: "0.4.0"
   });
 });
 
@@ -280,20 +277,16 @@ registerGptActionApi(app, {
   token: config.gptActionToken,
   grist,
   maxReadRecords: config.maxReadRecords,
-  maxWriteRecords: config.maxWriteRecords
+  maxWriteRecords: config.maxWriteRecords,
+  maxSchemaItems: config.maxSchemaItems
 });
 
 app.all("/mcp", (req, res) => {
   if (
-    !isAuthorizedBearerHeader(
-      req.get("Authorization"),
-      config.mcpBearerToken
-    )
+    !isAuthorizedBearerHeader(req.get("Authorization"), config.mcpBearerToken)
   ) {
     res.setHeader("WWW-Authenticate", "Bearer");
-    res.status(401).json({
-      error: "Unauthorized"
-    });
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
 

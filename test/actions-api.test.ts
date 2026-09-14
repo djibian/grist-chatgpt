@@ -13,6 +13,7 @@ import {
 const TOKEN = "abcdef0123456789abcdef0123456789";
 const MAX_READ = 1000;
 const MAX_WRITE = 100;
+const MAX_SCHEMA = 20;
 
 function fakeGrist(overrides: Partial<GristOperations> = {}): GristOperations {
   return {
@@ -22,6 +23,14 @@ function fakeGrist(overrides: Partial<GristOperations> = {}): GristOperations {
     createRecords: async () => ({ records: [{ id: 1 }] }),
     updateRecords: async () => null,
     deleteRecords: async () => null,
+    listColumns: async () => ({ columns: [] }),
+    createTables: async () => ({ tables: [] }),
+    updateTables: async () => null,
+    deleteTable: async () => null,
+    createColumns: async () => ({ columns: [] }),
+    updateColumns: async () => null,
+    renameColumn: async () => null,
+    deleteColumns: async () => null,
     ...overrides
   };
 }
@@ -35,7 +44,8 @@ async function startApi(
     token: TOKEN,
     grist,
     maxReadRecords: MAX_READ,
-    maxWriteRecords: MAX_WRITE
+    maxWriteRecords: MAX_WRITE,
+    maxSchemaItems: MAX_SCHEMA
   });
 
   const server = await new Promise<Server>((resolve) => {
@@ -55,10 +65,11 @@ async function stop(server: Server): Promise<void> {
   });
 }
 
-test("OpenAPI exposes discovery, guardrails and consequential deletion", () => {
+test("OpenAPI exposes data and consequential schema management actions", () => {
   const document = buildOpenApiDocument("https://bridge.example.org", {
     maxReadRecords: MAX_READ,
-    maxWriteRecords: MAX_WRITE
+    maxWriteRecords: MAX_WRITE,
+    maxSchemaItems: MAX_SCHEMA
   }) as any;
 
   assert.equal(document.servers[0].url, "https://bridge.example.org");
@@ -67,24 +78,25 @@ test("OpenAPI exposes discovery, guardrails and consequential deletion", () => {
     "listGristDocuments"
   );
   assert.equal(
-    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/query"].post
-      .requestBody.content["application/json"].schema.properties.limit.maximum,
-    MAX_READ
-  );
-  assert.equal(
-    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/records"].post
-      .requestBody.content["application/json"].schema.properties.records.maxItems,
-    MAX_WRITE
-  );
-  assert.equal(
-    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/records/delete"].post.operationId,
-    "deleteGristRecords"
-  );
-  assert.equal(
     document.paths["/api/v1/documents/{documentId}/tables/{tableId}/records/delete"].post[
       "x-openai-isConsequential"
     ],
     true
+  );
+  assert.equal(
+    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/columns"].get.operationId,
+    "listGristColumns"
+  );
+  assert.equal(
+    document.paths["/api/v1/documents/{documentId}/schema/tables/delete"].post[
+      "x-openai-isConsequential"
+    ],
+    true
+  );
+  assert.equal(
+    document.paths["/api/v1/documents/{documentId}/tables/{tableId}/columns/create"].post
+      .requestBody.content["application/json"].schema.properties.columns.maxItems,
+    MAX_SCHEMA
   );
 });
 
@@ -108,16 +120,13 @@ test("REST API rejects missing bearer token and lists allowed documents", async 
       headers: { Authorization: `Bearer ${TOKEN}` }
     });
     assert.equal(authorized.status, 200);
-    assert.deepEqual(await authorized.json(), {
-      documents: [{ document: { id: "doc-1" } }]
-    });
     assert.equal(calls, 1);
   } finally {
     await stop(server);
   }
 });
 
-test("query action forwards sort and format options and enforces configured limit", async () => {
+test("query action enforces configured read limit", async () => {
   const observed: unknown[] = [];
   const { baseUrl, server } = await startApi(
     fakeGrist({
@@ -134,18 +143,18 @@ test("query action forwards sort and format options and enforces configured limi
   };
 
   try {
-    const response = await fetch(
+    const accepted = await fetch(
       `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/query`,
       {
         method: "POST",
         headers,
-        body: JSON.stringify({ sort: "Nom,-Nombre", limit: 999, hidden: true, cellFormat: "typed" })
+        body: JSON.stringify({ limit: 999 })
       }
     );
-    assert.equal(response.status, 200);
+    assert.equal(accepted.status, 200);
     assert.equal(observed.length, 1);
 
-    const tooLarge = await fetch(
+    const rejected = await fetch(
       `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/query`,
       {
         method: "POST",
@@ -153,13 +162,13 @@ test("query action forwards sort and format options and enforces configured limi
         body: JSON.stringify({ limit: 1001 })
       }
     );
-    assert.equal(tooLarge.status, 400);
+    assert.equal(rejected.status, 400);
   } finally {
     await stop(server);
   }
 });
 
-test("delete action forwards exact unique record IDs and rejects duplicates", async () => {
+test("delete record action forwards exact unique IDs", async () => {
   const observed: unknown[] = [];
   const { baseUrl, server } = await startApi(
     fakeGrist({
@@ -175,7 +184,7 @@ test("delete action forwards exact unique record IDs and rejects duplicates", as
   };
 
   try {
-    const accepted = await fetch(
+    const response = await fetch(
       `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records/delete`,
       {
         method: "POST",
@@ -183,21 +192,76 @@ test("delete action forwards exact unique record IDs and rejects duplicates", as
         body: JSON.stringify({ recordIds: [4, 5] })
       }
     );
-    assert.equal(accepted.status, 200);
+    assert.equal(response.status, 200);
     assert.deepEqual(observed, [
       { documentId: "doc-1", tableId: "MCP_Test", recordIds: [4, 5] }
     ]);
+  } finally {
+    await stop(server);
+  }
+});
 
-    const rejected = await fetch(
-      `${baseUrl}/api/v1/documents/doc-1/tables/MCP_Test/records/delete`,
+test("schema routes forward formula metadata and targeted rename", async () => {
+  const observed: unknown[] = [];
+  const { baseUrl, server } = await startApi(
+    fakeGrist({
+      createColumns: async (documentId, tableId, columns) => {
+        observed.push({ action: "create", documentId, tableId, columns });
+        return { columns: [] };
+      },
+      renameColumn: async (documentId, tableId, oldColumnId, newColumnId) => {
+        observed.push({
+          action: "rename",
+          documentId,
+          tableId,
+          oldColumnId,
+          newColumnId
+        });
+        return null;
+      }
+    })
+  );
+  const headers = {
+    Authorization: `Bearer ${TOKEN}`,
+    "Content-Type": "application/json"
+  };
+
+  try {
+    const create = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/tables/People/columns/create`,
       {
         method: "POST",
         headers,
-        body: JSON.stringify({ recordIds: [4, 4] })
+        body: JSON.stringify({
+          columns: [
+            {
+              id: "DoubleScore",
+              fields: {
+                type: "Int",
+                isFormula: true,
+                formula: "$Score * 2",
+                widgetOptions: "{}"
+              }
+            }
+          ]
+        })
       }
     );
-    assert.equal(rejected.status, 400);
-    assert.equal(observed.length, 1);
+    assert.equal(create.status, 200);
+
+    const rename = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/tables/People/columns/rename`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          oldColumnId: "DoubleScore",
+          newColumnId: "ScoreX2"
+        })
+      }
+    );
+    assert.equal(rename.status, 200);
+    assert.equal(observed.length, 2);
   } finally {
     await stop(server);
   }

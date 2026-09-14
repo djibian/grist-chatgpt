@@ -8,7 +8,8 @@ import { GristService } from "../src/grist/service.js";
 function service(
   maxReadRecords = 1000,
   maxWriteRecords = 100,
-  writeBatchRecords = 2
+  writeBatchRecords = 2,
+  maxSchemaItems = 10
 ) {
   const observed: unknown[] = [];
   const client = {
@@ -28,7 +29,35 @@ function service(
       observed.push({ action: "delete", documentId, tableId, recordIds });
       return null;
     },
-    listTables: async () => ({ tables: [] })
+    listTables: async () => ({ tables: [] }),
+    listColumns: async (documentId: string, tableId: string, options: unknown) => {
+      observed.push({ action: "listColumns", documentId, tableId, options });
+      return { columns: [] };
+    },
+    createTables: async (documentId: string, tables: unknown) => {
+      observed.push({ action: "createTables", documentId, tables });
+      return { tables: [] };
+    },
+    updateTables: async (documentId: string, tables: unknown) => {
+      observed.push({ action: "updateTables", documentId, tables });
+      return null;
+    },
+    createColumns: async (documentId: string, tableId: string, columns: unknown) => {
+      observed.push({ action: "createColumns", documentId, tableId, columns });
+      return { columns: [] };
+    },
+    updateColumns: async (documentId: string, tableId: string, columns: unknown) => {
+      observed.push({ action: "updateColumns", documentId, tableId, columns });
+      return null;
+    },
+    deleteColumn: async (documentId: string, tableId: string, columnId: string) => {
+      observed.push({ action: "deleteColumn", documentId, tableId, columnId });
+      return null;
+    },
+    applyUserActions: async (documentId: string, actions: unknown) => {
+      observed.push({ action: "apply", documentId, actions });
+      return { actionNum: 1 };
+    }
   } as unknown as GristClient;
   const accessPolicy = {
     assertDocumentAllowed: async (documentId: string) => documentId,
@@ -39,7 +68,8 @@ function service(
     grist: new GristService(client, accessPolicy, {
       maxReadRecords,
       maxWriteRecords,
-      writeBatchRecords
+      writeBatchRecords,
+      maxSchemaItems
     }),
     observed
   };
@@ -109,12 +139,79 @@ test("delete requires unique positive IDs and batches them", async () => {
   );
 });
 
+test("renameColumn and deleteTable emit only fixed targeted Grist actions", async () => {
+  const { grist, observed } = service();
+
+  await grist.renameColumn("doc", "People", "FullName", "Name");
+  await grist.deleteTable("doc", "OldTable");
+
+  assert.deepEqual(observed, [
+    {
+      action: "apply",
+      documentId: "doc",
+      actions: [["RenameColumn", "People", "FullName", "Name"]]
+    },
+    {
+      action: "apply",
+      documentId: "doc",
+      actions: [["RemoveTable", "OldTable"]]
+    }
+  ]);
+});
+
+test("schema operations support formula/type/widget metadata and enforce guardrail", async () => {
+  const { grist, observed } = service(1000, 100, 20, 2);
+
+  await grist.createColumns("doc", "People", [
+    { id: "Score", fields: { type: "Int", label: "Score" } },
+    {
+      id: "DoubleScore",
+      fields: {
+        type: "Int",
+        isFormula: true,
+        formula: "$Score * 2",
+        widgetOptions: "{}"
+      }
+    }
+  ]);
+
+  assert.equal((observed[0] as any).action, "createColumns");
+  await assert.rejects(
+    () =>
+      grist.createColumns("doc", "People", [
+        { id: "A" },
+        { id: "B" },
+        { id: "C" }
+      ]),
+    /Schema item count 3 exceeds configured maximum 2/
+  );
+});
+
+test("deleteColumns requires explicit unique column IDs", async () => {
+  const { grist, observed } = service();
+  await grist.deleteColumns("doc", "People", ["OldA", "OldB"]);
+  assert.deepEqual(
+    observed.map((entry: any) => entry.columnId),
+    ["OldA", "OldB"]
+  );
+
+  await assert.rejects(
+    () => grist.deleteColumns("doc", "People", ["OldA", "OldA"]),
+    /Column IDs must be unique/
+  );
+});
+
 test("zero limits mean unlimited bridge-side guardrails", async () => {
-  const { grist } = service(0, 0, 200);
+  const { grist } = service(0, 0, 200, 0);
   await grist.queryRecords("doc", "Table1", { limit: 100000 });
   await grist.createRecords(
     "doc",
     "Table1",
     Array.from({ length: 1000 }, (_, i) => ({ fields: { i } }))
+  );
+  await grist.createColumns(
+    "doc",
+    "Table1",
+    Array.from({ length: 500 }, (_, i) => ({ id: `C${i}` }))
   );
 });
