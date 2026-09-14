@@ -6,6 +6,26 @@ export interface UpdateGristRecord extends NewGristRecord {
   id: number;
 }
 
+export interface GristColumnSpec {
+  id: string;
+  fields?: Record<string, unknown>;
+}
+
+export interface GristColumnUpdate {
+  id: string;
+  fields: Record<string, unknown>;
+}
+
+export interface GristTableSpec {
+  id: string;
+  columns?: GristColumnSpec[];
+}
+
+export interface GristTableUpdate {
+  id: string;
+  fields: Record<string, unknown>;
+}
+
 export interface GristOrgSummary {
   id: string | number;
   name?: string;
@@ -77,6 +97,95 @@ export class GristClient {
     return this.request(
       `/api/docs/${encodeURIComponent(documentId)}/tables${suffix}`
     );
+  }
+
+  async createTables(
+    documentIdOrUrl: string,
+    tables: GristTableSpec[]
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(`/api/docs/${encodeURIComponent(documentId)}/tables`, {
+      method: "POST",
+      body: JSON.stringify({ tables })
+    });
+  }
+
+  async updateTables(
+    documentIdOrUrl: string,
+    tables: GristTableUpdate[]
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(`/api/docs/${encodeURIComponent(documentId)}/tables`, {
+      method: "PATCH",
+      body: JSON.stringify({ tables })
+    });
+  }
+
+  async listColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    options: { hidden?: boolean } = {}
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    const query = new URLSearchParams();
+    if (options.hidden !== undefined) query.set("hidden", String(options.hidden));
+    const suffix = query.size ? `?${query.toString()}` : "";
+    return this.request(
+      `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/columns${suffix}`
+    );
+  }
+
+  async createColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    columns: GristColumnSpec[]
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(
+      `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/columns`,
+      {
+        method: "POST",
+        body: JSON.stringify({ columns })
+      }
+    );
+  }
+
+  async updateColumns(
+    documentIdOrUrl: string,
+    tableId: string,
+    columns: GristColumnUpdate[]
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(
+      `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/columns`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ columns })
+      }
+    );
+  }
+
+  async deleteColumn(
+    documentIdOrUrl: string,
+    tableId: string,
+    columnId: string
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(
+      `/api/docs/${encodeURIComponent(documentId)}/tables/${encodeURIComponent(tableId)}/columns/${encodeURIComponent(columnId)}`,
+      { method: "DELETE" }
+    );
+  }
+
+  async applyUserActions(
+    documentIdOrUrl: string,
+    actions: unknown[][]
+  ): Promise<unknown> {
+    const documentId = this.normalizeDocumentId(documentIdOrUrl);
+    return this.request(`/api/docs/${encodeURIComponent(documentId)}/apply`, {
+      method: "POST",
+      body: JSON.stringify(actions)
+    });
   }
 
   async queryRecords(
