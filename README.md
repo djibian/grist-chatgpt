@@ -143,7 +143,7 @@ npm test
 npm run build
 ```
 
-The repository pins the deployed dependency graph with `package-lock.json`; CI uses `npm ci` for reproducible installs.
+Direct dependency versions are pinned in `package.json`. A generated npm lockfile should be committed when the repository is next installed in an environment with registry access; until then CI continues to use `npm install`.
 
 ## Design principles
 
