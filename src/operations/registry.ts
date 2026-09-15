@@ -5,7 +5,7 @@ export type OperationCategory = "discovery" | "data" | "schema" | "context" | "u
 export interface OperationDefinition {
   name: string;
   category: OperationCategory;
-  capability: GristCapability;
+  capability: GristCapability | null;
   readOnly: boolean;
   destructive: boolean;
   summary: string;
@@ -27,7 +27,7 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
   { name: "rename_column", category: "schema", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Rename one column identifier." },
   { name: "delete_columns", category: "schema", capability: "doc.schema:write", readOnly: false, destructive: true, summary: "Delete explicitly identified columns." },
   { name: "inspect_document", category: "context", capability: "doc:read", readOnly: true, destructive: false, summary: "Build a compact semantic view of tables, columns, formulas and relationships." },
-  { name: "grist_help", category: "utility", capability: "doc:read", readOnly: true, destructive: false, summary: "Discover bridge operations and their required capabilities." }
+  { name: "grist_help", category: "utility", capability: null, readOnly: true, destructive: false, summary: "Discover bridge operations and their required capabilities." }
 ] as const;
 
 const OPERATION_MAP = new Map(OPERATION_REGISTRY.map((operation) => [operation.name, operation]));
@@ -36,6 +36,14 @@ export function getOperation(name: string): OperationDefinition {
   const operation = OPERATION_MAP.get(name);
   if (!operation) throw new Error(`Unknown operation "${name}".`);
   return operation;
+}
+
+export function getRequiredCapability(name: string): GristCapability {
+  const operation = getOperation(name);
+  if (!operation.capability) {
+    throw new Error(`Operation "${name}" does not target a Grist document capability.`);
+  }
+  return operation.capability;
 }
 
 export function operationHelp(names?: readonly string[]): { operations: OperationDefinition[] } {
