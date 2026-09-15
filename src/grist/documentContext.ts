@@ -1,10 +1,3 @@
-interface TableReader {
-  listTables(
-    documentIdOrUrl: string,
-    options?: { expandColumns?: boolean }
-  ): Promise<unknown>;
-}
-
 type JsonRecord = Record<string, unknown>;
 
 function record(value: unknown): JsonRecord | null {
@@ -22,10 +15,8 @@ function boolean(value: unknown): boolean | undefined {
 }
 
 export class DocumentContextService {
-  constructor(private readonly grist: TableReader) {}
-
-  async inspect(documentId: string): Promise<unknown> {
-    const raw = record(await this.grist.listTables(documentId, { expandColumns: true }));
+  build(documentId: string, tableResponse: unknown): unknown {
+    const raw = record(tableResponse);
     const sourceTables = Array.isArray(raw?.tables) ? raw.tables : [];
     const relations: Array<{
       sourceTable: string;
