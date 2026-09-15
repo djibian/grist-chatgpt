@@ -2,32 +2,28 @@
 
 ## Purpose
 
-Provide a ChatGPT Plus-compatible path to Grist through a custom GPT while preserving the MCP endpoint as the future plugin/public integration path.
+Provide a ChatGPT Plus-compatible path to Grist Community through a custom GPT while keeping the Grist API key, authorization and guardrails server-side.
 
-The GPT authenticates only to the bridge with `GPT_ACTION_TOKEN`. The Grist API key remains server-side.
+The GPT authenticates only to the bridge with `GPT_ACTION_TOKEN`.
 
 ```text
 ChatGPT custom GPT
        |
        | HTTPS + GPT_ACTION_TOKEN
        v
-grist-chatgpt /api/v1
+principal: chatgpt-actions
        |
        v
-   AccessPolicy
+AuthorizationService
        |
        v
-   GristService
+AuthorizedGristService
        |
        v
-   GristClient
-       |
-       | GRIST_API_KEY (server-side only)
-       v
-Grist Community
+GristService -> GristClient -> Grist Community
 ```
 
-## Authentication
+## Authentication and capability scope
 
 Configure a random `GPT_ACTION_TOKEN` of at least 32 characters, distinct from `MCP_BEARER_TOKEN`.
 
@@ -41,26 +37,47 @@ In the custom GPT Action editor:
 - Auth type: Bearer
 - Secret: `GPT_ACTION_TOKEN`
 
+The bearer identifies the static `chatgpt-actions` principal in the current personal deployment.
+
+Its capabilities are controlled by `GPT_ACTION_CAPABILITIES`. When omitted, compatibility defaults are:
+
+```text
+doc:read,doc:write,doc.schema:write
+```
+
+Removing a capability denies the corresponding operations server-side even if the Grist API key itself could perform them.
+
 ## OpenAPI schema
 
-The bridge serves the complete OpenAPI 3.1 document at:
+The bridge serves OpenAPI 3.1 at:
 
 ```text
 GET /openapi.json
 ```
 
-A deployed bridge may be imported directly by URL, e.g. `https://bridge.example.org/openapi.json`. Re-import or refresh this schema in the custom GPT after bridge upgrades that add operations.
+Re-import or refresh the schema in the custom GPT after bridge upgrades that add operations. The advertised version is shared with MCP and `/healthz`.
 
-The OpenAPI version advertised by the bridge is shared with the MCP and health-check runtime version.
+## Resource scope
 
-## Document scope
+ChatGPT does not inherit every document accessible to the Grist API key.
 
-ChatGPT does not automatically inherit every document accessible to the Grist API key. The bridge adds its own resource boundary:
+`AccessPolicy` defines the deployment resource boundary with:
 
-- `GRIST_ALLOWED_DOCUMENT_IDS`: explicit document IDs;
-- `GRIST_ALLOWED_WORKSPACE_IDS`: all documents currently present in selected workspaces.
+- `GRIST_ALLOWED_DOCUMENT_IDS`;
+- `GRIST_ALLOWED_WORKSPACE_IDS`.
 
-At least one scope entry is required. `listGristDocuments` returns only documents included in this bridge policy and accessible upstream in Grist.
+`AuthorizationService` then intersects that boundary with the `chatgpt-actions` principal and the capability required by each operation.
+
+`listGristDocuments` therefore returns only documents visible to this principal.
+
+## Discovery and semantic context
+
+v0.5 adds two read-only actions:
+
+- `getGristHelp` — returns the operation catalog with category, required capability and risk metadata;
+- `inspectGristDocument` — returns a compact semantic context containing tables, columns, formulas and `Ref` / `RefList` relationships without reading user-table rows.
+
+For complex document work, `inspectGristDocument` should normally be preferred over repeatedly discovering table structure one endpoint at a time.
 
 ## Data operations
 
@@ -71,45 +88,53 @@ At least one scope entry is required. `listGristDocuments` returns only document
 - `updateGristRecords` — update records by numeric ID.
 - `deleteGristRecords` — delete exact unique numeric IDs only.
 
+Read operations require `doc:read`; record writes require `doc:write`.
+
 Read size is controlled by `GRIST_MAX_READ_RECORDS`. Write size is controlled by `GRIST_MAX_WRITE_RECORDS`; large writes are internally split according to `GRIST_WRITE_BATCH_RECORDS`.
 
-Internal batches are **not atomic as a group**. If a later batch fails after previous batches succeeded, the API returns an explicit partial-operation error with the operation name, completed batch count, completed item count and failed batch number. A client must reconcile the already-applied items and must not retry the complete operation blindly.
+Internal batches are **not atomic as a group**. If a later batch fails after previous batches succeeded, the API reports the already-applied batches/items. A client must reconcile those items and must not retry the complete operation blindly.
 
 There is intentionally no pagination abstraction over Grist. Reads use Grist's native filter/sort/limit model.
 
 ## Schema operations
 
-- `listGristColumns` — inspect IDs, labels, types, formulas and widget metadata.
-- `createGristTables` — create tables with optional initial columns.
-- `updateGristTables` — update table metadata; `fields.tableId` renames a table and `fields.onDemand` changes on-demand loading.
-- `deleteGristTable` — delete one exact table ID.
-- `createGristColumns` — create columns.
-- `updateGristColumns` — modify metadata such as `label`, `type`, `formula`, `isFormula`, `visibleCol`, `widgetOptions`, etc.
-- `renameGristColumn` — rename one column ID.
-- `deleteGristColumns` — delete exact column IDs.
+The following require `doc.schema:write`:
 
-Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`. It is a total per-operation guardrail. For `createGristTables`, each table and each nested initial column counts toward the same maximum.
+- `listGristColumns` itself is read-only and requires only `doc:read`;
+- `createGristTables`;
+- `updateGristTables`;
+- `deleteGristTable`;
+- `createGristColumns`;
+- `updateGristColumns`;
+- `renameGristColumn`;
+- `deleteGristColumns`.
 
-Column deletion is sequential and may therefore also report a partial operation if a later column deletion fails.
+Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`, a total per-operation guardrail. For `createGristTables`, each table and nested initial column counts toward the same maximum.
+
+Column deletion is sequential and may therefore also report partial success.
 
 `widgetOptions` must be supplied in the JSON-string representation expected by Grist.
 
 ## Consequential actions
 
-Read operations are marked `x-openai-isConsequential: false`.
+Read operations, including help and document context, are marked `x-openai-isConsequential: false`.
 
-Create/update/delete data and every schema mutation are marked consequential. Destructive actions also require exact record/table/column identifiers rather than broad delete filters.
+Existing create/update/delete data and schema mutations remain marked consequential. This OpenAI metadata is independent of bridge authorization: it neither grants nor removes a server-side capability.
 
-## Low-level Grist API boundary
+## Low-level Grist boundary
 
 The bridge never exposes raw `/api/docs/{docId}/apply` to ChatGPT.
 
-Two high-level actions use it internally because they need Grist User Actions:
+Two current high-level actions use it internally:
 
-- `renameGristColumn` → fixed `RenameColumn` action;
-- `deleteGristTable` → fixed `RemoveTable` action.
+- `renameGristColumn` → fixed `RenameColumn`;
+- `deleteGristTable` → fixed `RemoveTable`.
 
-The model never supplies the User Action name or arbitrary action array.
+The model never supplies arbitrary User Action names or arrays.
+
+## Audit
+
+Every GPT operation routed through the policy-aware service emits structured operational metadata to the server log: request ID, principal, operation, capability, target document, status and duration. Cell values and credentials are not intentionally included.
 
 ## Deliberately unsupported generic capabilities
 
@@ -118,18 +143,19 @@ The GPT Actions interface does not expose:
 - arbitrary HTTP requests;
 - raw SQL;
 - raw Grist `/apply` actions;
-- unrestricted instance administration.
+- unrestricted instance administration;
+- user/ACL administration.
 
 ## Validation approach
 
-Use a synthetic allowed document when validating new destructive/schema actions. A useful sequence is:
+Use a synthetic allowed document when validating destructive/schema changes. A useful sequence is:
 
-1. `listGristDocuments`;
-2. inspect tables/columns;
-3. create a temporary table;
-4. add a typed column and a formula column;
-5. update/rename a column;
+1. `getGristHelp`;
+2. `listGristDocuments`;
+3. `inspectGristDocument`;
+4. create a temporary table;
+5. add typed/formula columns;
 6. create/update/delete synthetic records;
-7. delete the temporary columns/table after explicit confirmation.
+7. delete temporary schema objects.
 
-This exercises the same business layer used by MCP without exposing production data.
+This exercises the same authorized business layer used by MCP without exposing production data unnecessarily.
