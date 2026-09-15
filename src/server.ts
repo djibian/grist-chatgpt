@@ -16,7 +16,6 @@ import { loadConfig } from "./config.js";
 import { AccessPolicy } from "./grist/accessPolicy.js";
 import { AuthorizedGristService } from "./grist/authorizedService.js";
 import { GristApiError, GristClient } from "./grist/client.js";
-import { DocumentContextService } from "./grist/documentContext.js";
 import { GristService, PartialBatchError } from "./grist/service.js";
 import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
@@ -68,8 +67,6 @@ const gptGrist = new AuthorizedGristService(
   audit,
   gptPrincipal
 );
-const mcpDocumentContext = new DocumentContextService(mcpGrist);
-const gptDocumentContext = new DocumentContextService(gptGrist);
 
 function textResult(value: unknown) {
   return {
@@ -318,7 +315,7 @@ function buildServer(): McpServer {
   );
 
   registerSchemaTools(server, mcpGrist, config.maxSchemaItems);
-  registerDiscoveryTools(server, mcpDocumentContext);
+  registerDiscoveryTools(server, mcpGrist);
   return server;
 }
 
@@ -406,7 +403,7 @@ app.get("/api/v1/help", (_req, res) => {
 app.get("/api/v1/documents/:documentId/context", async (req, res) => {
   try {
     const documentId = z.string().min(1).parse(req.params.documentId);
-    res.json(await gptDocumentContext.inspect(documentId));
+    res.json(await gptGrist.inspectDocument(documentId));
   } catch (error) {
     sendApiError(res, error);
   }
