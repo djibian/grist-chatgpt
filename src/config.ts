@@ -1,3 +1,8 @@
+import {
+  GRIST_CAPABILITIES,
+  type GristCapability
+} from "./auth/principal.js";
+
 export interface Config {
   gristBaseUrl: string;
   gristApiKey: string;
@@ -9,6 +14,8 @@ export interface Config {
   maxSchemaItems: number;
   mcpBearerToken: string;
   gptActionToken: string;
+  mcpCapabilities: readonly GristCapability[];
+  gptActionCapabilities: readonly GristCapability[];
   mcpAllowedHosts: readonly string[];
   host: string;
   port: number;
@@ -52,6 +59,22 @@ function parseAllowedDocumentIds(value: string | undefined): string[] {
     }
   }
   return ids;
+}
+
+function parseCapabilities(
+  name: string,
+  value: string | undefined
+): GristCapability[] {
+  const configured = value?.trim() ? parseCsv(value) : [...GRIST_CAPABILITIES];
+  const allowed = new Set<string>(GRIST_CAPABILITIES);
+  for (const capability of configured) {
+    if (!allowed.has(capability)) {
+      throw new Error(
+        `${name} contains unsupported capability "${capability}". Allowed: ${GRIST_CAPABILITIES.join(", ")}.`
+      );
+    }
+  }
+  return configured as GristCapability[];
 }
 
 function parseLimit(name: string, defaultValue: number): number {
@@ -138,6 +161,14 @@ export function loadConfig(): Config {
     maxSchemaItems: parseLimit("GRIST_MAX_SCHEMA_ITEMS", 100),
     mcpBearerToken,
     gptActionToken,
+    mcpCapabilities: parseCapabilities(
+      "MCP_CAPABILITIES",
+      process.env.MCP_CAPABILITIES
+    ),
+    gptActionCapabilities: parseCapabilities(
+      "GPT_ACTION_CAPABILITIES",
+      process.env.GPT_ACTION_CAPABILITIES
+    ),
     mcpAllowedHosts: parseAllowedHosts(process.env.MCP_ALLOWED_HOSTS),
     host,
     port

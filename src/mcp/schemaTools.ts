@@ -3,6 +3,18 @@ import * as z from "zod/v4";
 
 import type { GristService } from "../grist/service.js";
 
+type SchemaOperations = Pick<
+  GristService,
+  | "listColumns"
+  | "createTables"
+  | "updateTables"
+  | "deleteTable"
+  | "createColumns"
+  | "updateColumns"
+  | "renameColumn"
+  | "deleteColumns"
+>;
+
 function boundedArray<T extends z.ZodType>(schema: T, max: number) {
   let result = z.array(schema).min(1);
   if (max > 0) result = result.max(max);
@@ -36,7 +48,7 @@ function errorResult(error: unknown) {
 
 export function registerSchemaTools(
   server: McpServer,
-  grist: GristService,
+  grist: SchemaOperations,
   maxSchemaItems: number
 ): void {
   const fieldsSchema = z.record(z.string(), z.unknown());

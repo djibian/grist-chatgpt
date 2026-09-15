@@ -3,13 +3,23 @@ import { toNodeHandler } from "@modelcontextprotocol/node";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
-import { registerGptActionApi } from "./actions/api.js";
+import {
+  buildOpenApiDocument,
+  registerGptActionApi,
+  sendApiError
+} from "./actions/api.js";
+import { AuditLogger } from "./audit/auditLogger.js";
+import { AuthorizationService } from "./auth/authorizationService.js";
+import { createPrincipal } from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { AccessPolicy } from "./grist/accessPolicy.js";
+import { AuthorizedGristService } from "./grist/authorizedService.js";
 import { GristApiError, GristClient } from "./grist/client.js";
 import { GristService, PartialBatchError } from "./grist/service.js";
+import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
+import { operationHelp } from "./operations/registry.js";
 import { VERSION } from "./version.js";
 
 const config = loadConfig();
@@ -21,12 +31,42 @@ const accessPolicy = new AccessPolicy(client, {
   allowedDocumentIds: config.allowedDocumentIds,
   allowedWorkspaceIds: config.allowedWorkspaceIds
 });
-const grist = new GristService(client, accessPolicy, {
+const baseGrist = new GristService(client, accessPolicy, {
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
   writeBatchRecords: config.writeBatchRecords,
   maxSchemaItems: config.maxSchemaItems
 });
+const authorization = new AuthorizationService(accessPolicy);
+const audit = new AuditLogger();
+
+const mcpPrincipal = createPrincipal({
+  id: "mcp-client",
+  transport: "mcp",
+  documentIds: config.allowedDocumentIds,
+  workspaceIds: config.allowedWorkspaceIds,
+  capabilities: config.mcpCapabilities
+});
+const gptPrincipal = createPrincipal({
+  id: "chatgpt-actions",
+  transport: "gpt-actions",
+  documentIds: config.allowedDocumentIds,
+  workspaceIds: config.allowedWorkspaceIds,
+  capabilities: config.gptActionCapabilities
+});
+
+const mcpGrist = new AuthorizedGristService(
+  baseGrist,
+  authorization,
+  audit,
+  mcpPrincipal
+);
+const gptGrist = new AuthorizedGristService(
+  baseGrist,
+  authorization,
+  audit,
+  gptPrincipal
+);
 
 function textResult(value: unknown) {
   return {
@@ -106,7 +146,7 @@ function buildServer(): McpServer {
     "list_documents",
     {
       description:
-        "List the Grist documents made available to ChatGPT by the bridge document/workspace access policy.",
+        "List the Grist documents made available to this MCP principal by the bridge policy.",
       inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
@@ -116,7 +156,7 @@ function buildServer(): McpServer {
     },
     async () => {
       try {
-        return textResult(await grist.listDocuments());
+        return textResult(await mcpGrist.listDocuments());
       } catch (error) {
         return errorResult(error);
       }
@@ -139,15 +179,12 @@ function buildServer(): McpServer {
     },
     async ({ documentId, expandColumns }) => {
       try {
-        return textResult(await grist.listTables(documentId, { expandColumns }));
+        return textResult(await mcpGrist.listTables(documentId, { expandColumns }));
       } catch (error) {
         return errorResult(error);
       }
     }
   );
-
-  const defaultReadLimit =
-    config.maxReadRecords > 0 ? Math.min(50, config.maxReadRecords) : 50;
 
   server.registerTool(
     "query_records",
@@ -159,7 +196,10 @@ function buildServer(): McpServer {
         tableId: z.string().min(1),
         filter: z.record(z.string(), z.array(z.unknown())).optional(),
         sort: z.string().min(1).optional(),
-        limit: boundedPositiveInt(config.maxReadRecords, defaultReadLimit),
+        limit: boundedPositiveInt(
+          config.maxReadRecords,
+          config.maxReadRecords > 0 ? Math.min(50, config.maxReadRecords) : 50
+        ),
         hidden: z.boolean().optional(),
         cellFormat: z.enum(["normal", "typed"]).optional()
       }),
@@ -172,7 +212,7 @@ function buildServer(): McpServer {
     async ({ documentId, tableId, filter, sort, limit, hidden, cellFormat }) => {
       try {
         return textResult(
-          await grist.queryRecords(documentId, tableId, {
+          await mcpGrist.queryRecords(documentId, tableId, {
             ...(filter ? { filter } : {}),
             ...(sort ? { sort } : {}),
             limit,
@@ -207,7 +247,7 @@ function buildServer(): McpServer {
     },
     async ({ documentId, tableId, records }) => {
       try {
-        return textResult(await grist.createRecords(documentId, tableId, records));
+        return textResult(await mcpGrist.createRecords(documentId, tableId, records));
       } catch (error) {
         return errorResult(error);
       }
@@ -236,7 +276,7 @@ function buildServer(): McpServer {
     },
     async ({ documentId, tableId, records }) => {
       try {
-        return textResult(await grist.updateRecords(documentId, tableId, records));
+        return textResult(await mcpGrist.updateRecords(documentId, tableId, records));
       } catch (error) {
         return errorResult(error);
       }
@@ -267,15 +307,63 @@ function buildServer(): McpServer {
     },
     async ({ documentId, tableId, recordIds }) => {
       try {
-        return textResult(await grist.deleteRecords(documentId, tableId, recordIds));
+        return textResult(await mcpGrist.deleteRecords(documentId, tableId, recordIds));
       } catch (error) {
         return errorResult(error);
       }
     }
   );
 
-  registerSchemaTools(server, grist, config.maxSchemaItems);
+  registerSchemaTools(server, mcpGrist, config.maxSchemaItems);
+  registerDiscoveryTools(server, mcpGrist);
   return server;
+}
+
+function publicBaseUrl(req: { get(name: string): string | undefined; protocol: string }): string {
+  const forwarded = req.get("X-Forwarded-Proto")?.split(",")[0]?.trim();
+  const protocol = forwarded === "https" || forwarded === "http" ? forwarded : req.protocol;
+  return `${protocol}://${req.get("host")}`;
+}
+
+function buildV05OpenApiDocument(baseUrl: string): Record<string, unknown> {
+  const document = buildOpenApiDocument(baseUrl, {
+    maxReadRecords: config.maxReadRecords,
+    maxWriteRecords: config.maxWriteRecords,
+    maxSchemaItems: config.maxSchemaItems
+  });
+  const paths = document.paths as Record<string, unknown>;
+  paths["/api/v1/help"] = {
+    get: {
+      operationId: "getGristHelp",
+      summary: "Discover available Grist bridge operations and required capabilities",
+      "x-openai-isConsequential": false,
+      responses: { "200": { description: "Operation catalog" } }
+    }
+  };
+  paths["/api/v1/documents/{documentId}/context"] = {
+    get: {
+      operationId: "inspectGristDocument",
+      summary: "Inspect the semantic structure of a Grist document",
+      description:
+        "Read-only. Returns tables, columns, formulas and Ref/RefList relationships without reading table rows.",
+      "x-openai-isConsequential": false,
+      parameters: [
+        {
+          name: "documentId",
+          in: "path",
+          required: true,
+          schema: { type: "string" }
+        }
+      ],
+      responses: {
+        "200": { description: "Compact semantic document context" },
+        "401": { description: "Missing or invalid GPT Actions bearer token" },
+        "403": { description: "Document or read capability is not allowed" },
+        "502": { description: "Grist upstream error" }
+      }
+    }
+  };
+  return document;
 }
 
 const handler = createMcpHandler(() => buildServer());
@@ -293,12 +381,32 @@ app.get("/healthz", (_req, res) => {
   });
 });
 
+// Register first so it shadows the compatibility OpenAPI route installed below.
+app.get("/openapi.json", (req, res) => {
+  res.json(buildV05OpenApiDocument(publicBaseUrl(req)));
+});
+
 registerGptActionApi(app, {
   token: config.gptActionToken,
-  grist,
+  grist: gptGrist,
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
   maxSchemaItems: config.maxSchemaItems
+});
+
+// These routes are registered after registerGptActionApi so its /api/v1 bearer
+// middleware protects them as well.
+app.get("/api/v1/help", (_req, res) => {
+  res.json(operationHelp());
+});
+
+app.get("/api/v1/documents/:documentId/context", async (req, res) => {
+  try {
+    const documentId = z.string().min(1).parse(req.params.documentId);
+    res.json(await gptGrist.inspectDocument(documentId));
+  } catch (error) {
+    sendApiError(res, error);
+  }
 });
 
 app.all("/mcp", (req, res) => {

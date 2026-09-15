@@ -1,8 +1,8 @@
 {
   "name": "grist-chatgpt",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "Experimental MCP bridge between ChatGPT-compatible clients and Grist.",
+  "description": "Controlled compatibility bridge between conversational AI clients and Grist Community.",
   "type": "module",
   "engines": {
     "node": ">=22"
