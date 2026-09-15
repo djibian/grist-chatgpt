@@ -4,11 +4,17 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import { registerGptActionApi } from "./actions/api.js";
+import { AuditLogger } from "./audit/auditLogger.js";
+import { AuthorizationService } from "./auth/authorizationService.js";
+import { createPrincipal } from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { AccessPolicy } from "./grist/accessPolicy.js";
+import { AuthorizedGristService } from "./grist/authorizedService.js";
 import { GristApiError, GristClient } from "./grist/client.js";
+import { DocumentContextService } from "./grist/documentContext.js";
 import { GristService, PartialBatchError } from "./grist/service.js";
+import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
 import { VERSION } from "./version.js";
 
@@ -21,12 +27,44 @@ const accessPolicy = new AccessPolicy(client, {
   allowedDocumentIds: config.allowedDocumentIds,
   allowedWorkspaceIds: config.allowedWorkspaceIds
 });
-const grist = new GristService(client, accessPolicy, {
+const baseGrist = new GristService(client, accessPolicy, {
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
   writeBatchRecords: config.writeBatchRecords,
   maxSchemaItems: config.maxSchemaItems
 });
+const authorization = new AuthorizationService(accessPolicy);
+const audit = new AuditLogger();
+
+const mcpPrincipal = createPrincipal({
+  id: "mcp-client",
+  transport: "mcp",
+  documentIds: config.allowedDocumentIds,
+  workspaceIds: config.allowedWorkspaceIds,
+  capabilities: config.mcpCapabilities
+});
+const gptPrincipal = createPrincipal({
+  id: "chatgpt-actions",
+  transport: "gpt-actions",
+  documentIds: config.allowedDocumentIds,
+  workspaceIds: config.allowedWorkspaceIds,
+  capabilities: config.gptActionCapabilities
+});
+
+const mcpGrist = new AuthorizedGristService(
+  baseGrist,
+  authorization,
+  audit,
+  mcpPrincipal
+);
+const gptGrist = new AuthorizedGristService(
+  baseGrist,
+  authorization,
+  audit,
+  gptPrincipal
+);
+const mcpDocumentContext = new DocumentContextService(mcpGrist);
+const gptDocumentContext = new DocumentContextService(gptGrist);
 
 function textResult(value: unknown) {
   return {
@@ -106,7 +144,7 @@ function buildServer(): McpServer {
     "list_documents",
     {
       description:
-        "List the Grist documents made available to ChatGPT by the bridge document/workspace access policy.",
+        "List the Grist documents made available to this MCP principal by the bridge policy.",
       inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
@@ -116,7 +154,7 @@ function buildServer(): McpServer {
     },
     async () => {
       try {
-        return textResult(await grist.listDocuments());
+        return textResult(await mcpGrist.listDocuments());
       } catch (error) {
         return errorResult(error);
       }
@@ -139,15 +177,12 @@ function buildServer(): McpServer {
     },
     async ({ documentId, expandColumns }) => {
       try {
-        return textResult(await grist.listTables(documentId, { expandColumns }));
+        return textResult(await mcpGrist.listTables(documentId, { expandColumns }));
       } catch (error) {
         return errorResult(error);
       }
     }
   );
-
-  const defaultReadLimit =
-    config.maxReadRecords > 0 ? Math.min(50, config.maxReadRecords) : 50;
 
   server.registerTool(
     "query_records",
@@ -159,7 +194,10 @@ function buildServer(): McpServer {
         tableId: z.string().min(1),
         filter: z.record(z.string(), z.array(z.unknown())).optional(),
         sort: z.string().min(1).optional(),
-        limit: boundedPositiveInt(config.maxReadRecords, defaultReadLimit),
+        limit: boundedPositiveInt(
+          config.maxReadRecords,
+          config.maxReadRecords > 0 ? Math.min(50, config.maxReadRecords) : 50
+        ),
         hidden: z.boolean().optional(),
         cellFormat: z.enum(["normal", "typed"]).optional()
       }),
@@ -172,7 +210,7 @@ function buildServer(): McpServer {
     async ({ documentId, tableId, filter, sort, limit, hidden, cellFormat }) => {
       try {
         return textResult(
-          await grist.queryRecords(documentId, tableId, {
+          await mcpGrist.queryRecords(documentId, tableId, {
             ...(filter ? { filter } : {}),
             ...(sort ? { sort } : {}),
             limit,
@@ -207,7 +245,7 @@ function buildServer(): McpServer {
     },
     async ({ documentId, tableId, records }) => {
       try {
-        return textResult(await grist.createRecords(documentId, tableId, records));
+        return textResult(await mcpGrist.createRecords(documentId, tableId, records));
       } catch (error) {
         return errorResult(error);
       }
@@ -236,7 +274,7 @@ function buildServer(): McpServer {
     },
     async ({ documentId, tableId, records }) => {
       try {
-        return textResult(await grist.updateRecords(documentId, tableId, records));
+        return textResult(await mcpGrist.updateRecords(documentId, tableId, records));
       } catch (error) {
         return errorResult(error);
       }
@@ -267,14 +305,15 @@ function buildServer(): McpServer {
     },
     async ({ documentId, tableId, recordIds }) => {
       try {
-        return textResult(await grist.deleteRecords(documentId, tableId, recordIds));
+        return textResult(await mcpGrist.deleteRecords(documentId, tableId, recordIds));
       } catch (error) {
         return errorResult(error);
       }
     }
   );
 
-  registerSchemaTools(server, grist, config.maxSchemaItems);
+  registerSchemaTools(server, mcpGrist, config.maxSchemaItems);
+  registerDiscoveryTools(server, mcpDocumentContext);
   return server;
 }
 
@@ -295,7 +334,8 @@ app.get("/healthz", (_req, res) => {
 
 registerGptActionApi(app, {
   token: config.gptActionToken,
-  grist,
+  grist: gptGrist,
+  documentContext: gptDocumentContext,
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
   maxSchemaItems: config.maxSchemaItems
