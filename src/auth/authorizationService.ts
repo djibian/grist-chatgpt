@@ -58,7 +58,7 @@ export class AuthorizationService {
 
     if (!match) {
       throw new AuthorizationError(
-        `Principal "${principal.id}" lacks ${capability} access to Grist document "${documentId}".`
+        `Grist document "${documentId}" is not allowed by this bridge for principal "${principal.id}" with capability ${capability}.`
       );
     }
     return documentId;
