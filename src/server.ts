@@ -3,7 +3,11 @@ import { toNodeHandler } from "@modelcontextprotocol/node";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
-import { registerGptActionApi } from "./actions/api.js";
+import {
+  buildOpenApiDocument,
+  registerGptActionApi,
+  sendApiError
+} from "./actions/api.js";
 import { AuditLogger } from "./audit/auditLogger.js";
 import { AuthorizationService } from "./auth/authorizationService.js";
 import { createPrincipal } from "./auth/principal.js";
@@ -16,6 +20,7 @@ import { DocumentContextService } from "./grist/documentContext.js";
 import { GristService, PartialBatchError } from "./grist/service.js";
 import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
+import { operationHelp } from "./operations/registry.js";
 import { VERSION } from "./version.js";
 
 const config = loadConfig();
@@ -317,6 +322,53 @@ function buildServer(): McpServer {
   return server;
 }
 
+function publicBaseUrl(req: { get(name: string): string | undefined; protocol: string }): string {
+  const forwarded = req.get("X-Forwarded-Proto")?.split(",")[0]?.trim();
+  const protocol = forwarded === "https" || forwarded === "http" ? forwarded : req.protocol;
+  return `${protocol}://${req.get("host")}`;
+}
+
+function buildV05OpenApiDocument(baseUrl: string): Record<string, unknown> {
+  const document = buildOpenApiDocument(baseUrl, {
+    maxReadRecords: config.maxReadRecords,
+    maxWriteRecords: config.maxWriteRecords,
+    maxSchemaItems: config.maxSchemaItems
+  });
+  const paths = document.paths as Record<string, unknown>;
+  paths["/api/v1/help"] = {
+    get: {
+      operationId: "getGristHelp",
+      summary: "Discover available Grist bridge operations and required capabilities",
+      "x-openai-isConsequential": false,
+      responses: { "200": { description: "Operation catalog" } }
+    }
+  };
+  paths["/api/v1/documents/{documentId}/context"] = {
+    get: {
+      operationId: "inspectGristDocument",
+      summary: "Inspect the semantic structure of a Grist document",
+      description:
+        "Read-only. Returns tables, columns, formulas and Ref/RefList relationships without reading table rows.",
+      "x-openai-isConsequential": false,
+      parameters: [
+        {
+          name: "documentId",
+          in: "path",
+          required: true,
+          schema: { type: "string" }
+        }
+      ],
+      responses: {
+        "200": { description: "Compact semantic document context" },
+        "401": { description: "Missing or invalid GPT Actions bearer token" },
+        "403": { description: "Document or read capability is not allowed" },
+        "502": { description: "Grist upstream error" }
+      }
+    }
+  };
+  return document;
+}
+
 const handler = createMcpHandler(() => buildServer());
 const nodeHandler = toNodeHandler(handler);
 const app = createMcpExpressApp({
@@ -332,13 +384,32 @@ app.get("/healthz", (_req, res) => {
   });
 });
 
+// Register first so it shadows the compatibility OpenAPI route installed below.
+app.get("/openapi.json", (req, res) => {
+  res.json(buildV05OpenApiDocument(publicBaseUrl(req)));
+});
+
 registerGptActionApi(app, {
   token: config.gptActionToken,
   grist: gptGrist,
-  documentContext: gptDocumentContext,
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
   maxSchemaItems: config.maxSchemaItems
+});
+
+// These routes are registered after registerGptActionApi so its /api/v1 bearer
+// middleware protects them as well.
+app.get("/api/v1/help", (_req, res) => {
+  res.json(operationHelp());
+});
+
+app.get("/api/v1/documents/:documentId/context", async (req, res) => {
+  try {
+    const documentId = z.string().min(1).parse(req.params.documentId);
+    res.json(await gptDocumentContext.inspect(documentId));
+  } catch (error) {
+    sendApiError(res, error);
+  }
 });
 
 app.all("/mcp", (req, res) => {
