@@ -1,7 +1,10 @@
 import type { AuditLogger } from "../audit/auditLogger.js";
 import type { AuthorizationService } from "../auth/authorizationService.js";
-import type { Principal } from "../auth/principal.js";
-import { getOperation } from "../operations/registry.js";
+import type { GristCapability, Principal } from "../auth/principal.js";
+import {
+  getOperation,
+  getRequiredCapability
+} from "../operations/registry.js";
 import type {
   GristColumnSpec,
   GristColumnUpdate,
@@ -10,9 +13,12 @@ import type {
   NewGristRecord,
   UpdateGristRecord
 } from "./client.js";
+import { DocumentContextService } from "./documentContext.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
 
 export class AuthorizedGristService {
+  private readonly documentContext = new DocumentContextService();
+
   constructor(
     private readonly inner: GristService,
     private readonly authorization: AuthorizationService,
@@ -38,14 +44,12 @@ export class AuthorizedGristService {
 
   async listDocuments(): Promise<unknown> {
     const definition = getOperation("list_documents");
+    const capability = getRequiredCapability(definition.name);
     const requestId = this.audit.nextRequestId();
     const started = Date.now();
     try {
       const documents = (
-        await this.authorization.listDocuments(
-          this.principal,
-          definition.capability
-        )
+        await this.authorization.listDocuments(this.principal, capability)
       ).map(({ org, workspace, document }) => ({
         org: { id: org.id, name: org.name, domain: org.domain },
         workspace: {
@@ -60,7 +64,7 @@ export class AuthorizedGristService {
         principal: this.principal.id,
         transport: this.principal.transport,
         operation: definition.name,
-        capability: definition.capability,
+        capability,
         status: "success",
         durationMs: Date.now() - started
       });
@@ -70,12 +74,19 @@ export class AuthorizedGristService {
         requestId,
         started,
         definition.name,
-        definition.capability,
+        capability,
         undefined,
         error
       );
       throw error;
     }
+  }
+
+  async inspectDocument(documentIdOrUrl: string): Promise<unknown> {
+    return this.execute("inspect_document", documentIdOrUrl, undefined, async (id) => {
+      const tableResponse = await this.inner.listTables(id, { expandColumns: true });
+      return this.documentContext.build(id, tableResponse);
+    });
   }
 
   async listTables(
@@ -213,6 +224,7 @@ export class AuthorizedGristService {
     action: (documentId: string) => Promise<unknown>
   ): Promise<unknown> {
     const definition = getOperation(operation);
+    const capability = getRequiredCapability(operation);
     const requestId = this.audit.nextRequestId();
     const started = Date.now();
     let documentId = documentIdOrUrl;
@@ -220,7 +232,7 @@ export class AuthorizedGristService {
       documentId = await this.authorization.assertDocumentAllowed(
         this.principal,
         documentIdOrUrl,
-        definition.capability
+        capability
       );
       const result = await action(documentId);
       this.audit.record({
@@ -228,7 +240,7 @@ export class AuthorizedGristService {
         principal: this.principal.id,
         transport: this.principal.transport,
         operation: definition.name,
-        capability: definition.capability,
+        capability,
         documentId,
         ...(itemCount !== undefined ? { itemCount } : {}),
         status: "success",
@@ -240,7 +252,7 @@ export class AuthorizedGristService {
         requestId,
         started,
         definition.name,
-        definition.capability,
+        capability,
         documentId,
         error,
         itemCount
@@ -253,7 +265,7 @@ export class AuthorizedGristService {
     requestId: string,
     started: number,
     operation: string,
-    capability: ReturnType<typeof getOperation>["capability"],
+    capability: GristCapability,
     documentId: string | undefined,
     error: unknown,
     itemCount?: number
