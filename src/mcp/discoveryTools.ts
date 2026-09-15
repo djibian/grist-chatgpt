@@ -1,8 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
-import type { DocumentContextService } from "../grist/documentContext.js";
 import { operationHelp } from "../operations/registry.js";
+
+interface ContextOperations {
+  inspectDocument(documentId: string): Promise<unknown>;
+}
 
 function textResult(value: unknown) {
   return {
@@ -24,7 +27,7 @@ function errorResult(error: unknown) {
 
 export function registerDiscoveryTools(
   server: McpServer,
-  documentContext: DocumentContextService
+  grist: ContextOperations
 ): void {
   server.registerTool(
     "grist_help",
@@ -63,7 +66,7 @@ export function registerDiscoveryTools(
     },
     async ({ documentId }) => {
       try {
-        return textResult(await documentContext.inspect(documentId));
+        return textResult(await grist.inspectDocument(documentId));
       } catch (error) {
         return errorResult(error);
       }
