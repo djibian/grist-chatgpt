@@ -32,14 +32,15 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
 
 const OPERATION_MAP = new Map(OPERATION_REGISTRY.map((operation) => [operation.name, operation]));
 
+export function getOperation(name: string): OperationDefinition {
+  const operation = OPERATION_MAP.get(name);
+  if (!operation) throw new Error(`Unknown operation "${name}".`);
+  return operation;
+}
+
 export function operationHelp(names?: readonly string[]): { operations: OperationDefinition[] } {
   if (!names || names.length === 0) {
     return { operations: [...OPERATION_REGISTRY] };
   }
-  const operations = names.map((name) => {
-    const operation = OPERATION_MAP.get(name);
-    if (!operation) throw new Error(`Unknown operation "${name}".`);
-    return operation;
-  });
-  return { operations };
+  return { operations: names.map(getOperation) };
 }
