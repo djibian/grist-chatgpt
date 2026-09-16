@@ -133,9 +133,14 @@ export class AuthorizedGristService {
     tableId: string,
     options: QueryRecordsOptions = {}
   ): Promise<unknown> {
-    return this.execute("query_records", documentIdOrUrl, undefined, (id) =>
-      this.inner.queryRecords(id, tableId, options)
-    );
+    return this.execute("query_records", documentIdOrUrl, undefined, (id) => {
+      if (tableId.startsWith("_grist_")) {
+        throw new Error(
+          "Grist metadata tables are internal to the bridge; use the semantic document/page/widget inspection operations instead."
+        );
+      }
+      return this.inner.queryRecords(id, tableId, options);
+    });
   }
 
   async createRecords(
