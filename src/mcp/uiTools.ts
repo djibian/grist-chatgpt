@@ -4,9 +4,14 @@ import * as z from "zod/v4";
 import type { PageWidgetUpdateInput } from "../grist/authorizedService.js";
 import {
   NATIVE_WIDGET_TYPES,
-  UiWriteVerificationError,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
+import { getMcpToolMetadata } from "../operations/registry.js";
+import {
+  pageMutationOutputSchema,
+  widgetMutationOutputSchema
+} from "./outputSchemas.js";
+import { errorResult, structuredResult } from "./results.js";
 
 interface UiOperations {
   createPage(documentId: string, tableId: string, name: string): Promise<unknown>;
@@ -25,60 +30,24 @@ interface UiOperations {
   ): Promise<unknown>;
 }
 
-function textResult(value: unknown) {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify(value, null, 2)
-      }
-    ]
-  };
-}
-
-function errorResult(error: unknown) {
-  const body = error instanceof UiWriteVerificationError
-    ? {
-        error: "Grist UI write verification failed",
-        operation: error.operation,
-        ...(error.createdId !== undefined ? { createdId: error.createdId } : {}),
-        retryWholeOperation: false
-      }
-    : {
-        error: error instanceof Error ? error.message : String(error)
-      };
-
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify(body)
-      }
-    ]
-  };
-}
-
 export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
     "create_page",
     {
-      description:
-        "Create one empty named Grist page using a bounded AddView UserAction. The page initially contains no widget; add widgets separately.",
+      ...getMcpToolMetadata("create_page"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
         name: z.string().trim().min(1)
       }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      outputSchema: pageMutationOutputSchema
     },
     async ({ documentId, tableId, name }) => {
       try {
-        return textResult(await grist.createPage(documentId, tableId, name));
+        const output = pageMutationOutputSchema.parse(
+          await grist.createPage(documentId, tableId, name)
+        );
+        return structuredResult(output);
       } catch (error) {
         return errorResult(error);
       }
@@ -88,25 +57,21 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
     "add_page_widget",
     {
-      description:
-        "Add exactly one native Grist widget to an existing page using a bounded CreateViewSection UserAction, with post-write re-read verification.",
+      ...getMcpToolMetadata("add_page_widget"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         pageId: z.number().int().positive(),
         tableId: z.string().min(1),
         type: z.enum(NATIVE_WIDGET_TYPES)
       }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      outputSchema: widgetMutationOutputSchema
     },
     async ({ documentId, pageId, tableId, type }) => {
       try {
-        return textResult(
+        const output = widgetMutationOutputSchema.parse(
           await grist.addPageWidget(documentId, pageId, tableId, type)
         );
+        return structuredResult(output);
       } catch (error) {
         return errorResult(error);
       }
@@ -116,22 +81,20 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
     "rename_page",
     {
-      description:
-        "Rename exactly one existing Grist page through a bounded metadata update, with post-write re-read verification.",
+      ...getMcpToolMetadata("rename_page"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         pageId: z.number().int().positive(),
         name: z.string().trim().min(1)
       }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      outputSchema: pageMutationOutputSchema
     },
     async ({ documentId, pageId, name }) => {
       try {
-        return textResult(await grist.renamePage(documentId, pageId, name));
+        const output = pageMutationOutputSchema.parse(
+          await grist.renamePage(documentId, pageId, name)
+        );
+        return structuredResult(output);
       } catch (error) {
         return errorResult(error);
       }
@@ -141,8 +104,7 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
     "update_page_widget",
     {
-      description:
-        "Update one widget title and/or a safe direct select-by link. Direct select-by is limited to another widget on the same page backed by the same table; null clears the link.",
+      ...getMcpToolMetadata("update_page_widget"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         pageId: z.number().int().positive(),
@@ -154,11 +116,7 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           .nullable()
           .optional()
       }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      outputSchema: widgetMutationOutputSchema
     },
     async ({ documentId, pageId, widgetId, title, selectBy }) => {
       try {
@@ -169,9 +127,10 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           ...(title !== undefined ? { title } : {}),
           ...(selectBy !== undefined ? { selectBy } : {})
         };
-        return textResult(
+        const output = widgetMutationOutputSchema.parse(
           await grist.updatePageWidget(documentId, pageId, widgetId, update)
         );
+        return structuredResult(output);
       } catch (error) {
         return errorResult(error);
       }

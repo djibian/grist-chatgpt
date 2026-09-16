@@ -41,7 +41,7 @@ Further document-UI breadth is not the current critical path.
              |                       |
              v                       v
  C1 Credential abstraction      C2 MCP contract v1
-          DONE                     ELIGIBLE
+          DONE                       DONE
              |
              v
  C3 User-aware Grist context
@@ -62,7 +62,7 @@ Further document-UI breadth is not the current critical path.
              v                          v
  C6 Production hardening       C7 Reviewer fixture
  BLOCKED by C4/C5              BLOCKED by C4/C5
-             |                          |
+             |
              +------------+-------------+
                           |
                           v
@@ -73,7 +73,7 @@ Further document-UI breadth is not the current critical path.
                    Plugin submission
 ```
 
-`C2 MCP contract v1` may progress in parallel with C3. OAuth research/design may occur before C3 completes, but core OAuth integration must not couple itself to the current process-wide Grist client/key architecture.
+`C2 MCP contract v1` is integrated. C3 is the next blocking implementation tranche. OAuth research/design may occur before C3 completes, but core OAuth integration remains blocked until C3 is integrated.
 
 ## C1 — Credential abstraction
 
@@ -111,7 +111,7 @@ Introduce the architectural seam required to stop treating one process-wide `GRI
 
 ## C2 — MCP contract v1
 
-**Status: ELIGIBLE**  
+**Status: DONE**  
 **Priority: high / independent**  
 **Suggested branch:** `feat/mcp-contract-v1`
 
@@ -314,14 +314,13 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The preferred next parallel pair is:
+The immediate implementation focus is:
 
 ```text
 Worker A: C3 User-aware Grist context
-Worker B: C2 MCP contract v1
 ```
 
-C3 is eligible because C1 is integrated. Do not integrate core C4 OAuth work until C3 is integrated.
+Independent OAuth research/design may proceed without selecting a provider or starting core C4 integration. C4 remains blocked until C3 is integrated.
 
 ## Controller integration order
 

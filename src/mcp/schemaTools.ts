@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import type { GristService } from "../grist/service.js";
+import { getMcpToolMetadata } from "../operations/registry.js";
+import { errorResult, textResult } from "./results.js";
 
 type SchemaOperations = Pick<
   GristService,
@@ -19,31 +21,6 @@ function boundedArray<T extends z.ZodType>(schema: T, max: number) {
   let result = z.array(schema).min(1);
   if (max > 0) result = result.max(max);
   return result;
-}
-
-function textResult(value: unknown) {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify(value, null, 2)
-      }
-    ]
-  };
-}
-
-function errorResult(error: unknown) {
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify({
-          error: error instanceof Error ? error.message : String(error)
-        })
-      }
-    ]
-  };
 }
 
 export function registerSchemaTools(
@@ -72,18 +49,12 @@ export function registerSchemaTools(
   server.registerTool(
     "list_columns",
     {
-      description:
-        "List columns and metadata for an allowed Grist table, including types, formulas and widget options.",
+      ...getMcpToolMetadata("list_columns"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
         hidden: z.boolean().default(false)
-      }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tableId, hidden }) => {
       try {
@@ -97,17 +68,11 @@ export function registerSchemaTools(
   server.registerTool(
     "create_tables",
     {
-      description:
-        "Create Grist tables, optionally with initial columns. This changes document structure.",
+      ...getMcpToolMetadata("create_tables"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tables: boundedArray(tableSpecSchema, maxSchemaItems)
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tables }) => {
       try {
@@ -121,17 +86,11 @@ export function registerSchemaTools(
   server.registerTool(
     "update_tables",
     {
-      description:
-        "Update Grist table metadata. fields may include tableId to rename a table or onDemand to change loading mode.",
+      ...getMcpToolMetadata("update_tables"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tables: boundedArray(tableUpdateSchema, maxSchemaItems)
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tables }) => {
       try {
@@ -145,17 +104,11 @@ export function registerSchemaTools(
   server.registerTool(
     "delete_table",
     {
-      description:
-        "Delete one explicitly identified Grist table. Inspect and present the exact target before invoking this destructive action.",
+      ...getMcpToolMetadata("delete_table"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1)
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: true,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tableId }) => {
       try {
@@ -169,18 +122,12 @@ export function registerSchemaTools(
   server.registerTool(
     "create_columns",
     {
-      description:
-        "Create columns in a Grist table. fields may include label, type, formula, isFormula, visibleCol, widgetOptions and other Grist metadata.",
+      ...getMcpToolMetadata("create_columns"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
         columns: boundedArray(columnSpecSchema, maxSchemaItems)
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tableId, columns }) => {
       try {
@@ -194,18 +141,12 @@ export function registerSchemaTools(
   server.registerTool(
     "update_columns",
     {
-      description:
-        "Update Grist column metadata, including type, formula, label, widgetOptions and other fields accepted by Grist. Use rename_column to change the column ID.",
+      ...getMcpToolMetadata("update_columns"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
         columns: boundedArray(columnUpdateSchema, maxSchemaItems)
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tableId, columns }) => {
       try {
@@ -219,19 +160,13 @@ export function registerSchemaTools(
   server.registerTool(
     "rename_column",
     {
-      description:
-        "Rename one Grist column ID using a fixed RenameColumn operation. This changes document structure.",
+      ...getMcpToolMetadata("rename_column"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
         oldColumnId: z.string().min(1),
         newColumnId: z.string().min(1)
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tableId, oldColumnId, newColumnId }) => {
       try {
@@ -252,8 +187,7 @@ export function registerSchemaTools(
   server.registerTool(
     "delete_columns",
     {
-      description:
-        "Delete explicitly identified Grist columns. Inspect and present the exact targets before invoking this destructive action.",
+      ...getMcpToolMetadata("delete_columns"),
       inputSchema: z.object({
         documentId: z.string().min(1),
         tableId: z.string().min(1),
@@ -261,12 +195,7 @@ export function registerSchemaTools(
           (ids) => new Set(ids).size === ids.length,
           "Column IDs must be unique."
         )
-      }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: true,
-        openWorldHint: false
-      }
+      })
     },
     async ({ documentId, tableId, columnIds }) => {
       try {
