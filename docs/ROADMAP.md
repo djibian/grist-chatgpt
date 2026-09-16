@@ -73,7 +73,7 @@ Further document-UI breadth is not the current critical path.
                    Plugin submission
 ```
 
-C1, C2 and C3 are integrated. The next blocking implementation tranche is C4, but core OAuth integration is now blocked on the explicit human decision selecting the identity-provider approach. Protocol research and a decision package may proceed without making that selection autonomously.
+C1, C2 and C3 are integrated. The C4 protocol research and identity-provider decision package is also integrated in `docs/OAUTH-IDP-DECISION.md`. Core OAuth implementation is now blocked on the explicit human decision selecting the identity-provider approach; no provider-specific C4 implementation is eligible until that decision is made durable.
 
 ## C1 — Credential abstraction
 
@@ -179,15 +179,23 @@ Make clients, resource discovery, deployment policy intersection and caches safe
 
 Replace the production MCP static bearer principal with OAuth-authenticated dynamic principals and explicit scopes.
 
+### Decision package
+
+The protocol research, candidate architecture categories, compatibility probes and human decision questions are integrated in `docs/OAUTH-IDP-DECISION.md`.
+
+That document deliberately does not select an identity provider or authorization-server architecture. The decision record in that document must be completed by an authorized human decision and the resulting choice made durable before provider-specific core implementation starts.
+
 ### Design/research work allowed now
 
-Research and documentation may establish:
+Research and documentation may continue to clarify:
 
 - the current MCP/OAuth 2.1 protocol requirements;
 - protected-resource metadata and challenge behavior;
 - token validation requirements (issuer/audience/expiry/scopes);
 - concrete identity-provider options and tradeoffs for the DINUM deployment;
 - mapping from OAuth scopes to the existing `doc:read`, `doc:write`, `doc.schema:write` vocabulary without changing that public scope set.
+
+Research may reduce uncertainty, but it must not silently become a provider selection or provider-specific production implementation.
 
 ### Human gate
 
@@ -316,7 +324,7 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The immediate next useful work is non-committing C4 research and preparation of the smallest identity-provider decision package for the human gate. Do not open core OAuth implementation until that decision is durable.
+The C4 decision package is integrated. The next critical-path transition is the human identity-provider decision documented in `docs/OAUTH-IDP-DECISION.md`. No core C4 OAuth implementation is eligible until that decision is made durable. Independent low-risk preparation may continue only where the roadmap already permits it and where it does not assume the outcome of the human gate.
 
 ## Controller integration order
 
