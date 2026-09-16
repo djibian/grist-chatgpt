@@ -1,6 +1,7 @@
 import type { Express, Response } from "express";
 import * as z from "zod/v4";
 
+import type { PageWidgetUpdateInput } from "../grist/authorizedService.js";
 import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
@@ -14,6 +15,13 @@ export interface GristUiOperations {
     tableId: string,
     type: NativeWidgetType
   ): Promise<unknown>;
+  renamePage(documentId: string, pageId: number, name: string): Promise<unknown>;
+  updatePageWidget(
+    documentId: string,
+    pageId: number,
+    widgetId: number,
+    update: PageWidgetUpdateInput
+  ): Promise<unknown>;
 }
 
 const documentParamsSchema = z.object({
@@ -23,6 +31,12 @@ const documentParamsSchema = z.object({
 const pageParamsSchema = z.object({
   documentId: z.string().min(1),
   pageId: z.coerce.number().int().positive()
+});
+
+const widgetParamsSchema = z.object({
+  documentId: z.string().min(1),
+  pageId: z.coerce.number().int().positive(),
+  widgetId: z.coerce.number().int().positive()
 });
 
 const createPageBodySchema = z
@@ -39,6 +53,26 @@ const addWidgetBodySchema = z
   })
   .strict();
 
+const renamePageBodySchema = z
+  .object({
+    name: z.string().trim().min(1)
+  })
+  .strict();
+
+const updateWidgetBodySchema = z
+  .object({
+    title: z.string().optional(),
+    selectBy: z
+      .object({ sourceWidgetId: z.number().int().positive() })
+      .strict()
+      .nullable()
+      .optional()
+  })
+  .strict()
+  .refine((value) => value.title !== undefined || value.selectBy !== undefined, {
+    message: "At least one of title or selectBy must be supplied."
+  });
+
 export function buildUiOpenApiPaths(): Record<string, unknown> {
   const documentIdParameter = {
     name: "documentId",
@@ -48,6 +82,12 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
   };
   const pageIdParameter = {
     name: "pageId",
+    in: "path",
+    required: true,
+    schema: { type: "integer", minimum: 1 }
+  };
+  const widgetIdParameter = {
+    name: "widgetId",
     in: "path",
     required: true,
     schema: { type: "integer", minimum: 1 }
@@ -90,6 +130,35 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
         }
       }
     },
+    "/api/v1/documents/{documentId}/pages/{pageId}": {
+      patch: {
+        operationId: "renameGristPage",
+        summary: "Rename one existing Grist page",
+        description:
+          "Renames exactly one page through a bounded metadata UpdateRecord, then re-reads the page and verifies the requested name.",
+        "x-openai-isConsequential": true,
+        parameters: [documentIdParameter, pageIdParameter],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["name"],
+                properties: {
+                  name: { type: "string", minLength: 1 }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": { description: "Renamed and re-read page" },
+          ...writeResponses
+        }
+      }
+    },
     "/api/v1/documents/{documentId}/pages/{pageId}/widgets": {
       post: {
         operationId: "addGristPageWidget",
@@ -122,6 +191,48 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
           ...writeResponses
         }
       }
+    },
+    "/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}": {
+      patch: {
+        operationId: "updateGristPageWidget",
+        summary: "Update one Grist widget title or safe direct select-by link",
+        description:
+          "Updates only bounded widget metadata. selectBy links one widget directly to another widget on the same page backed by the same table; null clears the link. Column-reference select-by is intentionally not exposed in this tranche.",
+        "x-openai-isConsequential": true,
+        parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                minProperties: 1,
+                properties: {
+                  title: { type: "string" },
+                  selectBy: {
+                    anyOf: [
+                      {
+                        type: "object",
+                        additionalProperties: false,
+                        required: ["sourceWidgetId"],
+                        properties: {
+                          sourceWidgetId: { type: "integer", minimum: 1 }
+                        }
+                      },
+                      { type: "null" }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": { description: "Updated and re-read page widget" },
+          ...writeResponses
+        }
+      }
     }
   };
 }
@@ -143,6 +254,16 @@ export function registerUiActionApi(
     }
   });
 
+  app.patch("/api/v1/documents/:documentId/pages/:pageId", async (req, res) => {
+    try {
+      const { documentId, pageId } = pageParamsSchema.parse(req.params);
+      const { name } = renamePageBodySchema.parse(req.body);
+      res.json(await options.grist.renamePage(documentId, pageId, name));
+    } catch (error) {
+      options.sendError(res, error);
+    }
+  });
+
   app.post(
     "/api/v1/documents/:documentId/pages/:pageId/widgets",
     async (req, res) => {
@@ -151,6 +272,21 @@ export function registerUiActionApi(
         const { tableId, type } = addWidgetBodySchema.parse(req.body);
         res.json(
           await options.grist.addPageWidget(documentId, pageId, tableId, type)
+        );
+      } catch (error) {
+        options.sendError(res, error);
+      }
+    }
+  );
+
+  app.patch(
+    "/api/v1/documents/:documentId/pages/:pageId/widgets/:widgetId",
+    async (req, res) => {
+      try {
+        const { documentId, pageId, widgetId } = widgetParamsSchema.parse(req.params);
+        const update = updateWidgetBodySchema.parse(req.body);
+        res.json(
+          await options.grist.updatePageWidget(documentId, pageId, widgetId, update)
         );
       } catch (error) {
         options.sendError(res, error);
