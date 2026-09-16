@@ -12,6 +12,17 @@ export const NATIVE_WIDGET_TYPES = [
 
 export type NativeWidgetType = (typeof NATIVE_WIDGET_TYPES)[number];
 
+export interface WidgetSelectByRefs {
+  sourceSectionId: number;
+  sourceColumnRef?: number;
+  targetColumnRef?: number;
+}
+
+export interface WidgetUiUpdate {
+  title?: string;
+  selectBy?: WidgetSelectByRefs | null;
+}
+
 type ApplyUserActionsClient = Pick<GristClient, "applyUserActions">;
 type JsonRecord = Record<string, unknown>;
 
@@ -35,6 +46,12 @@ function singleReturnValue(response: unknown, actionName: string): JsonRecord {
     throw new Error(`Grist ${actionName} returned an unexpected /apply response.`);
   }
   return value;
+}
+
+function assertPositiveId(value: number, label: string): void {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${label} must be a positive integer.`);
+  }
 }
 
 export class UiWriteVerificationError extends Error {
@@ -104,12 +121,8 @@ export class GristUiActionsAdapter {
     tableRef: number,
     type: NativeWidgetType
   ): Promise<{ pageId: number; tableRef: number; widgetId: number }> {
-    if (!Number.isInteger(pageId) || pageId < 1) {
-      throw new Error("Grist page ID must be a positive integer.");
-    }
-    if (!Number.isInteger(tableRef) || tableRef < 1) {
-      throw new Error("Grist table reference must be a positive integer.");
-    }
+    assertPositiveId(pageId, "Grist page ID");
+    assertPositiveId(tableRef, "Grist table reference");
     if (!NATIVE_WIDGET_TYPES.includes(type)) {
       throw new Error(`Unsupported Grist widget type "${type}".`);
     }
@@ -147,5 +160,56 @@ export class GristUiActionsAdapter {
     }
 
     return { pageId: returnedPageId, tableRef: returnedTableRef, widgetId };
+  }
+
+  async renamePage(documentId: string, pageId: number, name: string): Promise<void> {
+    assertPositiveId(pageId, "Grist page ID");
+    const pageName = name.trim();
+    if (!pageName) throw new Error("Page name must not be empty.");
+
+    await this.client.applyUserActions(documentId, [
+      ["UpdateRecord", "_grist_Views", pageId, { name: pageName }]
+    ]);
+  }
+
+  async updatePageWidget(
+    documentId: string,
+    widgetId: number,
+    update: WidgetUiUpdate
+  ): Promise<void> {
+    assertPositiveId(widgetId, "Grist widget ID");
+
+    const fields: Record<string, unknown> = {};
+    if (update.title !== undefined) {
+      fields.title = update.title.trim();
+    }
+    if (update.selectBy !== undefined) {
+      if (update.selectBy === null) {
+        fields.linkSrcSectionRef = 0;
+        fields.linkSrcColRef = 0;
+        fields.linkTargetColRef = 0;
+      } else {
+        assertPositiveId(update.selectBy.sourceSectionId, "Grist source widget ID");
+        const sourceColumnRef = update.selectBy.sourceColumnRef ?? 0;
+        const targetColumnRef = update.selectBy.targetColumnRef ?? 0;
+        if (!Number.isInteger(sourceColumnRef) || sourceColumnRef < 0) {
+          throw new Error("Grist source column reference must be a non-negative integer.");
+        }
+        if (!Number.isInteger(targetColumnRef) || targetColumnRef < 0) {
+          throw new Error("Grist target column reference must be a non-negative integer.");
+        }
+        fields.linkSrcSectionRef = update.selectBy.sourceSectionId;
+        fields.linkSrcColRef = sourceColumnRef;
+        fields.linkTargetColRef = targetColumnRef;
+      }
+    }
+
+    if (Object.keys(fields).length === 0) {
+      throw new Error("At least one widget UI field must be updated.");
+    }
+
+    await this.client.applyUserActions(documentId, [
+      ["UpdateRecord", "_grist_Views_section", widgetId, fields]
+    ]);
   }
 }
