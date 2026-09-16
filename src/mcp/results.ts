@@ -70,6 +70,9 @@ export function errorResult(error: unknown) {
     };
   }
 
+  // Keep typed errors in text content only. Some MCP clients validate any
+  // structuredContent against a tool's success outputSchema even when isError
+  // is true, which can turn a useful tool error into a protocol-level failure.
   return {
     isError: true,
     content: [
@@ -77,7 +80,6 @@ export function errorResult(error: unknown) {
         type: "text" as const,
         text: JSON.stringify(body)
       }
-    ],
-    structuredContent: body
+    ]
   };
 }

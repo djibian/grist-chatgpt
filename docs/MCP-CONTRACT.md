@@ -46,14 +46,14 @@ Raw Grist REST response shapes for records and schema operations are intentional
 
 ## Typed error direction
 
-MCP tool failures use an additive error envelope with a stable `code` and human-readable `error` field. Current categories are:
+MCP tool failures use an additive JSON error envelope in text content with a stable `code` and human-readable `error` field. Current categories are:
 
 - `partial_write` — a non-atomic batched write failed after some work completed;
 - `write_verification_failed` — a UI write may have succeeded but its final state could not be verified safely;
 - `grist_upstream` — Grist returned an upstream HTTP/API failure;
 - `operation_failed` — other bounded validation or operation failures.
 
-Errors are returned in both text content and `structuredContent`. Upstream response bodies and internal stacks are not exposed.
+Errors deliberately do **not** include `structuredContent`. Success `outputSchema` describes the stable successful result only, and some MCP clients validate any present `structuredContent` against that success schema even for `isError: true`. Keeping the typed error envelope in text content avoids converting a recoverable tool error into a client-side schema failure. Upstream response bodies and internal stacks are not exposed.
 
 For `partial_write`, the contract preserves `operation`, `completedBatches`, `completedItems`, `failedBatch` and `retryWholeOperation: false`.
 

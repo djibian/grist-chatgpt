@@ -12,6 +12,10 @@ function body(result: ReturnType<typeof errorResult>): Record<string, unknown> {
   return JSON.parse(content.text) as Record<string, unknown>;
 }
 
+function assertNoStructuredErrorContent(result: ReturnType<typeof errorResult>): void {
+  assert.equal("structuredContent" in result, false);
+}
+
 test("partial writes preserve completed work and forbid whole-operation retry", () => {
   const result = errorResult(
     new PartialBatchError("deleteColumns", 2, 4, 3, new Error("upstream failure"))
@@ -24,7 +28,7 @@ test("partial writes preserve completed work and forbid whole-operation retry", 
   assert.equal(parsed.completedItems, 4);
   assert.equal(parsed.failedBatch, 3);
   assert.equal(parsed.retryWholeOperation, false);
-  assert.deepEqual(result.structuredContent, parsed);
+  assertNoStructuredErrorContent(result);
 });
 
 test("ambiguous UI writes preserve retryWholeOperation false and a created ID when known", () => {
@@ -37,6 +41,7 @@ test("ambiguous UI writes preserve retryWholeOperation false and a created ID wh
   assert.equal(parsed.operation, "create_page");
   assert.equal(parsed.createdId, 17);
   assert.equal(parsed.retryWholeOperation, false);
+  assertNoStructuredErrorContent(result);
 });
 
 test("upstream errors expose a stable category and status without leaking response bodies", () => {
@@ -49,10 +54,13 @@ test("upstream errors expose a stable category and status without leaking respon
   assert.equal(parsed.code, "grist_upstream");
   assert.equal(parsed.status, 500);
   assert.equal(JSON.stringify(result).includes(secretBody), false);
+  assertNoStructuredErrorContent(result);
 });
 
 test("other failures use the generic typed category", () => {
-  const parsed = body(errorResult(new Error("invalid request")));
+  const result = errorResult(new Error("invalid request"));
+  const parsed = body(result);
   assert.equal(parsed.code, "operation_failed");
   assert.equal(parsed.error, "invalid request");
+  assertNoStructuredErrorContent(result);
 });
