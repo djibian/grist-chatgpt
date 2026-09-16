@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { GristApiError } from "../src/grist/client.js";
 import { DocumentUiService } from "../src/grist/documentUi.js";
 
 const tables = {
@@ -110,8 +111,12 @@ test("lists pages compactly and returns widgets for an explicit page", () => {
     widgets: Array<{ id: number }>;
   };
   assert.deepEqual(widgets.widgets.map((widget) => widget.id), [201, 202]);
+
   assert.throws(
     () => service.getPageWidgets(context, 999),
-    /Grist page 999 does not exist/
+    (error: unknown) =>
+      error instanceof GristApiError &&
+      error.status === 404 &&
+      /Grist page 999 does not exist/.test(error.message)
   );
 });
