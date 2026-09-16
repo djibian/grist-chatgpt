@@ -5,6 +5,8 @@ import { operationHelp } from "../operations/registry.js";
 
 interface ContextOperations {
   inspectDocument(documentId: string): Promise<unknown>;
+  getPages(documentId: string): Promise<unknown>;
+  getPageWidgets(documentId: string, pageId: number): Promise<unknown>;
 }
 
 function textResult(value: unknown) {
@@ -56,7 +58,7 @@ export function registerDiscoveryTools(
     "inspect_document",
     {
       description:
-        "Inspect one allowed Grist document before complex work. Returns a compact semantic context with tables, columns, formulas and Ref/RefList relationships, without reading table rows.",
+        "Inspect one allowed Grist document before complex work. Returns compact semantic context for tables, columns, formulas, Ref/RefList relationships, pages and widgets, without reading user-table rows.",
       inputSchema: z.object({ documentId: z.string().min(1) }),
       annotations: {
         readOnlyHint: true,
@@ -67,6 +69,51 @@ export function registerDiscoveryTools(
     async ({ documentId }) => {
       try {
         return textResult(await grist.inspectDocument(documentId));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_pages",
+    {
+      description:
+        "List pages in one allowed Grist document, including page IDs, names, layout metadata and widget IDs, without reading user-table rows.",
+      inputSchema: z.object({ documentId: z.string().min(1) }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ documentId }) => {
+      try {
+        return textResult(await grist.getPages(documentId));
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_page_widgets",
+    {
+      description:
+        "Inspect the widgets of one Grist page, including widget type, table, title, options, layout metadata and select-by links.",
+      inputSchema: z.object({
+        documentId: z.string().min(1),
+        pageId: z.number().int().positive()
+      }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ documentId, pageId }) => {
+      try {
+        return textResult(await grist.getPageWidgets(documentId, pageId));
       } catch (error) {
         return errorResult(error);
       }

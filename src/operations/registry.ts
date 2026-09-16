@@ -1,6 +1,12 @@
 import type { GristCapability } from "../auth/principal.js";
 
-export type OperationCategory = "discovery" | "data" | "schema" | "context" | "utility";
+export type OperationCategory =
+  | "discovery"
+  | "data"
+  | "schema"
+  | "context"
+  | "ui"
+  | "utility";
 
 export interface OperationDefinition {
   name: string;
@@ -26,7 +32,13 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
   { name: "update_columns", category: "schema", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Update column metadata, types or formulas." },
   { name: "rename_column", category: "schema", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Rename one column identifier." },
   { name: "delete_columns", category: "schema", capability: "doc.schema:write", readOnly: false, destructive: true, summary: "Delete explicitly identified columns." },
-  { name: "inspect_document", category: "context", capability: "doc:read", readOnly: true, destructive: false, summary: "Build a compact semantic view of tables, columns, formulas and relationships." },
+  { name: "inspect_document", category: "context", capability: "doc:read", readOnly: true, destructive: false, summary: "Build a compact semantic view of tables, columns, formulas, relationships, pages and widgets." },
+  { name: "get_pages", category: "ui", capability: "doc:read", readOnly: true, destructive: false, summary: "List Grist pages and their widget IDs without reading row data." },
+  { name: "get_page_widgets", category: "ui", capability: "doc:read", readOnly: true, destructive: false, summary: "Inspect normalized page widget metadata and select-by links." },
+  { name: "create_page", category: "ui", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Create one empty named Grist page through a bounded AddView action." },
+  { name: "add_page_widget", category: "ui", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Add one native widget to an existing page through a bounded CreateViewSection action." },
+  { name: "rename_page", category: "ui", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Rename one explicitly identified Grist page through a bounded metadata update." },
+  { name: "update_page_widget", category: "ui", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Update one widget title and/or its safe direct select-by link through a bounded metadata update." },
   { name: "grist_help", category: "utility", capability: null, readOnly: true, destructive: false, summary: "Discover bridge operations and their required capabilities." }
 ] as const;
 

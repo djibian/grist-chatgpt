@@ -1,3 +1,5 @@
+import type { DocumentUiContext } from "./documentUi.js";
+
 type JsonRecord = Record<string, unknown>;
 
 function record(value: unknown): JsonRecord | null {
@@ -15,7 +17,11 @@ function boolean(value: unknown): boolean | undefined {
 }
 
 export class DocumentContextService {
-  build(documentId: string, tableResponse: unknown): unknown {
+  build(
+    documentId: string,
+    tableResponse: unknown,
+    ui?: DocumentUiContext
+  ): unknown {
     const raw = record(tableResponse);
     const sourceTables = Array.isArray(raw?.tables) ? raw.tables : [];
     const relations: Array<{
@@ -63,10 +69,17 @@ export class DocumentContextService {
       summary: {
         tableCount: tables.length,
         columnCount: tables.reduce((count, table) => count + table.columns.length, 0),
-        relationCount: relations.length
+        relationCount: relations.length,
+        ...(ui
+          ? {
+              pageCount: ui.summary.pageCount,
+              widgetCount: ui.summary.widgetCount
+            }
+          : {})
       },
       tables,
-      relations
+      relations,
+      ...(ui ? { ui } : {})
     };
   }
 }
