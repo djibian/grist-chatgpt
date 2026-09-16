@@ -1,234 +1,130 @@
-# Architecture v0.5.0
+# Architecture
 
-## Objective
+`grist-chatgpt` is a controlled compatibility bridge between conversational AI clients and Grist Community. GPT Actions and MCP are transport adapters over the same policy-aware service layer.
 
-`grist-chatgpt` is a controlled compatibility bridge between conversational AI clients and Grist Community. It keeps authentication, authorization, guardrails and Grist credentials server-side while exposing named operations through GPT Actions and MCP.
-
-It is not intended to reproduce the whole Grist API or to become a generic remote-control proxy.
-
-## Architecture
+## Core flow
 
 ```text
-ChatGPT GPT Actions                 MCP client
-        |                               |
-        +---------------+---------------+
-                        |
-                        v
-                transport adapters
-                        |
-                        v
-              Principal / capabilities
-                        |
-                        v
-              AuthorizationService
-                        |
-                        v
-              AuthorizedGristService
-                  |             |
-                  |             +--> AuditLogger
-                  v
-                 GristService
-                        |
-          +-------------+-------------+
-          |                           |
-          v                           v
-     GristClient                bounded /apply
-     REST operations            UserActions only
-          +-------------+-------------+
-                        |
-                        v
-                 Grist Community
+GPT Actions / MCP
+        |
+        v
+principal + capabilities
+        |
+        v
+AuthorizationService
+        |
+        v
+AuthorizedGristService
+   |              |
+   |              +--> AuditLogger
+   v
+GristService
+   |
+   +--> Grist REST API
+   |
+   +--> GristUiActionsAdapter
+            |
+            +--> fixed, bounded UserActions only
 ```
 
-## Responsibility boundaries
+`AccessPolicy` remains the deployment-level allowlist for documents/workspaces. `AuthorizationService` adds principal-specific resource and capability checks. Grist's own permissions remain authoritative upstream.
 
-### Transport adapters
+## Capabilities
 
-GPT Actions and MCP translate protocol-specific calls into the same service methods. No Grist authorization rule should depend on the transport implementation itself.
+The bridge uses Grist-aligned capabilities:
 
-### Principal
+- `doc:read`: discovery, semantic inspection and record reads;
+- `doc:write`: record create/update/delete;
+- `doc.schema:write`: document structure changes, including table/column mutations and v0.6 page/widget creation.
 
-Each authenticated bridge client is represented as a `Principal` with:
+The operation registry is authoritative for the capability required by each semantic operation.
 
-- a stable internal ID;
-- a transport (`gpt-actions` or `mcp` today);
-- one or more resource grants;
-- Grist-aligned capabilities.
+## Service boundaries
 
-The current single-user deployment creates two static principals from the existing bearer tokens. This is deliberately replaceable later by OIDC/OAuth or another authenticator.
+### `GristClient`
 
-### AccessPolicy
+Low-level HTTP client for the stable Grist REST API. It also owns the private `/apply` transport used by bounded adapters. The raw `/apply` method is never exposed as a model-facing operation.
 
-`AccessPolicy` remains the deployment-level resource boundary. It defines which document IDs and/or workspaces may be exposed by this bridge at all.
+### `GristService`
 
-### AuthorizationService
+Business layer for documents, tables, columns and records, including batching and schema guardrails.
 
-`AuthorizationService` intersects:
+### `AuthorizedGristService`
 
-1. the deployment `AccessPolicy`;
-2. the current principal's resource grants;
-3. the operation's required capability.
+Policy-aware facade used by both transports. It:
 
-Both conditions must pass before a document operation reaches the business service.
+- resolves the document resource;
+- enforces the operation capability from the registry;
+- invokes the semantic service/adapter;
+- emits one structured audit event;
+- builds normalized document/page/widget context from internal metadata reads.
 
-### Operation registry
+Public `query_records` cannot target `_grist_*` tables. Internal semantic inspection is limited to the fixed metadata tables needed to reconstruct pages and widgets.
 
-`src/operations/registry.ts` is authoritative for operation policy metadata:
+### `GristUiActionsAdapter` (v0.6 draft)
+
+This adapter is the only layer allowed to construct document-UI UserActions. The creation tranche currently permits exactly two semantic effects:
+
+```text
+create_page
+  -> ["AddView", tableId, "empty", pageName]
+
+add_page_widget
+  -> ["CreateViewSection", tableRef, pageId, widgetType, null, null]
+```
+
+The model never supplies an action name or raw UserAction array.
+
+`tableRef` is resolved internally from a stable Grist `tableId`. Page and widget IDs returned by Grist are checked, then the normalized UI model is re-read after each creation. If the write may have succeeded but its result cannot be verified, the bridge returns a dedicated verification error that explicitly forbids blind whole-operation retry.
+
+Updates, removals, select-by writes and layout writes are not part of this creation tranche.
+
+## Semantic document context
+
+`DocumentContextService` returns a compact representation of:
+
+- tables and columns;
+- formulas;
+- `Ref` / `RefList` relations;
+- pages and normalized widgets;
+- layout/options metadata when present;
+- current select-by references when present.
+
+The goal is to let a model understand document structure before complex operations without loading user rows.
+
+## Operation registry
+
+`src/operations/registry.ts` is the canonical catalog for:
 
 - operation name;
 - category;
 - required capability;
-- read-only flag;
-- destructive flag;
-- concise purpose.
+- read-only/write classification;
+- destructive classification;
+- short semantic description.
 
-`AuthorizedGristService` obtains required capabilities from this registry, and `grist_help` exposes the same metadata to clients. The goal is to prevent security policy and tool documentation from drifting apart.
+`AuthorizationService` and `grist_help` consume this same catalog so transport documentation and enforcement do not diverge.
 
-Input/output schemas are still owned by the current GPT/MCP adapters in v0.5. A later compact-surface migration may also generate protocol schemas from shared operation definitions.
+## Audit
 
-### AuthorizedGristService
+Each operation through `AuthorizedGristService` records a structured event containing identifiers and operational metadata such as request ID, principal, transport, operation, document, capability, item count, outcome and duration.
 
-This facade preserves the validated `GristService` behavior while adding:
+Normal audit events never contain bearer tokens, Grist credentials or full cell contents.
 
-- capability enforcement;
-- resource authorization;
-- principal identity;
-- structured audit.
+## Failure model
 
-This incremental wrapper avoids rewriting the stable v0.4 service and makes the migration reversible and testable.
+Record/schema batching is sequential rather than transactionally atomic across all batches. Partial success is reported explicitly and must not trigger blind replay.
 
-### GristService
+The v0.6 UI creation adapter applies the same principle more conservatively: once `/apply` has been sent, an unexpected response or failed post-write verification is treated as a potentially successful write. The caller receives `retryWholeOperation: false` when the transport supports structured error output.
 
-`GristService` remains the transport-neutral business layer for validated data and schema behavior:
+## Security invariants
 
-- read/write/schema guardrails;
-- exact-target deletion;
-- write batching;
-- explicit partial-success errors;
-- validation of identifiers and counts.
-
-### GristClient and low-level actions
-
-`GristClient` owns explicit REST calls.
-
-Raw `/apply` remains inaccessible to models. v0.5 still uses it internally only for fixed operations:
-
-- `RenameColumn`;
-- `RemoveTable`.
-
-Future page/widget support must use a separate bounded UI-actions adapter rather than exposing arbitrary UserActions.
-
-## Capabilities
-
-The initial capability vocabulary intentionally mirrors Grist's official OAuth/MCP model where practical:
-
-```text
-doc:read
-doc:write
-doc.schema:write
-```
-
-Semantics:
-
-- `doc:read`: document discovery, tables/columns, semantic context, record reads;
-- `doc:write`: record creation/update/deletion;
-- `doc.schema:write`: table and column mutations.
-
-The capability model is extensible for future bounded features such as attachments or webhooks without granting them implicitly through `doc:write`.
-
-## Semantic document context
-
-`DocumentContextService` provides a compact structural representation intended for reasoning before complex modifications.
-
-It currently reports:
-
-- table IDs;
-- column IDs, labels and types;
-- formulas and formula flags;
-- `Ref` / `RefList` relationships;
-- table/column/relation counts.
-
-It deliberately does not read user-table rows. MCP exposes it as `inspect_document`; GPT Actions exposes `inspectGristDocument`.
-
-This service is stateless in v0.5. Future versions may extend it with pages/widgets and bounded caching invalidated after structural mutations.
-
-## Audit model
-
-Every call routed through `AuthorizedGristService` emits one structured JSON event containing only operational metadata:
-
-```text
-requestId
-principal
-transport
-operation
-capability
-documentId (when applicable)
-itemCount (when meaningful)
-status
-durationMs
-errorType (on failure)
-```
-
-Cell values, API keys and bearer tokens are never intentionally logged by the audit layer.
-
-The current VPS can rely on `journald`; an institutional deployment may route the same event shape to centralized audit infrastructure.
-
-## Personal deployment
-
-The current validated personal architecture remains intentionally simple:
-
-```text
-ChatGPT Plus
-   |
-   | HTTPS / GPT Actions token
-   v
-personal VPS bridge
-   |
-   | personal Grist API key (server-side only)
-   v
-Grist Community DINUM
-```
-
-`GPT_ACTION_CAPABILITIES` and `MCP_CAPABILITIES` allow the two client principals to be restricted independently without changing the Grist API key.
-
-## Future institutional substitution points
-
-v0.5 does not implement institutional IAM. It prepares clean replacement points:
-
-```text
-static bearer principal today
-        -> future OIDC/OAuth principal
-
-single server-side API key today
-        -> future delegated-user credential provider
-```
-
-Business services should not need to know which authentication or credential mechanism produced the authorized request.
-
-If the target Grist deployment later offers the official Grist MCP/OAuth functionality directly, using the official integration should be preferred over maintaining equivalent bridge functionality.
-
-## Deliberate exclusions
-
-The bridge continues to exclude:
-
-- generic HTTP forwarding;
-- raw SQL;
-- arbitrary `/apply` / UserActions;
-- unrestricted instance administration;
-- user/ACL administration.
-
-## Next architectural layer
-
-The intended v0.6 direction is bounded document UI composition modeled on Grist's official MCP semantics:
-
-- inspect pages/widgets;
-- create/update/remove pages;
-- add/configure native or known custom widgets;
-- configure layouts;
-- configure `select-by` links.
-
-Generated executable widget code is explicitly outside this first UI layer and should be treated as a separate security boundary.
-
-## Architectural invariant
-
-> Every capability exposed to a model must correspond to a named Grist operation with explicit server-side resource authorization, an explicit required capability and predictable bounded effects.
+1. Grist credentials remain server-side.
+2. Every target document/workspace must be allowed by deployment policy.
+3. Every semantic operation has an explicit capability.
+4. GPT Actions and MCP share the same authorized business facade.
+5. No raw SQL, arbitrary HTTP or arbitrary `/apply` is exposed.
+6. Model-facing reads cannot query `_grist_*` directly.
+7. Destructive operations use explicit targets.
+8. Grist cell content is untrusted data, never instructions.
+9. Executable custom-widget generation remains outside the current trust boundary.
