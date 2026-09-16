@@ -40,8 +40,8 @@ function singleReturnValue(response: unknown, actionName: string): JsonRecord {
 export class UiWriteVerificationError extends Error {
   constructor(
     public readonly operation: string,
-    public readonly createdId: number,
-    message: string
+    message: string,
+    public readonly createdId?: number
   ) {
     super(`${message} The Grist write may already have succeeded; do not retry the whole operation blindly.`);
     this.name = "UiWriteVerificationError";
@@ -63,10 +63,23 @@ export class GristUiActionsAdapter {
     const response = await this.client.applyUserActions(documentId, [
       ["AddView", tableId, "empty", pageName]
     ]);
-    const result = singleReturnValue(response, "AddView");
+
+    let result: JsonRecord;
+    try {
+      result = singleReturnValue(response, "AddView");
+    } catch (error) {
+      throw new UiWriteVerificationError(
+        "create_page",
+        error instanceof Error ? error.message : "Grist AddView response could not be interpreted."
+      );
+    }
+
     const pageId = positiveInteger(result.id);
     if (!pageId) {
-      throw new Error("Grist AddView did not return a positive page ID.");
+      throw new UiWriteVerificationError(
+        "create_page",
+        "Grist AddView did not return a positive page ID."
+      );
     }
     return { pageId };
   }
@@ -90,7 +103,19 @@ export class GristUiActionsAdapter {
     const response = await this.client.applyUserActions(documentId, [
       ["CreateViewSection", tableRef, pageId, type, null, null]
     ]);
-    const result = singleReturnValue(response, "CreateViewSection");
+
+    let result: JsonRecord;
+    try {
+      result = singleReturnValue(response, "CreateViewSection");
+    } catch (error) {
+      throw new UiWriteVerificationError(
+        "add_page_widget",
+        error instanceof Error
+          ? error.message
+          : "Grist CreateViewSection response could not be interpreted."
+      );
+    }
+
     const returnedTableRef = positiveInteger(result.tableRef);
     const returnedPageId = positiveInteger(result.viewRef);
     const widgetId = positiveInteger(result.sectionRef);
@@ -100,7 +125,11 @@ export class GristUiActionsAdapter {
       returnedPageId !== pageId ||
       widgetId === undefined
     ) {
-      throw new Error("Grist CreateViewSection returned inconsistent identifiers.");
+      throw new UiWriteVerificationError(
+        "add_page_widget",
+        "Grist CreateViewSection returned inconsistent identifiers.",
+        widgetId
+      );
     }
 
     return { pageId: returnedPageId, tableRef: returnedTableRef, widgetId };
