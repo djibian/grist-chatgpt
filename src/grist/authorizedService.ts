@@ -14,13 +14,18 @@ import type {
   UpdateGristRecord
 } from "./client.js";
 import { DocumentContextService } from "./documentContext.js";
-import { DocumentUiService, type DocumentUiContext } from "./documentUi.js";
+import { DocumentUiService, type DocumentUiContext, type GristPageWidget } from "./documentUi.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
 import {
   GristUiActionsAdapter,
   UiWriteVerificationError,
   type NativeWidgetType
 } from "./uiActionsAdapter.js";
+
+export interface PageWidgetUpdateInput {
+  title?: string;
+  selectBy?: { sourceWidgetId: number } | null;
+}
 
 export class AuthorizedGristService {
   private readonly documentContext = new DocumentContextService();
@@ -189,6 +194,136 @@ export class AuthorizedGristService {
     });
   }
 
+  async renamePage(
+    documentIdOrUrl: string,
+    pageId: number,
+    name: string
+  ): Promise<unknown> {
+    if (!Number.isInteger(pageId) || pageId < 1) {
+      throw new Error("Grist page ID must be a positive integer.");
+    }
+    const pageName = name.trim();
+    if (!pageName) throw new Error("Page name must not be empty.");
+
+    return this.execute("rename_page", documentIdOrUrl, 1, async (id) => {
+      const before = await this.loadDocumentUi(id);
+      if (!before.pages.some((page) => page.id === pageId)) {
+        throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
+      }
+
+      await this.uiActions.renamePage(id, pageId, pageName);
+      try {
+        const after = await this.loadDocumentUi(id);
+        const page = after.pages.find((candidate) => candidate.id === pageId);
+        if (!page || page.name !== pageName) {
+          throw new Error(`Renamed page ${pageId} did not match the requested name on re-read.`);
+        }
+        const { widgets, ...pageInfo } = page;
+        return {
+          documentId: id,
+          page: {
+            ...pageInfo,
+            widgetCount: widgets.length,
+            widgetIds: widgets.map((widget) => widget.id)
+          }
+        };
+      } catch (error) {
+        throw new UiWriteVerificationError(
+          "rename_page",
+          error instanceof Error ? error.message : "Renamed page could not be verified."
+        );
+      }
+    });
+  }
+
+  async updatePageWidget(
+    documentIdOrUrl: string,
+    pageId: number,
+    widgetId: number,
+    update: PageWidgetUpdateInput
+  ): Promise<unknown> {
+    if (!Number.isInteger(pageId) || pageId < 1) {
+      throw new Error("Grist page ID must be a positive integer.");
+    }
+    if (!Number.isInteger(widgetId) || widgetId < 1) {
+      throw new Error("Grist widget ID must be a positive integer.");
+    }
+    if (update.title === undefined && update.selectBy === undefined) {
+      throw new Error("At least one widget UI field must be updated.");
+    }
+
+    return this.execute("update_page_widget", documentIdOrUrl, 1, async (id) => {
+      const before = await this.loadDocumentUi(id);
+      const page = before.pages.find((candidate) => candidate.id === pageId);
+      if (!page) {
+        throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
+      }
+      const target = page.widgets.find((candidate) => candidate.id === widgetId);
+      if (!target) {
+        throw new Error(`Grist widget ${widgetId} does not exist on page ${pageId}.`);
+      }
+
+      const adapterUpdate: Parameters<GristUiActionsAdapter["updatePageWidget"]>[2] = {};
+      const expectedTitle = update.title !== undefined ? update.title.trim() : undefined;
+      if (expectedTitle !== undefined) {
+        adapterUpdate.title = expectedTitle;
+      }
+
+      let expectedSourceWidgetId: number | null | undefined;
+      if (update.selectBy !== undefined) {
+        if (update.selectBy === null) {
+          adapterUpdate.selectBy = null;
+          expectedSourceWidgetId = null;
+        } else {
+          const sourceWidgetId = update.selectBy.sourceWidgetId;
+          if (!Number.isInteger(sourceWidgetId) || sourceWidgetId < 1) {
+            throw new Error("Select-by source widget ID must be a positive integer.");
+          }
+          if (sourceWidgetId === widgetId) {
+            throw new Error("A Grist widget cannot select itself.");
+          }
+          const source = page.widgets.find((candidate) => candidate.id === sourceWidgetId);
+          if (!source) {
+            throw new Error(`Select-by source widget ${sourceWidgetId} does not exist on page ${pageId}.`);
+          }
+          this.assertDirectSelectByAllowed(before, source, target);
+          adapterUpdate.selectBy = { sourceSectionId: sourceWidgetId };
+          expectedSourceWidgetId = sourceWidgetId;
+        }
+      }
+
+      await this.uiActions.updatePageWidget(id, widgetId, adapterUpdate);
+      try {
+        const after = await this.loadDocumentUi(id);
+        const updatedPage = after.pages.find((candidate) => candidate.id === pageId);
+        const widget = updatedPage?.widgets.find((candidate) => candidate.id === widgetId);
+        if (!widget) {
+          throw new Error(`Updated widget ${widgetId} was not found on re-read.`);
+        }
+        if (expectedTitle !== undefined && widget.title !== expectedTitle) {
+          throw new Error(`Updated widget ${widgetId} did not match the requested title on re-read.`);
+        }
+        if (expectedSourceWidgetId === null && widget.selectBy !== undefined) {
+          throw new Error(`Updated widget ${widgetId} still had a select-by link after clearing it.`);
+        }
+        if (
+          typeof expectedSourceWidgetId === "number" &&
+          (widget.selectBy?.sourceSectionId !== expectedSourceWidgetId ||
+            widget.selectBy.sourceColumnRef !== undefined ||
+            widget.selectBy.targetColumnRef !== undefined)
+        ) {
+          throw new Error(`Updated widget ${widgetId} did not match the requested direct select-by link on re-read.`);
+        }
+        return { documentId: id, pageId, widget };
+      } catch (error) {
+        throw new UiWriteVerificationError(
+          "update_page_widget",
+          error instanceof Error ? error.message : "Updated widget could not be verified."
+        );
+      }
+    });
+  }
+
   async listTables(
     documentIdOrUrl: string,
     options: { expandColumns?: boolean } = {}
@@ -320,6 +455,43 @@ export class AuthorizedGristService {
     return this.execute("delete_columns", documentIdOrUrl, columnIds.length, (id) =>
       this.inner.deleteColumns(id, tableId, columnIds)
     );
+  }
+
+  private assertDirectSelectByAllowed(
+    context: DocumentUiContext,
+    source: GristPageWidget,
+    target: GristPageWidget
+  ): void {
+    if (source.pageId !== target.pageId) {
+      throw new Error("Direct select-by is limited to widgets on the same Grist page.");
+    }
+    if (source.tableRef !== target.tableRef || source.tableId !== target.tableId) {
+      throw new Error(
+        "This tranche only allows direct select-by between widgets backed by the same Grist table."
+      );
+    }
+    if (source.type === "chart" || source.type === "custom") {
+      throw new Error(
+        `Widget type "${source.type}" is not allowed as a direct select-by source in this safe subset.`
+      );
+    }
+
+    const widgets = new Map<number, GristPageWidget>();
+    for (const page of context.pages) {
+      for (const widget of page.widgets) widgets.set(widget.id, widget);
+    }
+    const visited = new Set<number>();
+    let current: GristPageWidget | undefined = source;
+    while (current?.selectBy?.sourceSectionId) {
+      if (visited.has(current.id)) {
+        throw new Error("The existing select-by graph already contains a cycle; refusing to modify it.");
+      }
+      visited.add(current.id);
+      if (current.selectBy.sourceSectionId === target.id) {
+        throw new Error("The requested select-by link would create a cycle; refusing the update.");
+      }
+      current = widgets.get(current.selectBy.sourceSectionId);
+    }
   }
 
   private async resolveTableRef(documentId: string, tableId: string): Promise<number> {
