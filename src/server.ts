@@ -325,13 +325,25 @@ function publicBaseUrl(req: { get(name: string): string | undefined; protocol: s
   return `${protocol}://${req.get("host")}`;
 }
 
-function buildV05OpenApiDocument(baseUrl: string): Record<string, unknown> {
+function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> {
   const document = buildOpenApiDocument(baseUrl, {
     maxReadRecords: config.maxReadRecords,
     maxWriteRecords: config.maxWriteRecords,
     maxSchemaItems: config.maxSchemaItems
   });
   const paths = document.paths as Record<string, unknown>;
+  const documentIdParameter = {
+    name: "documentId",
+    in: "path",
+    required: true,
+    schema: { type: "string" }
+  };
+  const readResponses = {
+    "401": { description: "Missing or invalid GPT Actions bearer token" },
+    "403": { description: "Document or read capability is not allowed" },
+    "502": { description: "Grist upstream error" }
+  };
+
   paths["/api/v1/help"] = {
     get: {
       operationId: "getGristHelp",
@@ -343,23 +355,50 @@ function buildV05OpenApiDocument(baseUrl: string): Record<string, unknown> {
   paths["/api/v1/documents/{documentId}/context"] = {
     get: {
       operationId: "inspectGristDocument",
-      summary: "Inspect the semantic structure of a Grist document",
+      summary: "Inspect the semantic structure and UI of a Grist document",
       description:
-        "Read-only. Returns tables, columns, formulas and Ref/RefList relationships without reading table rows.",
+        "Read-only. Returns tables, columns, formulas, Ref/RefList relationships, pages and widgets without reading user-table rows.",
+      "x-openai-isConsequential": false,
+      parameters: [documentIdParameter],
+      responses: {
+        "200": { description: "Compact semantic document context" },
+        ...readResponses
+      }
+    }
+  };
+  paths["/api/v1/documents/{documentId}/pages"] = {
+    get: {
+      operationId: "getGristPages",
+      summary: "List Grist pages and their widget IDs",
+      description:
+        "Read-only. Returns normalized page metadata without reading user-table rows.",
+      "x-openai-isConsequential": false,
+      parameters: [documentIdParameter],
+      responses: {
+        "200": { description: "Grist page metadata" },
+        ...readResponses
+      }
+    }
+  };
+  paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets"] = {
+    get: {
+      operationId: "getGristPageWidgets",
+      summary: "Inspect widgets on one Grist page",
+      description:
+        "Read-only. Returns normalized widget metadata, layout options and select-by links.",
       "x-openai-isConsequential": false,
       parameters: [
+        documentIdParameter,
         {
-          name: "documentId",
+          name: "pageId",
           in: "path",
           required: true,
-          schema: { type: "string" }
+          schema: { type: "integer", minimum: 1 }
         }
       ],
       responses: {
-        "200": { description: "Compact semantic document context" },
-        "401": { description: "Missing or invalid GPT Actions bearer token" },
-        "403": { description: "Document or read capability is not allowed" },
-        "502": { description: "Grist upstream error" }
+        "200": { description: "Grist page widgets" },
+        ...readResponses
       }
     }
   };
@@ -383,7 +422,7 @@ app.get("/healthz", (_req, res) => {
 
 // Register first so it shadows the compatibility OpenAPI route installed below.
 app.get("/openapi.json", (req, res) => {
-  res.json(buildV05OpenApiDocument(publicBaseUrl(req)));
+  res.json(buildExtendedOpenApiDocument(publicBaseUrl(req)));
 });
 
 registerGptActionApi(app, {
@@ -404,6 +443,25 @@ app.get("/api/v1/documents/:documentId/context", async (req, res) => {
   try {
     const documentId = z.string().min(1).parse(req.params.documentId);
     res.json(await gptGrist.inspectDocument(documentId));
+  } catch (error) {
+    sendApiError(res, error);
+  }
+});
+
+app.get("/api/v1/documents/:documentId/pages", async (req, res) => {
+  try {
+    const documentId = z.string().min(1).parse(req.params.documentId);
+    res.json(await gptGrist.getPages(documentId));
+  } catch (error) {
+    sendApiError(res, error);
+  }
+});
+
+app.get("/api/v1/documents/:documentId/pages/:pageId/widgets", async (req, res) => {
+  try {
+    const documentId = z.string().min(1).parse(req.params.documentId);
+    const pageId = z.coerce.number().int().positive().parse(req.params.pageId);
+    res.json(await gptGrist.getPageWidgets(documentId, pageId));
   } catch (error) {
     sendApiError(res, error);
   }
