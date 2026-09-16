@@ -8,6 +8,10 @@ import {
   registerGptActionApi,
   sendApiError
 } from "./actions/api.js";
+import {
+  buildUiOpenApiPaths,
+  registerUiActionApi
+} from "./actions/uiApi.js";
 import { AuditLogger } from "./audit/auditLogger.js";
 import { AuthorizationService } from "./auth/authorizationService.js";
 import { createPrincipal } from "./auth/principal.js";
@@ -17,8 +21,13 @@ import { AccessPolicy } from "./grist/accessPolicy.js";
 import { AuthorizedGristService } from "./grist/authorizedService.js";
 import { GristApiError, GristClient } from "./grist/client.js";
 import { GristService, PartialBatchError } from "./grist/service.js";
+import {
+  GristUiActionsAdapter,
+  UiWriteVerificationError
+} from "./grist/uiActionsAdapter.js";
 import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
+import { registerUiTools } from "./mcp/uiTools.js";
 import { operationHelp } from "./operations/registry.js";
 import { VERSION } from "./version.js";
 
@@ -37,6 +46,7 @@ const baseGrist = new GristService(client, accessPolicy, {
   writeBatchRecords: config.writeBatchRecords,
   maxSchemaItems: config.maxSchemaItems
 });
+const uiActions = new GristUiActionsAdapter(client);
 const authorization = new AuthorizationService(accessPolicy);
 const audit = new AuditLogger();
 
@@ -59,13 +69,15 @@ const mcpGrist = new AuthorizedGristService(
   baseGrist,
   authorization,
   audit,
-  mcpPrincipal
+  mcpPrincipal,
+  uiActions
 );
 const gptGrist = new AuthorizedGristService(
   baseGrist,
   authorization,
   audit,
-  gptPrincipal
+  gptPrincipal,
+  uiActions
 );
 
 function textResult(value: unknown) {
@@ -92,6 +104,23 @@ function errorResult(error: unknown) {
             completedBatches: error.completedBatches,
             completedItems: error.completedItems,
             failedBatch: error.failedBatch,
+            retryWholeOperation: false
+          })
+        }
+      ]
+    };
+  }
+
+  if (error instanceof UiWriteVerificationError) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            error: "Grist UI write verification failed",
+            operation: error.operation,
+            createdId: error.createdId,
             retryWholeOperation: false
           })
         }
@@ -316,6 +345,7 @@ function buildServer(): McpServer {
 
   registerSchemaTools(server, mcpGrist, config.maxSchemaItems);
   registerDiscoveryTools(server, mcpGrist);
+  registerUiTools(server, mcpGrist);
   return server;
 }
 
@@ -332,6 +362,7 @@ function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> 
     maxSchemaItems: config.maxSchemaItems
   });
   const paths = document.paths as Record<string, unknown>;
+  Object.assign(paths, buildUiOpenApiPaths());
   const documentIdParameter = {
     name: "documentId",
     in: "path",
@@ -366,7 +397,9 @@ function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> 
       }
     }
   };
+  const pagesPath = (paths["/api/v1/documents/{documentId}/pages"] ?? {}) as Record<string, unknown>;
   paths["/api/v1/documents/{documentId}/pages"] = {
+    ...pagesPath,
     get: {
       operationId: "getGristPages",
       summary: "List Grist pages and their widget IDs",
@@ -380,7 +413,9 @@ function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> 
       }
     }
   };
+  const widgetsPath = (paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets"] ?? {}) as Record<string, unknown>;
   paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets"] = {
+    ...widgetsPath,
     get: {
       operationId: "getGristPageWidgets",
       summary: "Inspect widgets on one Grist page",
@@ -431,6 +466,22 @@ registerGptActionApi(app, {
   maxReadRecords: config.maxReadRecords,
   maxWriteRecords: config.maxWriteRecords,
   maxSchemaItems: config.maxSchemaItems
+});
+
+registerUiActionApi(app, {
+  grist: gptGrist,
+  sendError: (res, error) => {
+    if (error instanceof UiWriteVerificationError) {
+      res.status(502).json({
+        error: "Grist UI write verification failed",
+        operation: error.operation,
+        createdId: error.createdId,
+        retryWholeOperation: false
+      });
+      return;
+    }
+    sendApiError(res, error);
+  }
 });
 
 // These routes are registered after registerGptActionApi so its /api/v1 bearer
