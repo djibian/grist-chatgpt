@@ -78,24 +78,31 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
     name: "documentId",
     in: "path",
     required: true,
+    description:
+      "Exact allowed Grist document ID supplied by the user or returned by listGristDocuments. Never invent, guess, shorten or substitute this identifier.",
     schema: { type: "string" }
   };
   const pageIdParameter = {
     name: "pageId",
     in: "path",
     required: true,
+    description:
+      "Exact existing Grist page ID returned by getGristPages. Never invent or guess a page ID.",
     schema: { type: "integer", minimum: 1 }
   };
   const widgetIdParameter = {
     name: "widgetId",
     in: "path",
     required: true,
+    description:
+      "Exact existing Grist widget ID returned by getGristPageWidgets. Never invent or guess a widget ID.",
     schema: { type: "integer", minimum: 1 }
   };
   const writeResponses = {
     "400": { description: "Invalid page or widget request" },
     "401": { description: "Missing or invalid GPT Actions bearer token" },
     "403": { description: "Document or structure-write capability is not allowed" },
+    "404": { description: "Explicitly identified page or widget does not exist" },
     "502": { description: "Grist upstream error or post-write verification failure" }
   };
 
@@ -217,7 +224,12 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
                         additionalProperties: false,
                         required: ["sourceWidgetId"],
                         properties: {
-                          sourceWidgetId: { type: "integer", minimum: 1 }
+                          sourceWidgetId: {
+                            type: "integer",
+                            minimum: 1,
+                            description:
+                              "Exact source widget ID returned by getGristPageWidgets for the same page. Never invent or guess it."
+                          }
                         }
                       },
                       { type: "null" }
