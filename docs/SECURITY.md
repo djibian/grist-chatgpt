@@ -33,9 +33,9 @@ The bridge may reduce authority but must never grant authority that the user's G
 
 A Grist API key has the permissions of its owner and is therefore a high-value secret.
 
-**Current prototype control:** `GRIST_API_KEY` is server-side only. It is never an MCP/GPT parameter, OpenAPI value, prompt value or client-visible secret.
+**Current development control:** `GRIST_API_KEY` remains server-side only and is resolved through `StaticApiKeyCredentialProvider`. It is never an MCP/GPT parameter, OpenAPI value, prompt value or client-visible secret.
 
-**Production target:** the process-wide key becomes a per-user credential obtained through a `GristCredentialProvider` or equivalent abstraction. Each request/service context must use only the credential associated with the authenticated principal.
+**Production target:** a user-aware `GristCredentialProvider` resolves the current authenticated principal's own Grist credential. Each request/service context must use only the credential associated with that principal.
 
 A Grist API key must never appear in:
 
@@ -67,11 +67,13 @@ Users retain the independent ability to revoke/regenerate their Grist API key at
 
 ### Credential and cache isolation
 
-The current prototype uses one singleton `GristClient` and an `AccessPolicy` discovery cache built under one process-wide API key.
+C3 separates shareable deployment policy from every state item derived from a Grist credential.
 
-That state must not become cross-user state in the production multi-user architecture.
+`DeploymentResourcePolicy` contains only the configured document/workspace ceiling and is safe to share. `GristContextFactory.create(principal)` resolves a credential for exactly that principal and creates a fresh `GristClient`, `GristResourceDiscovery` cache, `AccessPolicy`, authorization layer and service graph. The factory deliberately does not retain or reuse principal contexts.
 
-Any Grist client, document discovery result, workspace/document cache or authorization input derived from a user's API key must be isolated by that credential/principal or reconstructed safely for the request/session.
+The current static MCP and GPT Actions principals still resolve through the same configured development API key, but their client/discovery/service contexts are distinct. A future user-aware credential provider can therefore supply different credentials without introducing cross-principal discovery state.
+
+Any Grist client, document discovery result, workspace/document cache or authorization input derived from a user's API key must remain isolated by that credential/principal or reconstructed safely for the request/session.
 
 It must be impossible for resource visibility discovered under user A's key to make a resource visible to user B.
 
