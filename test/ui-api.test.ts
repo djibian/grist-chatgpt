@@ -63,6 +63,11 @@ test("UI OpenAPI exposes only bounded consequential creation actions", () => {
       .content["application/json"].schema.properties.type.enum,
     ["record", "single", "detail", "form", "chart", "calendar", "custom"]
   );
+  assert.equal(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets"].post
+      .requestBody.content["application/json"].schema.additionalProperties,
+    false
+  );
 });
 
 test("UI REST routes forward semantic page and widget requests", async () => {
@@ -112,6 +117,33 @@ test("UI REST routes forward semantic page and widget requests", async () => {
         type: "record"
       }
     ]);
+  } finally {
+    await stop(server);
+  }
+});
+
+test("UI REST routes reject arbitrary widget types before calling Grist", async () => {
+  let calls = 0;
+  const grist: GristUiOperations = {
+    createPage: async () => ({ page: { id: 7 } }),
+    addPageWidget: async () => {
+      calls += 1;
+      return { widget: { id: 11 } };
+    }
+  };
+  const { baseUrl, server } = await startApi(grist);
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/pages/7/widgets`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tableId: "Personnes", type: "arbitrary" })
+      }
+    );
+    assert.equal(response.status, 400);
+    assert.equal(calls, 0);
   } finally {
     await stop(server);
   }
