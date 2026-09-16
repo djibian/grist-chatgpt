@@ -38,7 +38,7 @@ function singleReturnValue(response: unknown, actionName: string): JsonRecord {
 }
 
 export class UiWriteVerificationError extends Error {
-  public readonly createdId?: number;
+  public readonly createdId: number | undefined;
 
   constructor(
     public readonly operation: string,
