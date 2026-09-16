@@ -16,6 +16,11 @@ import type {
 import { DocumentContextService } from "./documentContext.js";
 import { DocumentUiService, type DocumentUiContext } from "./documentUi.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
+import {
+  GristUiActionsAdapter,
+  UiWriteVerificationError,
+  type NativeWidgetType
+} from "./uiActionsAdapter.js";
 
 export class AuthorizedGristService {
   private readonly documentContext = new DocumentContextService();
@@ -25,7 +30,8 @@ export class AuthorizedGristService {
     private readonly inner: GristService,
     private readonly authorization: AuthorizationService,
     private readonly audit: AuditLogger,
-    private readonly principal: Principal
+    private readonly principal: Principal,
+    private readonly uiActions: GristUiActionsAdapter
   ) {}
 
   get maxReadRecords(): number {
@@ -106,6 +112,80 @@ export class AuthorizedGristService {
     return this.execute("get_page_widgets", documentIdOrUrl, undefined, async (id) => {
       const ui = await this.loadDocumentUi(id);
       return this.documentUi.getPageWidgets(ui, pageId);
+    });
+  }
+
+  async createPage(
+    documentIdOrUrl: string,
+    tableId: string,
+    name: string
+  ): Promise<unknown> {
+    return this.execute("create_page", documentIdOrUrl, 1, async (id) => {
+      await this.resolveTableRef(id, tableId);
+      const created = await this.uiActions.createEmptyPage(id, tableId, name);
+      try {
+        const ui = await this.loadDocumentUi(id);
+        const page = ui.pages.find((candidate) => candidate.id === created.pageId);
+        if (!page) {
+          throw new Error(`Created page ${created.pageId} was not found on re-read.`);
+        }
+        const { widgets, ...pageInfo } = page;
+        return {
+          documentId: id,
+          page: {
+            ...pageInfo,
+            widgetCount: widgets.length,
+            widgetIds: widgets.map((widget) => widget.id)
+          }
+        };
+      } catch (error) {
+        throw new UiWriteVerificationError(
+          "create_page",
+          created.pageId,
+          error instanceof Error ? error.message : "Created page could not be verified."
+        );
+      }
+    });
+  }
+
+  async addPageWidget(
+    documentIdOrUrl: string,
+    pageId: number,
+    tableId: string,
+    type: NativeWidgetType
+  ): Promise<unknown> {
+    if (!Number.isInteger(pageId) || pageId < 1) {
+      throw new Error("Grist page ID must be a positive integer.");
+    }
+    return this.execute("add_page_widget", documentIdOrUrl, 1, async (id) => {
+      const before = await this.loadDocumentUi(id);
+      if (!before.pages.some((page) => page.id === pageId)) {
+        throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
+      }
+      const tableRef = await this.resolveTableRef(id, tableId);
+      const created = await this.uiActions.addPageWidget(
+        id,
+        pageId,
+        tableRef,
+        type
+      );
+      try {
+        const after = await this.loadDocumentUi(id);
+        const page = after.pages.find((candidate) => candidate.id === pageId);
+        const widget = page?.widgets.find(
+          (candidate) => candidate.id === created.widgetId
+        );
+        if (!widget) {
+          throw new Error(`Created widget ${created.widgetId} was not found on re-read.`);
+        }
+        return { documentId: id, pageId, widget };
+      } catch (error) {
+        throw new UiWriteVerificationError(
+          "add_page_widget",
+          created.widgetId,
+          error instanceof Error ? error.message : "Created widget could not be verified."
+        );
+      }
     });
   }
 
@@ -240,6 +320,32 @@ export class AuthorizedGristService {
     return this.execute("delete_columns", documentIdOrUrl, columnIds.length, (id) =>
       this.inner.deleteColumns(id, tableId, columnIds)
     );
+  }
+
+  private async resolveTableRef(documentId: string, tableId: string): Promise<number> {
+    if (!tableId.trim()) throw new Error("Table ID must not be empty.");
+    if (tableId.startsWith("_grist_")) {
+      throw new Error("Internal Grist metadata tables cannot be used as page widget sources.");
+    }
+    const raw = await this.inner.listTables(documentId);
+    const root = raw !== null && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : null;
+    const tables = Array.isArray(root?.tables) ? root.tables : [];
+    for (const entry of tables) {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+      const table = entry as Record<string, unknown>;
+      if (table.id !== tableId) continue;
+      const fields = table.fields !== null && typeof table.fields === "object" && !Array.isArray(table.fields)
+        ? (table.fields as Record<string, unknown>)
+        : null;
+      const tableRef = fields?.tableRef;
+      if (typeof tableRef === "number" && Number.isInteger(tableRef) && tableRef > 0) {
+        return tableRef;
+      }
+      throw new Error(`Grist table "${tableId}" has no usable table reference.`);
+    }
+    throw new Error(`Grist table "${tableId}" does not exist in document "${documentId}".`);
   }
 
   private async loadDocumentUi(
