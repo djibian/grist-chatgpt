@@ -41,11 +41,11 @@ Further document-UI breadth is not the current critical path.
              |                       |
              v                       v
  C1 Credential abstraction      C2 MCP contract v1
-        ELIGIBLE                   ELIGIBLE
+          DONE                     ELIGIBLE
              |
              v
  C3 User-aware Grist context
-        BLOCKED by C1
+          ELIGIBLE
              |
              +------------+
                           |
@@ -73,11 +73,11 @@ Further document-UI breadth is not the current critical path.
                    Plugin submission
 ```
 
-`C2 MCP contract v1` may progress in parallel with C1/C3. OAuth research/design may occur before C3 completes, but core OAuth integration must not couple itself to the current process-wide Grist client/key architecture.
+`C2 MCP contract v1` may progress in parallel with C3. OAuth research/design may occur before C3 completes, but core OAuth integration must not couple itself to the current process-wide Grist client/key architecture.
 
 ## C1 — Credential abstraction
 
-**Status: ELIGIBLE**  
+**Status: DONE**  
 **Priority: blocking / highest**  
 **Suggested branch:** `feat/credential-provider`
 
@@ -146,7 +146,7 @@ Make MCP the clear product contract while preserving existing service behavior.
 
 ## C3 — User-aware Grist context
 
-**Status: BLOCKED by C1**  
+**Status: ELIGIBLE**  
 **Priority: blocking**  
 **Suggested branch:** `feat/user-aware-grist-context`
 
@@ -314,14 +314,14 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The preferred first parallel pair is:
+The preferred next parallel pair is:
 
 ```text
-Worker A: C1 Credential abstraction
+Worker A: C3 User-aware Grist context
 Worker B: C2 MCP contract v1
 ```
 
-Do not start C3 until C1 is integrated. Do not integrate core C4 OAuth work on top of the old singleton credential architecture.
+C3 is eligible because C1 is integrated. Do not integrate core C4 OAuth work until C3 is integrated.
 
 ## Controller integration order
 
