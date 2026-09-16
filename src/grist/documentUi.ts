@@ -117,6 +117,7 @@ export class DocumentUiService {
       const pageId = ref(section.fields.parentId);
       if (!pageId) continue;
       const tableRef = ref(section.fields.tableRef);
+      const tableId = tableIds.get(tableRef);
       const sourceSectionId = ref(section.fields.linkSrcSectionRef);
       const sourceColumnRef = ref(section.fields.linkSrcColRef);
       const targetColumnRef = ref(section.fields.linkTargetColRef);
@@ -124,7 +125,7 @@ export class DocumentUiService {
         id: section.id,
         pageId,
         tableRef,
-        ...(tableIds.get(tableRef) ? { tableId: tableIds.get(tableRef) } : {}),
+        ...(tableId ? { tableId } : {}),
         type: text(section.fields.parentKey) ?? "unknown",
         title: text(section.fields.title) ?? "",
         ...(text(section.fields.description)
