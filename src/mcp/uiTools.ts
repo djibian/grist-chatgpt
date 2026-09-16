@@ -153,8 +153,6 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           .strict()
           .nullable()
           .optional()
-      }).refine((value) => value.title !== undefined || value.selectBy !== undefined, {
-        message: "At least one of title or selectBy must be supplied."
       }),
       annotations: {
         readOnlyHint: false,
@@ -164,6 +162,9 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
     },
     async ({ documentId, pageId, widgetId, title, selectBy }) => {
       try {
+        if (title === undefined && selectBy === undefined) {
+          throw new Error("At least one of title or selectBy must be supplied.");
+        }
         const update: PageWidgetUpdateInput = {
           ...(title !== undefined ? { title } : {}),
           ...(selectBy !== undefined ? { selectBy } : {})
