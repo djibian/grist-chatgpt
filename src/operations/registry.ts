@@ -35,6 +35,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
   { name: "inspect_document", category: "context", capability: "doc:read", readOnly: true, destructive: false, summary: "Build a compact semantic view of tables, columns, formulas, relationships, pages and widgets." },
   { name: "get_pages", category: "ui", capability: "doc:read", readOnly: true, destructive: false, summary: "List Grist pages and their widget IDs without reading row data." },
   { name: "get_page_widgets", category: "ui", capability: "doc:read", readOnly: true, destructive: false, summary: "Inspect normalized page widget metadata and select-by links." },
+  { name: "create_page", category: "ui", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Create one empty named Grist page through a bounded AddView action." },
+  { name: "add_page_widget", category: "ui", capability: "doc.schema:write", readOnly: false, destructive: false, summary: "Add one native widget to an existing page through a bounded CreateViewSection action." },
   { name: "grist_help", category: "utility", capability: null, readOnly: true, destructive: false, summary: "Discover bridge operations and their required capabilities." }
 ] as const;
 
