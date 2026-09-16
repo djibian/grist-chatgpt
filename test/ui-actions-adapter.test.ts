@@ -4,7 +4,7 @@ import test from "node:test";
 import type { GristClient } from "../src/grist/client.js";
 import { GristUiActionsAdapter } from "../src/grist/uiActionsAdapter.js";
 
-function harness(retValues: unknown[]) {
+function harness(retValues: unknown[] = []) {
   const observed: unknown[][][] = [];
   const client = {
     applyUserActions: async (_documentId: string, actions: unknown[][]) => {
@@ -41,6 +41,48 @@ test("addPageWidget emits exactly one bounded CreateViewSection action", async (
   assert.deepEqual(result, { pageId: 7, tableRef: 2, widgetId: 11 });
   assert.deepEqual(observed, [
     [["CreateViewSection", 2, 7, "record", null, null]]
+  ]);
+});
+
+test("renamePage emits only the bounded _grist_Views name update", async () => {
+  const { adapter, observed } = harness();
+
+  await adapter.renamePage("doc-1", 7, "Nouvelle page");
+
+  assert.deepEqual(observed, [
+    [["UpdateRecord", "_grist_Views", 7, { name: "Nouvelle page" }]]
+  ]);
+});
+
+test("updatePageWidget combines title and direct select-by in one bounded action", async () => {
+  const { adapter, observed } = harness();
+
+  await adapter.updatePageWidget("doc-1", 11, {
+    title: "Fiche personne",
+    selectBy: { sourceSectionId: 9 }
+  });
+
+  assert.deepEqual(observed, [
+    [["UpdateRecord", "_grist_Views_section", 11, {
+      title: "Fiche personne",
+      linkSrcSectionRef: 9,
+      linkSrcColRef: 0,
+      linkTargetColRef: 0
+    }]]
+  ]);
+});
+
+test("updatePageWidget clears all three select-by references atomically", async () => {
+  const { adapter, observed } = harness();
+
+  await adapter.updatePageWidget("doc-1", 11, { selectBy: null });
+
+  assert.deepEqual(observed, [
+    [["UpdateRecord", "_grist_Views_section", 11, {
+      linkSrcSectionRef: 0,
+      linkSrcColRef: 0,
+      linkTargetColRef: 0
+    }]]
   ]);
 });
 
