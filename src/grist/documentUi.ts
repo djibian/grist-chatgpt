@@ -1,3 +1,5 @@
+import { GristApiError } from "./client.js";
+
 type JsonRecord = Record<string, unknown>;
 
 interface MetaRecord {
@@ -209,7 +211,10 @@ export class DocumentUiService {
   getPageWidgets(context: DocumentUiContext, pageId: number): unknown {
     const page = context.pages.find((candidate) => candidate.id === pageId);
     if (!page) {
-      throw new Error(`Grist page ${pageId} does not exist in document "${context.documentId}".`);
+      throw new GristApiError(
+        `Grist page ${pageId} does not exist in document "${context.documentId}".`,
+        404
+      );
     }
     const { widgets, ...pageInfo } = page;
     return {
