@@ -284,7 +284,11 @@ export function registerUiActionApi(
     async (req, res) => {
       try {
         const { documentId, pageId, widgetId } = widgetParamsSchema.parse(req.params);
-        const update = updateWidgetBodySchema.parse(req.body);
+        const parsed = updateWidgetBodySchema.parse(req.body);
+        const update: PageWidgetUpdateInput = {
+          ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+          ...(parsed.selectBy !== undefined ? { selectBy: parsed.selectBy } : {})
+        };
         res.json(
           await options.grist.updatePageWidget(documentId, pageId, widgetId, update)
         );
