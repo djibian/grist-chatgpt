@@ -116,33 +116,30 @@ export class DocumentUiService {
     for (const section of sections) {
       const pageId = ref(section.fields.parentId);
       if (!pageId) continue;
+
       const tableRef = ref(section.fields.tableRef);
       const tableId = tableIds.get(tableRef);
+      const description = text(section.fields.description);
+      const chartType = text(section.fields.chartType);
+      const options = jsonText(section.fields.options);
+      const layoutSpec = jsonText(section.fields.layoutSpec);
+      const sortColRefs = jsonText(section.fields.sortColRefs);
       const sourceSectionId = ref(section.fields.linkSrcSectionRef);
       const sourceColumnRef = ref(section.fields.linkSrcColRef);
       const targetColumnRef = ref(section.fields.linkTargetColRef);
+
       const widget: GristPageWidget = {
         id: section.id,
         pageId,
         tableRef,
-        ...(tableId ? { tableId } : {}),
+        ...(tableId !== undefined ? { tableId } : {}),
         type: text(section.fields.parentKey) ?? "unknown",
         title: text(section.fields.title) ?? "",
-        ...(text(section.fields.description)
-          ? { description: text(section.fields.description) }
-          : {}),
-        ...(text(section.fields.chartType)
-          ? { chartType: text(section.fields.chartType) }
-          : {}),
-        ...(jsonText(section.fields.options) !== undefined
-          ? { options: jsonText(section.fields.options) }
-          : {}),
-        ...(jsonText(section.fields.layoutSpec) !== undefined
-          ? { layoutSpec: jsonText(section.fields.layoutSpec) }
-          : {}),
-        ...(jsonText(section.fields.sortColRefs) !== undefined
-          ? { sortColRefs: jsonText(section.fields.sortColRefs) }
-          : {}),
+        ...(description !== undefined && description !== "" ? { description } : {}),
+        ...(chartType !== undefined && chartType !== "" ? { chartType } : {}),
+        ...(options !== undefined ? { options } : {}),
+        ...(layoutSpec !== undefined ? { layoutSpec } : {}),
+        ...(sortColRefs !== undefined ? { sortColRefs } : {}),
         ...(sourceSectionId
           ? {
               selectBy: {
@@ -164,7 +161,9 @@ export class DocumentUiService {
         if (!pageId) return [];
         const view = views.get(pageId);
         if (!view) return [];
+
         const pagePos = number(pageRecord.fields.pagePos);
+        const layoutSpec = jsonText(view.fields.layoutSpec);
         const widgets = (widgetsByPage.get(pageId) ?? []).sort((a, b) => a.id - b.id);
         const page: GristPage = {
           id: pageId,
@@ -173,9 +172,7 @@ export class DocumentUiService {
           type: text(view.fields.type) ?? "",
           indentation: number(pageRecord.fields.indentation) ?? 0,
           ...(pagePos !== undefined ? { pagePos } : {}),
-          ...(jsonText(view.fields.layoutSpec) !== undefined
-            ? { layoutSpec: jsonText(view.fields.layoutSpec) }
-            : {}),
+          ...(layoutSpec !== undefined ? { layoutSpec } : {}),
           widgets
         };
         return [page];
