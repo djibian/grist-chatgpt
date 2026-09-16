@@ -14,10 +14,12 @@ import type {
   UpdateGristRecord
 } from "./client.js";
 import { DocumentContextService } from "./documentContext.js";
+import { DocumentUiService, type DocumentUiContext } from "./documentUi.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
 
 export class AuthorizedGristService {
   private readonly documentContext = new DocumentContextService();
+  private readonly documentUi = new DocumentUiService();
 
   constructor(
     private readonly inner: GristService,
@@ -85,7 +87,25 @@ export class AuthorizedGristService {
   async inspectDocument(documentIdOrUrl: string): Promise<unknown> {
     return this.execute("inspect_document", documentIdOrUrl, undefined, async (id) => {
       const tableResponse = await this.inner.listTables(id, { expandColumns: true });
-      return this.documentContext.build(id, tableResponse);
+      const ui = await this.loadDocumentUi(id, tableResponse);
+      return this.documentContext.build(id, tableResponse, ui);
+    });
+  }
+
+  async getPages(documentIdOrUrl: string): Promise<unknown> {
+    return this.execute("get_pages", documentIdOrUrl, undefined, async (id) => {
+      const ui = await this.loadDocumentUi(id);
+      return this.documentUi.listPages(ui);
+    });
+  }
+
+  async getPageWidgets(documentIdOrUrl: string, pageId: number): Promise<unknown> {
+    if (!Number.isInteger(pageId) || pageId < 1) {
+      throw new Error("Grist page ID must be a positive integer.");
+    }
+    return this.execute("get_page_widgets", documentIdOrUrl, undefined, async (id) => {
+      const ui = await this.loadDocumentUi(id);
+      return this.documentUi.getPageWidgets(ui, pageId);
     });
   }
 
@@ -215,6 +235,31 @@ export class AuthorizedGristService {
     return this.execute("delete_columns", documentIdOrUrl, columnIds.length, (id) =>
       this.inner.deleteColumns(id, tableId, columnIds)
     );
+  }
+
+  private async loadDocumentUi(
+    documentId: string,
+    tableResponse?: unknown
+  ): Promise<DocumentUiContext> {
+    const metadataLimit = this.inner.maxReadRecords > 0
+      ? this.inner.maxReadRecords
+      : 5000;
+    const [tables, pages, views, sections] = await Promise.all([
+      tableResponse ?? this.inner.listTables(documentId),
+      this.inner.queryRecords(documentId, "_grist_Pages", {
+        limit: metadataLimit,
+        hidden: true
+      }),
+      this.inner.queryRecords(documentId, "_grist_Views", {
+        limit: metadataLimit,
+        hidden: true
+      }),
+      this.inner.queryRecords(documentId, "_grist_Views_section", {
+        limit: metadataLimit,
+        hidden: true
+      })
+    ]);
+    return this.documentUi.build(documentId, tables, pages, views, sections);
   }
 
   private async execute(
