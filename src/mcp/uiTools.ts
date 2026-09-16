@@ -3,6 +3,7 @@ import * as z from "zod/v4";
 
 import {
   NATIVE_WIDGET_TYPES,
+  UiWriteVerificationError,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
 
@@ -28,14 +29,23 @@ function textResult(value: unknown) {
 }
 
 function errorResult(error: unknown) {
+  const body = error instanceof UiWriteVerificationError
+    ? {
+        error: "Grist UI write verification failed",
+        operation: error.operation,
+        ...(error.createdId !== undefined ? { createdId: error.createdId } : {}),
+        retryWholeOperation: false
+      }
+    : {
+        error: error instanceof Error ? error.message : String(error)
+      };
+
   return {
     isError: true,
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify({
-          error: error instanceof Error ? error.message : String(error)
-        })
+        text: JSON.stringify(body)
       }
     ]
   };
