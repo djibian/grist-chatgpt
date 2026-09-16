@@ -13,21 +13,16 @@ import {
   registerUiActionApi
 } from "./actions/uiApi.js";
 import { AuditLogger } from "./audit/auditLogger.js";
-import { AuthorizationService } from "./auth/authorizationService.js";
-import { createPrincipal, type Principal } from "./auth/principal.js";
+import { createPrincipal } from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
-import { AccessPolicy } from "./grist/accessPolicy.js";
-import { AuthorizedGristService } from "./grist/authorizedService.js";
+import { DeploymentResourcePolicy } from "./grist/accessPolicy.js";
+import { GristContextFactory } from "./grist/contextFactory.js";
 import {
   GristClientFactory,
   StaticApiKeyCredentialProvider
 } from "./grist/credentials.js";
-import { GristService } from "./grist/service.js";
-import {
-  GristUiActionsAdapter,
-  UiWriteVerificationError
-} from "./grist/uiActionsAdapter.js";
+import { UiWriteVerificationError } from "./grist/uiActionsAdapter.js";
 import { registerCoreTools } from "./mcp/coreTools.js";
 import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
@@ -41,7 +36,22 @@ const clientFactory = new GristClientFactory(
   config.gristBaseUrl,
   credentialProvider
 );
+const deploymentPolicy = new DeploymentResourcePolicy({
+  allowedDocumentIds: config.allowedDocumentIds,
+  allowedWorkspaceIds: config.allowedWorkspaceIds
+});
 const audit = new AuditLogger();
+const contextFactory = new GristContextFactory(
+  clientFactory,
+  deploymentPolicy,
+  audit,
+  {
+    maxReadRecords: config.maxReadRecords,
+    maxWriteRecords: config.maxWriteRecords,
+    writeBatchRecords: config.writeBatchRecords,
+    maxSchemaItems: config.maxSchemaItems
+  }
+);
 
 const mcpPrincipal = createPrincipal({
   id: "mcp-client",
@@ -58,34 +68,10 @@ const gptPrincipal = createPrincipal({
   capabilities: config.gptActionCapabilities
 });
 
-async function buildAuthorizedGrist(
-  principal: Principal
-): Promise<AuthorizedGristService> {
-  const client = await clientFactory.createClient({ principal });
-  const accessPolicy = new AccessPolicy(client, {
-    allowedDocumentIds: config.allowedDocumentIds,
-    allowedWorkspaceIds: config.allowedWorkspaceIds
-  });
-  const baseGrist = new GristService(client, accessPolicy, {
-    maxReadRecords: config.maxReadRecords,
-    maxWriteRecords: config.maxWriteRecords,
-    writeBatchRecords: config.writeBatchRecords,
-    maxSchemaItems: config.maxSchemaItems
-  });
-  const uiActions = new GristUiActionsAdapter(client);
-  const authorization = new AuthorizationService(accessPolicy);
-
-  return new AuthorizedGristService(
-    baseGrist,
-    authorization,
-    audit,
-    principal,
-    uiActions
-  );
-}
-
-const mcpGrist = await buildAuthorizedGrist(mcpPrincipal);
-const gptGrist = await buildAuthorizedGrist(gptPrincipal);
+// Static development principals still get startup contexts. The factory itself
+// is principal-aware and can later be called per authenticated OAuth principal.
+const mcpGrist = await contextFactory.create(mcpPrincipal);
+const gptGrist = await contextFactory.create(gptPrincipal);
 
 function buildServer(): McpServer {
   const server = new McpServer({

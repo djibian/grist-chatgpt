@@ -45,13 +45,13 @@ Further document-UI breadth is not the current critical path.
              |
              v
  C3 User-aware Grist context
-          ELIGIBLE
+          DONE
              |
              +------------+
                           |
                           v
                  C4 OAuth MCP identity
-                 BLOCKED by C3
+             BLOCKED by human gate
                           |
                           v
                  C5 Secure onboarding
@@ -73,7 +73,7 @@ Further document-UI breadth is not the current critical path.
                    Plugin submission
 ```
 
-`C2 MCP contract v1` is integrated. C3 is the next blocking implementation tranche. OAuth research/design may occur before C3 completes, but core OAuth integration remains blocked until C3 is integrated.
+C1, C2 and C3 are integrated. The next blocking implementation tranche is C4, but core OAuth integration is now blocked on the explicit human decision selecting the identity-provider approach. Protocol research and a decision package may proceed without making that selection autonomously.
 
 ## C1 — Credential abstraction
 
@@ -146,7 +146,7 @@ Make MCP the clear product contract while preserving existing service behavior.
 
 ## C3 — User-aware Grist context
 
-**Status: ELIGIBLE**  
+**Status: DONE**  
 **Priority: blocking**  
 **Suggested branch:** `feat/user-aware-grist-context`
 
@@ -154,13 +154,14 @@ Make MCP the clear product contract while preserving existing service behavior.
 
 Make clients, resource discovery, deployment policy intersection and caches safe for multiple authenticated users with different Grist API keys.
 
-### Intended slice
+### Integrated slice
 
-- separate deployment-level policy from user-visible Grist resource discovery;
-- construct/request Grist clients through the credential/client factory for a principal;
-- ensure discovery caches are per-principal/per-credential or safely request-scoped;
-- prove through tests that visibility under user A cannot appear under user B;
-- preserve current allowlist/workspace policy semantics as the maximum deployment boundary.
+- deployment-level document/workspace policy is separated from credential-derived Grist discovery;
+- principal contexts are constructed through the credential/client factory;
+- every created principal context gets its own Grist client, discovery cache, access policy and service graph;
+- the deployment policy remains a shareable static maximum boundary;
+- explicit cross-user tests prove visibility/cache state learned through user A cannot appear under user B;
+- the existing static single-key development deployment remains supported.
 
 ### Exit criteria
 
@@ -170,39 +171,40 @@ Make clients, resource discovery, deployment policy intersection and caches safe
 
 ## C4 — OAuth MCP identity
 
-**Status: BLOCKED by C3 for core integration**  
+**Status: BLOCKED by human identity-provider decision**  
 **Priority: blocking**  
-**Suggested branch:** `feat/oauth-mcp`
+**Suggested branch after decision:** `feat/oauth-mcp`
 
 ### Goal
 
 Replace the production MCP static bearer principal with OAuth-authenticated dynamic principals and explicit scopes.
 
-### Design work allowed before C3
+### Design/research work allowed now
 
 Research and documentation may establish:
 
 - the current MCP/OAuth 2.1 protocol requirements;
 - protected-resource metadata and challenge behavior;
 - token validation requirements (issuer/audience/expiry/scopes);
-- candidate identity-provider options;
-- mapping from OAuth scopes to `doc:read`, `doc:write`, `doc.schema:write`.
+- concrete identity-provider options and tradeoffs for the DINUM deployment;
+- mapping from OAuth scopes to the existing `doc:read`, `doc:write`, `doc.schema:write` vocabulary without changing that public scope set.
 
 ### Human gate
 
-Identity-provider selection is a human decision unless already made durable in product documentation.
+Identity-provider selection is a human decision. Autonomous implementation must stop before choosing or committing to a provider or provider-specific production architecture.
 
-### Core implementation after C3
+### Core implementation after the human decision
 
 - validate OAuth access tokens;
 - construct dynamic `Principal` objects;
+- create a principal-bound Grist context through `GristContextFactory`;
 - enforce scopes through the existing authorization service;
 - expose appropriate MCP security metadata/challenges;
 - preserve the static bearer mode only as an explicit development/backward-compatible path if still useful.
 
 ## C5 — Secure Grist onboarding and credential lifecycle
 
-**Status: BLOCKED by C4 and C3**  
+**Status: BLOCKED by C4 and human persistence/encryption decisions**  
 **Priority: blocking**  
 **Suggested branch:** `feat/grist-onboarding`
 
@@ -314,13 +316,7 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The immediate implementation focus is:
-
-```text
-Worker A: C3 User-aware Grist context
-```
-
-Independent OAuth research/design may proceed without selecting a provider or starting core C4 integration. C4 remains blocked until C3 is integrated.
+The immediate next useful work is non-committing C4 research and preparation of the smallest identity-provider decision package for the human gate. Do not open core OAuth implementation until that decision is durable.
 
 ## Controller integration order
 
