@@ -38,13 +38,27 @@ function singleReturnValue(response: unknown, actionName: string): JsonRecord {
 }
 
 export class UiWriteVerificationError extends Error {
+  public readonly createdId?: number;
+
   constructor(
     public readonly operation: string,
-    message: string,
-    public readonly createdId?: number
+    messageOrCreatedId: string | number | undefined,
+    createdIdOrMessage?: number | string
   ) {
+    const message =
+      typeof messageOrCreatedId === "string"
+        ? messageOrCreatedId
+        : typeof createdIdOrMessage === "string"
+          ? createdIdOrMessage
+          : "Grist UI write could not be verified.";
     super(`${message} The Grist write may already have succeeded; do not retry the whole operation blindly.`);
     this.name = "UiWriteVerificationError";
+    this.createdId =
+      typeof messageOrCreatedId === "number"
+        ? messageOrCreatedId
+        : typeof createdIdOrMessage === "number"
+          ? createdIdOrMessage
+          : undefined;
   }
 }
 
