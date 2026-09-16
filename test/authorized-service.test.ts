@@ -6,6 +6,7 @@ import type { AuthorizationService } from "../src/auth/authorizationService.js";
 import type { Principal } from "../src/auth/principal.js";
 import { AuthorizedGristService } from "../src/grist/authorizedService.js";
 import type { GristService } from "../src/grist/service.js";
+import type { GristUiActionsAdapter } from "../src/grist/uiActionsAdapter.js";
 
 function harness() {
   const queriedTables: string[] = [];
@@ -80,8 +81,19 @@ function harness() {
     ]
   };
 
+  const uiActions = {
+    createEmptyPage: async () => ({ pageId: 99 }),
+    addPageWidget: async () => ({ pageId: 1, tableRef: 1, widgetId: 99 })
+  } as unknown as GristUiActionsAdapter;
+
   return {
-    service: new AuthorizedGristService(inner, authorization, audit, principal),
+    service: new AuthorizedGristService(
+      inner,
+      authorization,
+      audit,
+      principal,
+      uiActions
+    ),
     queriedTables
   };
 }
