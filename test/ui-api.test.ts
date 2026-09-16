@@ -41,7 +41,17 @@ async function stop(server: Server): Promise<void> {
   });
 }
 
-test("UI OpenAPI exposes only bounded consequential creation actions", () => {
+function noopUiOperations(overrides: Partial<GristUiOperations> = {}): GristUiOperations {
+  return {
+    createPage: async () => ({ page: { id: 7 } }),
+    addPageWidget: async () => ({ widget: { id: 11 } }),
+    renamePage: async () => ({ page: { id: 7 } }),
+    updatePageWidget: async () => ({ widget: { id: 11 } }),
+    ...overrides
+  };
+}
+
+test("UI OpenAPI exposes bounded consequential create and update actions", () => {
   const paths = buildUiOpenApiPaths() as any;
 
   assert.equal(
@@ -55,8 +65,22 @@ test("UI OpenAPI exposes only bounded consequential creation actions", () => {
     true
   );
   assert.equal(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}"].patch.operationId,
+    "renameGristPage"
+  );
+  assert.equal(
     paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets"].post.operationId,
     "addGristPageWidget"
+  );
+  assert.equal(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}"].patch.operationId,
+    "updateGristPageWidget"
+  );
+  assert.equal(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}"].patch[
+      "x-openai-isConsequential"
+    ],
+    true
   );
   assert.deepEqual(
     paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets"].post.requestBody
@@ -68,11 +92,16 @@ test("UI OpenAPI exposes only bounded consequential creation actions", () => {
       .requestBody.content["application/json"].schema.additionalProperties,
     false
   );
+  assert.equal(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}"].patch
+      .requestBody.content["application/json"].schema.additionalProperties,
+    false
+  );
 });
 
-test("UI REST routes forward semantic page and widget requests", async () => {
+test("UI REST routes forward semantic page and widget create/update requests", async () => {
   const observed: unknown[] = [];
-  const grist: GristUiOperations = {
+  const grist = noopUiOperations({
     createPage: async (documentId, tableId, name) => {
       observed.push({ action: "page", documentId, tableId, name });
       return { documentId, page: { id: 7, name } };
@@ -80,8 +109,16 @@ test("UI REST routes forward semantic page and widget requests", async () => {
     addPageWidget: async (documentId, pageId, tableId, type) => {
       observed.push({ action: "widget", documentId, pageId, tableId, type });
       return { documentId, pageId, widget: { id: 11, tableId, type } };
+    },
+    renamePage: async (documentId, pageId, name) => {
+      observed.push({ action: "rename-page", documentId, pageId, name });
+      return { documentId, page: { id: pageId, name } };
+    },
+    updatePageWidget: async (documentId, pageId, widgetId, update) => {
+      observed.push({ action: "update-widget", documentId, pageId, widgetId, update });
+      return { documentId, pageId, widget: { id: widgetId } };
     }
-  };
+  });
   const { baseUrl, server } = await startApi(grist);
 
   try {
@@ -102,6 +139,29 @@ test("UI REST routes forward semantic page and widget requests", async () => {
     );
     assert.equal(widgetResponse.status, 200);
 
+    const renameResponse = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/pages/7`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Suivi personnes" })
+      }
+    );
+    assert.equal(renameResponse.status, 200);
+
+    const updateResponse = await fetch(
+      `${baseUrl}/api/v1/documents/doc-1/pages/7/widgets/12`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Fiche personne",
+          selectBy: { sourceWidgetId: 11 }
+        })
+      }
+    );
+    assert.equal(updateResponse.status, 200);
+
     assert.deepEqual(observed, [
       {
         action: "page",
@@ -115,6 +175,22 @@ test("UI REST routes forward semantic page and widget requests", async () => {
         pageId: 7,
         tableId: "Personnes",
         type: "record"
+      },
+      {
+        action: "rename-page",
+        documentId: "doc-1",
+        pageId: 7,
+        name: "Suivi personnes"
+      },
+      {
+        action: "update-widget",
+        documentId: "doc-1",
+        pageId: 7,
+        widgetId: 12,
+        update: {
+          title: "Fiche personne",
+          selectBy: { sourceWidgetId: 11 }
+        }
       }
     ]);
   } finally {
@@ -124,13 +200,12 @@ test("UI REST routes forward semantic page and widget requests", async () => {
 
 test("UI REST routes reject arbitrary widget types before calling Grist", async () => {
   let calls = 0;
-  const grist: GristUiOperations = {
-    createPage: async () => ({ page: { id: 7 } }),
+  const grist = noopUiOperations({
     addPageWidget: async () => {
       calls += 1;
       return { widget: { id: 11 } };
     }
-  };
+  });
   const { baseUrl, server } = await startApi(grist);
 
   try {
@@ -143,6 +218,34 @@ test("UI REST routes reject arbitrary widget types before calling Grist", async 
       }
     );
     assert.equal(response.status, 400);
+    assert.equal(calls, 0);
+  } finally {
+    await stop(server);
+  }
+});
+
+test("widget update rejects unknown fields and empty patches before calling Grist", async () => {
+  let calls = 0;
+  const grist = noopUiOperations({
+    updatePageWidget: async () => {
+      calls += 1;
+      return { widget: { id: 11 } };
+    }
+  });
+  const { baseUrl, server } = await startApi(grist);
+
+  try {
+    for (const body of [{}, { arbitrary: true }]) {
+      const response = await fetch(
+        `${baseUrl}/api/v1/documents/doc-1/pages/7/widgets/11`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        }
+      );
+      assert.equal(response.status, 400);
+    }
     assert.equal(calls, 0);
   } finally {
     await stop(server);
