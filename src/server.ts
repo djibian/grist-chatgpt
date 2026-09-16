@@ -14,12 +14,15 @@ import {
 } from "./actions/uiApi.js";
 import { AuditLogger } from "./audit/auditLogger.js";
 import { AuthorizationService } from "./auth/authorizationService.js";
-import { createPrincipal } from "./auth/principal.js";
+import { createPrincipal, type Principal } from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { AccessPolicy } from "./grist/accessPolicy.js";
 import { AuthorizedGristService } from "./grist/authorizedService.js";
-import { GristClient } from "./grist/client.js";
+import {
+  GristClientFactory,
+  StaticApiKeyCredentialProvider
+} from "./grist/credentials.js";
 import { GristService } from "./grist/service.js";
 import {
   GristUiActionsAdapter,
@@ -33,22 +36,11 @@ import { operationHelp } from "./operations/registry.js";
 import { VERSION } from "./version.js";
 
 const config = loadConfig();
-const client = new GristClient({
-  baseUrl: config.gristBaseUrl,
-  apiKey: config.gristApiKey
-});
-const accessPolicy = new AccessPolicy(client, {
-  allowedDocumentIds: config.allowedDocumentIds,
-  allowedWorkspaceIds: config.allowedWorkspaceIds
-});
-const baseGrist = new GristService(client, accessPolicy, {
-  maxReadRecords: config.maxReadRecords,
-  maxWriteRecords: config.maxWriteRecords,
-  writeBatchRecords: config.writeBatchRecords,
-  maxSchemaItems: config.maxSchemaItems
-});
-const uiActions = new GristUiActionsAdapter(client);
-const authorization = new AuthorizationService(accessPolicy);
+const credentialProvider = new StaticApiKeyCredentialProvider(config.gristApiKey);
+const clientFactory = new GristClientFactory(
+  config.gristBaseUrl,
+  credentialProvider
+);
 const audit = new AuditLogger();
 
 const mcpPrincipal = createPrincipal({
@@ -66,20 +58,34 @@ const gptPrincipal = createPrincipal({
   capabilities: config.gptActionCapabilities
 });
 
-const mcpGrist = new AuthorizedGristService(
-  baseGrist,
-  authorization,
-  audit,
-  mcpPrincipal,
-  uiActions
-);
-const gptGrist = new AuthorizedGristService(
-  baseGrist,
-  authorization,
-  audit,
-  gptPrincipal,
-  uiActions
-);
+async function buildAuthorizedGrist(
+  principal: Principal
+): Promise<AuthorizedGristService> {
+  const client = await clientFactory.createClient({ principal });
+  const accessPolicy = new AccessPolicy(client, {
+    allowedDocumentIds: config.allowedDocumentIds,
+    allowedWorkspaceIds: config.allowedWorkspaceIds
+  });
+  const baseGrist = new GristService(client, accessPolicy, {
+    maxReadRecords: config.maxReadRecords,
+    maxWriteRecords: config.maxWriteRecords,
+    writeBatchRecords: config.writeBatchRecords,
+    maxSchemaItems: config.maxSchemaItems
+  });
+  const uiActions = new GristUiActionsAdapter(client);
+  const authorization = new AuthorizationService(accessPolicy);
+
+  return new AuthorizedGristService(
+    baseGrist,
+    authorization,
+    audit,
+    principal,
+    uiActions
+  );
+}
+
+const mcpGrist = await buildAuthorizedGrist(mcpPrincipal);
+const gptGrist = await buildAuthorizedGrist(gptPrincipal);
 
 function buildServer(): McpServer {
   const server = new McpServer({
