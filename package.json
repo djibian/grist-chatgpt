@@ -12,7 +12,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=.env dist/server.js",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "probe:proconnect": "tsx tools/proconnect-mcp-probe.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",
