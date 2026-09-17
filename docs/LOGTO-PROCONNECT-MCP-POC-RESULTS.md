@@ -143,17 +143,22 @@ npm run probe:logto -- metadata \
 
 It returned PASS for exact issuer matching, HTTPS authorization endpoint, HTTPS token endpoint, HTTPS JWKS endpoint, PKCE `S256`, Authorization Code response support and Authorization Code grant support.
 
+The Logto Admin Console now contains the MCP API resource with identifier `https://grist-chatgpt.loeildumaitre.fr/mcp` and exactly the three required permissions `doc:read`, `doc:write`, and `doc.schema:write`. The operator has not yet confirmed the resource's `Default API` toggle state, so that property remains UNKNOWN rather than inferred.
+
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | Discovery issuer/endpoints/JWKS contract | PASS | public live discovery plus repository `metadata` probe |
 | PKCE `S256` advertised | PASS | live discovery and repository probe both report `S256` |
 | Authorization Code response/grant support | PASS | live discovery/probe advertise `code` response and `authorization_code` grant |
 | Refresh-token grant advertised | PASS | live discovery advertises `refresh_token`; actual refresh behavior remains a later live-flow check |
+| MCP API resource configured in Logto | PASS | operator confirmed resource creation with canonical identifier `https://grist-chatgpt.loeildumaitre.fr/mcp` |
+| Required bridge permissions configured in Logto | PASS | operator confirmed exactly `doc:read`, `doc:write`, and `doc.schema:write` are present |
+| MCP API resource is not configured as Default API | UNKNOWN | resource General settings have not yet been visually confirmed |
 | RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request |
 | RFC 8707 `resource` accepted on token request | UNKNOWN | requires live OAuth exchange |
 | Access token bound to canonical MCP audience/resource | UNKNOWN | requires cryptographically validated live token claims |
 | Wrong-resource token rejected on live MCP request path | UNKNOWN | claims-level policy is tested, but live JWT validation/request-path rejection is still required |
-| Bridge scopes represented and recoverable | UNKNOWN | Logto API resource/scopes still need to be created and exercised in a live token |
+| Bridge scopes represented and recoverable in a live access token | UNKNOWN | permissions are configured, but live token issuance/claims remain to be demonstrated |
 | Refresh/offline connectivity suitable for ChatGPT | UNKNOWN | support is advertised, but actual refresh behavior requires live ChatGPT flow |
 | CIMD/dynamic-app compatibility | UNKNOWN | interoperability bonus; not initial ChatGPT blocker |
 
@@ -195,8 +200,8 @@ It returned PASS for exact issuer matching, HTTPS authorization endpoint, HTTPS 
 
 ## Current conclusion
 
-The live C4-P0 deployment has now demonstrated the non-production Logto/PostgreSQL runtime, public HTTPS, protected admin access, working outbound container connectivity, successful first-admin creation, live OIDC discovery, PKCE `S256`, and Authorization Code metadata behavior. The repository-side provider-neutral seams remain demonstrated by CI.
+The live C4-P0 deployment has now demonstrated the non-production Logto/PostgreSQL runtime, public HTTPS, protected admin access, working outbound container connectivity, successful first-admin creation, live OIDC discovery, PKCE `S256`, Authorization Code metadata behavior, and creation of the canonical MCP API resource with the three fixed bridge permissions. The repository-side provider-neutral seams remain demonstrated by CI.
 
-The architecture is **not yet declared compatible**. Mandatory UNKNOWNs remain for ProConnect federation, RFC 8707 live request/token handling, audience/resource-bound live tokens, cryptographic JWT/JWKS validation, actual `/mcp` OAuth wiring, scope enforcement on live requests, and ChatGPT interoperability/refresh.
+The architecture is **not yet declared compatible**. Mandatory UNKNOWNs remain for the MCP resource's non-default setting, ProConnect federation, RFC 8707 live request/token handling, audience/resource-bound live tokens, cryptographic JWT/JWKS validation, actual `/mcp` OAuth wiring, scope enforcement on live requests, and ChatGPT interoperability/refresh.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
