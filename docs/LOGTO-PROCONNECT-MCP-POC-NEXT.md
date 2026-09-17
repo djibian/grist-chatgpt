@@ -47,7 +47,8 @@ Current live PASS evidence includes:
 - the repository `probe:logto` metadata probe passes exact issuer, HTTPS auth/token/JWKS endpoints, PKCE `S256`, Authorization Code response and Authorization Code grant checks;
 - the canonical MCP API resource `https://grist-chatgpt.loeildumaitre.fr/mcp` exists in Logto;
 - exactly the three fixed bridge permissions `doc:read`, `doc:write`, and `doc.schema:write` are present on that resource;
-- the MCP resource's `Default API` setting is visually confirmed **OFF**, so the POC does not rely on an implicit default audience.
+- the MCP resource's `Default API` setting is visually confirmed **OFF**, so the POC does not rely on an implicit default audience;
+- a non-production ProConnect **Internet / integration** Fournisseur de Service application named `Logto` exists and its redirect URI is the exact callback URI displayed by the Logto OIDC connector.
 
 Do not infer untested live properties from those metadata/configuration PASS results. RFC 8707 acceptance, live token audience binding, cryptographic JWT/JWKS verification, scope recovery/enforcement in live tokens and ChatGPT refresh behavior remain separate evidence.
 
@@ -80,13 +81,13 @@ Important operational constraint: `/etc/nftables.conf` starts with `flush rulese
 
 Systemd ordering was inspected and is compatible with normal boot: `nftables.service` is enabled for `sysinit.target`, runs before `network-pre.target`, and Docker starts later under `multi-user.target`. The current boot began before nftables was installed/enabled, so an actual reboot persistence check is still UNKNOWN and should be done only as a deliberate controlled test.
 
-## Exact next live step: ProConnect federation
+## Exact next live step: configure Logto -> ProConnect OIDC
 
 The MCP API resource and permissions are fully configured for the POC:
 
 ```text
-Name:       grist-chatgpt MCP
-Identifier: https://grist-chatgpt.loeildumaitre.fr/mcp
+Name:        grist-chatgpt MCP
+Identifier:  https://grist-chatgpt.loeildumaitre.fr/mcp
 Default API: OFF
 
 Permissions:
@@ -95,32 +96,46 @@ doc:write
 doc.schema:write
 ```
 
-This preserves the requirement to prove explicit RFC 8707 `resource` handling rather than silently substituting a default audience.
+The ProConnect test application is also registered:
 
-The next live step is now ProConnect federation.
+```text
+Environment: Internet / integration
+Application: Logto
+Redirect URI: exact Logto OIDC connector callback URI
+```
 
-For OSS, use Logto's generic **social OIDC connector**, not the commercial Enterprise SSO path.
+No `client_id` or `client_secret` value is recorded in Git or in this handoff.
 
-Register/use a non-production ProConnect integration client outside Git. Copy the exact callback URI shown by the Logto connector into the ProConnect registration.
+The exact next action is to finish the generic **social OIDC connector** in Logto using the ProConnect test application credentials locally.
 
-Configure Logto with locally handled secret values only:
+ProConnect Internet/integration domain:
 
-- ProConnect integration issuer / discovery URL;
-- client ID;
-- client secret;
+```text
+fca.integ01.dev-agentconnect.fr
+```
+
+ProConnect discovery URL:
+
+```text
+https://fca.integ01.dev-agentconnect.fr/api/v2/.well-known/openid-configuration
+```
+
+Use the values exposed by that discovery document for issuer, authorization endpoint, token endpoint and JWKS URI rather than inventing endpoints manually.
+
+Configure the Logto connector with:
+
+- `clientId`: the ProConnect integration `client_id`;
+- `clientSecret`: the ProConnect integration secret, entered directly in Logto and never pasted into chat/Git;
 - Authorization Code flow;
-- only identity scopes required for the POC.
+- identity scopes for the initial POC: `openid email given_name usual_name`;
+- token endpoint authentication method matching ProConnect discovery/documentation;
+- ID-token verification using ProConnect issuer/JWKS from discovery.
 
-The ProConnect client secret must remain outside Git and outside model-visible conversation content.
+Do not request additional ProConnect business/organizational scopes for the initial identity proof unless a demonstrated technical need appears.
 
-Do not broaden or rename the public scope vocabulary without the human gate required by `AGENTS.md`.
+After saving the connector, first prove only that Logto accepts the ProConnect configuration. Then run one complete Logto -> ProConnect -> Logto login, followed by a second login for the same ProConnect user to demonstrate stable identity mapping. Record no raw tokens, authorization codes, cookies or secrets.
 
-Required live identity evidence after configuration:
-
-1. complete Logto -> ProConnect -> Logto login;
-2. complete a second login for the same ProConnect user;
-3. record only sanitized evidence proving stable Logto identity mapping;
-4. test logout/re-login behavior without recording raw cookies/tokens.
+Do not broaden or rename the public MCP scope vocabulary without the human gate required by `AGENTS.md`.
 
 ## Mandatory evidence still UNKNOWN
 
