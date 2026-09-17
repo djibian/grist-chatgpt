@@ -101,9 +101,12 @@ The Logto `--dapc` / `--disable-admin-pwned-password-check` escape hatch was del
 
 For OSS, the selected upstream path is Logto's generic **social OIDC connector**, not the commercial Enterprise SSO feature.
 
+A non-production **Internet / integration** ProConnect Fournisseur de Service application named `Logto` has now been created in the Espace Partenaires. Its registered redirect URI is the exact callback URI displayed by the Logto OIDC connector. No `client_id`, `client_secret`, token, code, cookie, or other credential value is recorded here.
+
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| ProConnect integration issuer/discovery accepted by Logto | UNKNOWN | requires registered integration client and live Logto connector configuration |
+| ProConnect integration client registered | PASS | operator created the non-production `Logto` application and registered the exact Logto connector callback URI |
+| ProConnect integration issuer/discovery accepted by Logto | UNKNOWN | requires live Logto connector configuration |
 | Authorization Code login Logto -> ProConnect -> Logto | UNKNOWN | requires live flow |
 | Same ProConnect user maps to stable Logto subject across repeated login | UNKNOWN | requires two sanitized live login observations |
 | Logout/re-login does not create unintended bridge identity | UNKNOWN | requires live flow |
@@ -200,8 +203,8 @@ The Logto Admin Console now contains the MCP API resource with identifier `https
 
 ## Current conclusion
 
-The live C4-P0 deployment has now demonstrated the non-production Logto/PostgreSQL runtime, public HTTPS, protected admin access, working outbound container connectivity, successful first-admin creation, live OIDC discovery, PKCE `S256`, Authorization Code metadata behavior, creation of the canonical MCP API resource with the three fixed bridge permissions, and confirmation that the MCP resource is not Logto's Default API. The repository-side provider-neutral seams remain demonstrated by CI.
+The live C4-P0 deployment has now demonstrated the non-production Logto/PostgreSQL runtime, public HTTPS, protected admin access, working outbound container connectivity, successful first-admin creation, live OIDC discovery, PKCE `S256`, Authorization Code metadata behavior, creation of the canonical MCP API resource with the three fixed bridge permissions, confirmation that the MCP resource is not Logto's Default API, and registration of the non-production ProConnect integration client with the exact Logto callback URI. The repository-side provider-neutral seams remain demonstrated by CI.
 
-The architecture is **not yet declared compatible**. Mandatory UNKNOWNs remain for ProConnect federation, RFC 8707 live request/token handling, audience/resource-bound live tokens, cryptographic JWT/JWKS validation, actual `/mcp` OAuth wiring, scope enforcement on live requests, and ChatGPT interoperability/refresh.
+The architecture is **not yet declared compatible**. Mandatory UNKNOWNs remain for live Logto -> ProConnect federation, RFC 8707 live request/token handling, audience/resource-bound live tokens, cryptographic JWT/JWKS validation, actual `/mcp` OAuth wiring, scope enforcement on live requests, and ChatGPT interoperability/refresh.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
