@@ -18,17 +18,7 @@ Priority does not imply eligibility. An item may be high priority but blocked.
 
 **Status: DONE**
 
-Integrated capabilities include:
-
-- semantic page/widget inspection;
-- bounded page creation;
-- bounded native widget creation;
-- page rename;
-- widget title update;
-- conservative direct `select-by` configuration;
-- post-write normalized verification;
-- UI missing-resource error handling;
-- plugin-ready architecture/security documentation.
+Integrated capabilities include semantic page/widget inspection, bounded page/widget mutation, conservative direct `select-by`, post-write normalized verification and plugin-ready architecture/security documentation.
 
 Further document-UI breadth is not the current critical path.
 
@@ -47,168 +37,154 @@ Further document-UI breadth is not the current critical path.
  C3 User-aware Grist context
           DONE
              |
-             +------------+
-                          |
-                          v
-                 C4 OAuth MCP identity
-             BLOCKED by human gate
-                          |
-                          v
-                 C5 Secure onboarding
-                 BLOCKED by C4
-                          |
-             +------------+-------------+
-             |                          |
-             v                          v
- C6 Production hardening       C7 Reviewer fixture
- BLOCKED by C4/C5              BLOCKED by C4/C5
+             v
+ C4-P0 Logto/ProConnect MCP POC
+          ELIGIBLE
              |
-             +------------+-------------+
-                          |
-                          v
-                 C8 Submission package
-                 BLOCKED by C6/C7
-                          |
-                          v
-                   Plugin submission
+             v
+ C4 OAuth MCP identity
+       BLOCKED by POC
+             |
+             v
+ C5 Secure onboarding
+       BLOCKED by C4
+             |
+        +----+----+
+        |         |
+        v         v
+ C6 Production   C7 Reviewer
+ hardening       fixture
+ blocked C4/C5   blocked C4/C5
+        |         |
+        +----+----+
+             |
+             v
+ C8 Submission package
+             |
+             v
+ Plugin submission
 ```
 
-C1, C2 and C3 are integrated. The C4 protocol research and identity-provider decision package is also integrated in `docs/OAUTH-IDP-DECISION.md`. Core OAuth implementation is now blocked on the explicit human decision selecting the identity-provider approach; no provider-specific C4 implementation is eligible until that decision is made durable.
+C1, C2 and C3 are integrated. The C4 human identity-provider gate is now resolved and recorded in `docs/OAUTH-IDP-DECISION.md`.
+
+Selected architecture:
+
+- ProConnect is the upstream institutional identity source;
+- Logto OSS self-hosted is the reference MCP-facing authorization server;
+- `grist-chatgpt` remains a provider-neutral OAuth resource server;
+- Auth0 EU is the SaaS fallback and Curity Standard the commercial self-hosted fallback;
+- direct ProConnect as MCP-facing authorization server remains ruled out for the currently assessed configuration because RFC 8707 Resource Indicators are disabled.
+
+The next critical-path work is the bounded Logto/ProConnect/ChatGPT interoperability POC. Full C4 implementation is intentionally blocked until that POC proves the mandatory MCP properties.
 
 ## C1 — Credential abstraction
 
 **Status: DONE**  
-**Priority: blocking / highest**  
-**Suggested branch:** `feat/credential-provider`
+**Priority: blocking / highest**
 
-### Goal
+Integrated result:
 
-Introduce the architectural seam required to stop treating one process-wide `GRIST_API_KEY` as the only possible credential source, without changing production behavior yet.
-
-### Intended slice
-
-- define a `GristCredentialProvider` (or equivalently minimal abstraction);
-- define a credential-aware `GristClientFactory` / request-context seam;
-- implement a `StaticApiKeyCredentialProvider` preserving today's single-user deployment;
-- route current business-service construction through that seam with no behavior regression;
-- add tests proving the static provider preserves current behavior;
-- document the interface expected by future user-aware providers.
-
-### Must not do yet
-
-- no database/secret-store choice;
-- no OAuth provider choice;
-- no user onboarding UI;
-- no per-user storage implementation;
-- no new public tool behavior.
-
-### Exit criteria
-
-- process-wide API key is encapsulated behind the credential seam;
-- current deployment remains behaviorally equivalent;
-- downstream code can later request a client/service context for a principal without redesigning Grist business operations;
-- CI green on exact PR head.
+- `GristCredentialProvider` seam;
+- credential-aware client/context construction;
+- static API-key provider preserving existing deployment behavior;
+- no storage or multi-user persistence decision embedded in the abstraction.
 
 ## C2 — MCP contract v1
 
 **Status: DONE**  
-**Priority: high / independent**  
-**Suggested branch:** `feat/mcp-contract-v1`
+**Priority: high / independent**
 
-### Goal
-
-Make MCP the clear product contract while preserving existing service behavior.
-
-### Intended slice
-
-- enrich the operation registry with product-level metadata where it can safely become authoritative;
-- add user-intent-oriented titles/descriptions;
-- remove unnecessary internal `UserAction` implementation terminology from public descriptions;
-- verify `readOnlyHint`, `destructiveHint` and `openWorldHint` over the full MCP surface;
-- introduce reusable structured output/error conventions incrementally;
-- add `outputSchema` / `structuredContent` where stable and useful, especially for IDs reused by later calls;
-- define stable typed error categories without leaking secrets/internal stacks;
-- ensure the operation registry and MCP annotations cannot silently drift.
-
-### Constraints
-
-- do not weaken existing authorization;
-- do not change the per-user credential architecture;
-- do not broaden Grist feature scope merely to make the tool catalog larger;
-- keep functional resource IDs available where needed for safe follow-up calls.
-
-### Exit criteria
-
-- full-surface contract tests exist;
-- tool metadata is coherent and user-intent-oriented;
-- structured outputs/errors have a documented stable direction;
-- CI green on exact PR head.
+Integrated result includes full-surface contract metadata/testing direction, user-intent-oriented tool metadata and stable structured-output/error conventions without weakening authorization or broadening Grist escape hatches.
 
 ## C3 — User-aware Grist context
 
 **Status: DONE**  
-**Priority: blocking**  
-**Suggested branch:** `feat/user-aware-grist-context`
+**Priority: blocking**
+
+Integrated result:
+
+- deployment policy separated from credential-derived discovery;
+- principal-bound Grist clients/service graphs;
+- per-principal discovery/cache isolation;
+- explicit cross-user isolation tests;
+- current static single-key development deployment retained.
+
+## C4-P0 — Logto / ProConnect / MCP interoperability POC
+
+**Status: ELIGIBLE**  
+**Priority: blocking / highest**  
+**Suggested branch:** `poc/logto-proconnect-mcp`
 
 ### Goal
 
-Make clients, resource discovery, deployment policy intersection and caches safe for multiple authenticated users with different Grist API keys.
+Prove the human-selected C4 architecture before production-quality OAuth integration.
 
-### Integrated slice
+Authoritative POC contract:
 
-- deployment-level document/workspace policy is separated from credential-derived Grist discovery;
-- principal contexts are constructed through the credential/client factory;
-- every created principal context gets its own Grist client, discovery cache, access policy and service graph;
-- the deployment policy remains a shareable static maximum boundary;
-- explicit cross-user tests prove visibility/cache state learned through user A cannot appear under user B;
-- the existing static single-key development deployment remains supported.
+```text
+docs/LOGTO-PROCONNECT-MCP-POC.md
+```
+
+### Required proof
+
+The POC must demonstrate:
+
+- Logto OSS non-production deployment with PostgreSQL/HTTPS and secrets outside Git;
+- ProConnect integration login through Logto's generic OIDC federation path;
+- stable identity mapping across repeated login;
+- MCP Authorization Code + PKCE `S256`;
+- RFC 8707 `resource` handling;
+- access token audience/resource binding to the canonical MCP resource;
+- representation/enforcement of `doc:read`, `doc:write`, `doc.schema:write`;
+- rejection of wrong-resource and insufficient-scope tokens;
+- standard JWT/JWKS resource-server validation without proprietary Logto SDK coupling;
+- mapping to dynamic `Principal` and the existing C3 `GristContextFactory` isolation boundary;
+- durable refresh/offline connectivity with a draft ChatGPT MCP app;
+- proof that OAuth/ProConnect tokens never become Grist credentials.
+
+### Constraints
+
+- non-production only unless separately approved;
+- no production ProConnect/DataPass commitment;
+- no model-visible or committed secrets/tokens;
+- no C5 credential persistence/encryption decision;
+- do not broaden public scopes;
+- do not make Logto-specific SDK behavior part of bridge core.
 
 ### Exit criteria
 
-- no singleton user-derived Grist visibility state remains;
-- explicit cross-user isolation tests pass;
-- current single-user static credential deployment still works.
+All mandatory POC checks are PASS with sanitized durable evidence in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
+
+If a mandatory MCP requirement fails because of Logto, reopen only the authorization-server product choice and evaluate the documented fallbacks. Do not silently weaken MCP conformance.
 
 ## C4 — OAuth MCP identity
 
-**Status: BLOCKED by human identity-provider decision**  
+**Status: BLOCKED by C4-P0 POC**  
 **Priority: blocking**  
-**Suggested branch after decision:** `feat/oauth-mcp`
+**Suggested branch after POC:** `feat/oauth-mcp`
 
 ### Goal
 
 Replace the production MCP static bearer principal with OAuth-authenticated dynamic principals and explicit scopes.
 
-### Decision package
+### Fixed architecture after human decision
 
-The protocol research, candidate architecture categories, compatibility probes and human decision questions are integrated in `docs/OAUTH-IDP-DECISION.md`.
+- identity source: ProConnect;
+- reference authorization server: Logto OSS self-hosted;
+- bridge: standards-based OAuth resource server;
+- preferred token validation: JWT + JWKS;
+- canonical resource URI is deployment-configurable;
+- scopes remain `doc:read`, `doc:write`, `doc.schema:write`;
+- static bearer may remain only as an explicit development/backward-compatibility path if still useful.
 
-That document deliberately does not select an identity provider or authorization-server architecture. The decision record in that document must be completed by an authorized human decision and the resulting choice made durable before provider-specific core implementation starts.
+### Core implementation after POC
 
-### Design/research work allowed now
-
-Research and documentation may continue to clarify:
-
-- the current MCP/OAuth 2.1 protocol requirements;
-- protected-resource metadata and challenge behavior;
-- token validation requirements (issuer/audience/expiry/scopes);
-- concrete identity-provider options and tradeoffs for the DINUM deployment;
-- mapping from OAuth scopes to the existing `doc:read`, `doc:write`, `doc.schema:write` vocabulary without changing that public scope set.
-
-Research may reduce uncertainty, but it must not silently become a provider selection or provider-specific production implementation.
-
-### Human gate
-
-Identity-provider selection is a human decision. Autonomous implementation must stop before choosing or committing to a provider or provider-specific production architecture.
-
-### Core implementation after the human decision
-
-- validate OAuth access tokens;
+- publish protected-resource metadata and standards-compatible authentication challenges;
+- validate signature, issuer, audience/resource, expiry and scopes;
 - construct dynamic `Principal` objects;
-- create a principal-bound Grist context through `GristContextFactory`;
-- enforce scopes through the existing authorization service;
-- expose appropriate MCP security metadata/challenges;
-- preserve the static bearer mode only as an explicit development/backward-compatible path if still useful.
+- create principal-bound Grist contexts through `GristContextFactory`;
+- enforce scopes through existing `AuthorizationService`;
+- keep provider-specific configuration at the edge, not in Grist business logic.
 
 ## C5 — Secure Grist onboarding and credential lifecycle
 
@@ -218,26 +194,23 @@ Identity-provider selection is a human decision. Autonomous implementation must 
 
 ### Goal
 
-Allow an authenticated user to securely connect their own Grist Community API key without exposing it to the model.
+Allow an authenticated user to securely connect their own Grist Community API key outside model-visible MCP tool data.
 
 ### Required behavior
 
-- bridge-owned secure onboarding flow outside MCP tool arguments/conversation content;
-- validate the supplied key directly against the configured DINUM Grist instance;
-- associate verified Grist identity with the authenticated principal;
-- encrypt credential at rest;
-- retrieve it only for that principal's upstream requests;
-- provide disconnect/removal;
-- support revalidation/rotation lifecycle metadata;
+- bridge-owned secure onboarding flow;
+- validate supplied key against configured DINUM Grist;
+- associate verified Grist identity with authenticated principal;
+- encrypted-at-rest credential storage;
+- per-principal retrieval only;
+- disconnect/removal and revalidation/rotation lifecycle;
 - never log/return/prompt the credential.
 
-### Human gates
-
-Before implementation, require explicit decisions for:
+### Remaining human gates
 
 - persistence technology;
 - encryption/key-management design;
-- production identity-provider integration details if they affect credential binding.
+- production institutional ownership where required.
 
 ## C6 — Production hardening
 
@@ -247,7 +220,8 @@ Before implementation, require explicit decisions for:
 ### Integrated independent preparation
 
 - Grist upstream requests have an explicit 10-second abort timeout;
-- Node HTTP request reception is explicitly bounded to 120 seconds and header reception to 60 seconds without limiting MCP streaming response duration.
+- Node HTTP request reception is explicitly bounded to 120 seconds and header reception to 60 seconds without limiting MCP streaming response duration;
+- `main` is protected by the repository ruleset and required CI gate.
 
 ### Remaining/finalization work
 
@@ -256,53 +230,23 @@ Before implementation, require explicit decisions for:
 - structured audit export as needed;
 - secret/key rotation procedure;
 - deployment and rollback procedure;
-- protected release workflow / `main` protections;
 - post-deploy synthetic smoke tests.
 
-Independent low-risk preparatory improvements may be done earlier when they do not assume the final identity implementation.
+Independent low-risk preparation may continue only when it does not assume unfinished C4/C5 behavior.
 
 ## C7 — Reviewer fixture
 
 **Status: BLOCKED by C4/C5**  
 **Priority: submission-critical**
 
-### Goal
-
-Provide reproducible synthetic reviewer access without real educational/administrative data.
-
-Positive scenarios should include at least:
-
-1. inspect structure/relations/pages/widgets;
-2. query/filter records;
-3. create a table, columns and records;
-4. update bounded data/schema state;
-5. create a page, add widgets, configure `select-by`, verify by independent re-read.
-
-Negative scenarios should include at least:
-
-1. write with insufficient scope;
-2. resource outside deployment/principal permission;
-3. invalid/nonexistent UI linkage target with no unintended write.
-
-Turn these into both automated integration tests and reviewer instructions.
+Provide reproducible synthetic reviewer access without real educational/administrative data, including positive record/schema/UI scenarios and negative insufficient-scope/resource/linkage scenarios.
 
 ## C8 — Publisher/submission package
 
 **Status: BLOCKED by C6/C7**  
 **Priority: final**
 
-Prepare/revalidate at submission time:
-
-- stable public HTTPS MCP endpoint;
-- publisher/developer identity and permissions;
-- domain verification challenge;
-- public plugin metadata and example prompts;
-- website/support contact;
-- privacy policy and terms;
-- reviewer credentials/instructions;
-- countries/availability;
-- tool scan findings and fixes;
-- explicit non-misleading relationship to Grist Labs and DINUM.
+Prepare/revalidate at submission time stable HTTPS MCP, publisher identity, domain verification, public metadata, privacy/terms/support, reviewer instructions, availability and tool-scan findings.
 
 ## Deferred feature breadth
 
@@ -316,8 +260,6 @@ The following are intentionally not on the current critical path:
 - skills;
 - arbitrary multi-instance Grist routing.
 
-They may become eligible later only when identity/security critical-path work no longer dominates or a demonstrated user need raises their priority.
-
 ## Parallelism policy
 
 Normal maximum active development:
@@ -328,7 +270,7 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The C4 decision package is integrated. The next critical-path transition is the human identity-provider decision documented in `docs/OAUTH-IDP-DECISION.md`. No core C4 OAuth implementation is eligible until that decision is made durable. Independent low-risk preparation may continue only where the roadmap already permits it and where it does not assume the outcome of the human gate.
+The C4 human gate is resolved. `C4-P0` is the next blocking chantier. Full C4 OAuth integration must not start until the POC exit criteria are met.
 
 ## Controller integration order
 
