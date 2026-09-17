@@ -270,8 +270,13 @@ app.all("/mcp", (req, res) => {
   void nodeHandler(req, res, req.body);
 });
 
-app.listen(config.port, config.host, () => {
+const httpServer = app.listen(config.port, config.host, () => {
   console.log(
     `grist-chatgpt listening on http://${config.host}:${config.port} (MCP /mcp, GPT Actions /api/v1)`
   );
 });
+
+// Bound only the time allowed to receive inbound HTTP request data. These
+// parser-level limits do not cap the duration of an MCP streaming response.
+httpServer.requestTimeout = 120_000;
+httpServer.headersTimeout = 60_000;
