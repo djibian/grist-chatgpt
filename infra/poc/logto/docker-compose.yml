@@ -22,6 +22,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
     environment:
       DB_URL: postgresql://logto:${LOGTO_DB_PASSWORD}@postgres:5432/logto
       TRUST_PROXY_HEADER: "1"
@@ -30,9 +31,6 @@ services:
     ports:
       - "127.0.0.1:3001:3001"
       - "127.0.0.1:3002:3002"
-    volumes:
-      - logto-connectors:/etc/logto/packages/core/connectors
 
 volumes:
   logto-postgres:
-  logto-connectors:
