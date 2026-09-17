@@ -74,6 +74,8 @@ Sync profile information: Only sync at sign-up
 Store tokens for persistent API access: OFF
 Require users to provide missing sign-up identifier: OFF
 Automatically link accounts with the same identifier: OFF
+Accept String-typed Boolean Claims: OFF
+Trust Unverified Email: OFF
 ```
 
 ### Live federation attempts
@@ -100,7 +102,9 @@ jwks_uri = https://fca.integ01.dev-agentconnect.fr/api/v2/jwks
 
 A repeated Live preview sign-in then completed successfully and Logto displayed its successful-login page with a Logto user identifier. The raw identifier is intentionally not recorded. ProConnect reused the already-authenticated upstream session, so no second credential/MFA prompt was required for this successful repeat; this does not weaken the successful OIDC round-trip evidence.
 
-This demonstrates that Logto can verify the ProConnect ID token using the configured remote JWKS and issuer and can complete account creation/sign-in.
+A second completed Logto Live preview authorization flow was then started with the same ProConnect identity. It completed successfully, displayed the **same Logto user identifier** as the first successful flow, and the Logto Admin Console showed that **no additional user account was created**. The raw identifier is intentionally not recorded.
+
+This demonstrates both successful upstream ProConnect ID-token verification and stable mapping of the same ProConnect identity to the same Logto user across repeated completed login flows.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
@@ -113,10 +117,10 @@ This demonstrates that Logto can verify the ProConnect ID token using the config
 | ProConnect authentication and return to Logto callback | PASS | real authentication completed and exact callback was reached |
 | Authorization-code exchange reaches ID-token processing | PASS | Logto entered ID-token processing after callback |
 | ProConnect discovery issuer/JWKS configured for ID-token verification | PASS | exact public discovery `issuer` and `jwks_uri` configured in connector |
-| ProConnect ID-token verification through remote JWKS/issuer | PASS | repeated flow completed only after JWKS/issuer correction and reached successful Logto sign-in |
+| ProConnect ID-token verification through remote JWKS/issuer | PASS | flow completed after JWKS/issuer correction and reached successful Logto sign-in |
 | Complete Authorization Code login Logto -> ProConnect -> Logto | PASS | Logto Live preview reported successful sign-in and displayed a Logto user ID |
-| Same ProConnect user maps to stable Logto identity across repeated successful login | UNKNOWN | requires a second completed login and local comparison of the Logto user ID/account |
-| Logout/re-login does not create unintended bridge identity | UNKNOWN | requires explicit repeat after ending/restarting the Logto preview session |
+| Same ProConnect user maps to stable Logto identity across repeated successful login | PASS | second completed flow returned the same Logto user ID and created no additional Logto user |
+| Explicit upstream logout/re-login semantics | UNKNOWN | repeated authorization flow is proven; explicit ProConnect logout/re-auth lifecycle has not yet been isolated |
 
 ## MCP-facing authorization-server behavior
 
@@ -147,7 +151,7 @@ The Logto Admin Console contains the canonical MCP API resource with exactly the
 | MCP API resource configured in Logto | PASS | canonical identifier present |
 | Required bridge permissions configured | PASS | exactly `doc:read`, `doc:write`, `doc.schema:write` present |
 | MCP API resource is not Default API | PASS | operator visually confirmed `Default API = OFF` |
-| RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request |
+| RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request for the canonical MCP resource |
 | RFC 8707 `resource` accepted on token request | UNKNOWN | requires live OAuth exchange |
 | Access token bound to canonical MCP audience/resource | UNKNOWN | requires live token validation |
 | Bridge scopes represented in a live access token | UNKNOWN | requires live token issuance |
@@ -173,10 +177,10 @@ All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth lo
 
 ## Current conclusion
 
-The live C4-P0 deployment now demonstrates a complete non-production **Logto -> ProConnect -> Logto Authorization Code federation login**. The initial failure was a connector configuration defect: missing/invalid ProConnect JWKS metadata. After configuring the exact ProConnect discovery `jwks_uri` and `issuer`, Logto completed ID-token verification and successful sign-in.
+The live C4-P0 deployment now demonstrates a complete non-production **Logto -> ProConnect -> Logto Authorization Code federation login with stable identity mapping across repeated completed flows**. The initial JWKS configuration defect is resolved, and a second completed flow reuses the same Logto user without creating a duplicate account.
 
-The immediate next identity proof is stable identity mapping: repeat the successful login with the same ProConnect user and verify locally that Logto reuses the same user/account rather than creating a second one, without recording the raw user/provider identifier.
+Phase 2 identity federation is therefore substantially proven. Explicit upstream logout semantics remain useful secondary evidence, but the next blocking proof on the critical path is Phase 3: exercise Logto as the MCP-facing authorization server with the canonical resource URI, explicit RFC 8707 `resource`, PKCE, the three fixed bridge scopes, and an access token demonstrably bound to that resource.
 
-Mandatory UNKNOWNs still include stable repeated identity, RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation of Logto access tokens, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
+Mandatory UNKNOWNs still include RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation of Logto access tokens, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
