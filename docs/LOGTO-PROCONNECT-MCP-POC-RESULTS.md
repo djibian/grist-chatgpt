@@ -13,14 +13,15 @@ Status vocabulary:
 
 ## Repository verification baseline
 
-Two exact code-bearing heads passed the full integration gate:
+Three exact code-bearing heads passed the full integration gate:
 
 ```text
 CI #157  c28aa33c9a87611f60c8fb79599349e2f4ba8e8c
 CI #160  f77edf8235d992d4757defee4d2d276ca8a0da89
+CI #163  76092750207f823cf41d8bcff63edcd7e2067e0b
 ```
 
-Both runs passed `npm ci`, production dependency audit, TypeScript check, the full test suite, and build. CI #160 additionally covers provider-neutral issuer/audience/expiry enforcement. Later evidence-only updates must pass their own exact-head CI before integration.
+These runs passed `npm ci`, production dependency audit, TypeScript check, the full test suite, and build. CI #160 covers provider-neutral issuer/audience/expiry enforcement; CI #163 additionally covers the OAuth bearer -> verifier -> Principal -> context-factory boundary. Later evidence-only updates must pass their own exact-head CI before integration.
 
 ## Reproducible environment
 
@@ -79,21 +80,25 @@ doc.schema:write
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| OAuth scope maps only to existing Grist capabilities | PASS | `test/oauth-principal.test.ts`, CI #157/#160 |
-| Unknown OAuth scopes cannot expand bridge authority | PASS | unknown scopes are filtered out by `GRIST_CAPABILITIES`; CI #157/#160 |
-| Stable opaque principal ID derives from verified issuer + subject | PASS | `oauthPrincipalId()` tests, CI #157/#160 |
-| Raw upstream subject need not enter normal audit principal ID | PASS | opaque SHA-256-derived principal ID test, CI #157/#160 |
-| Discovery evaluator fails on wrong issuer / insecure endpoint / missing S256 | PASS | `test/logto-mcp-compat.test.ts`, CI #157/#160 |
-| Omitted metadata remains UNKNOWN rather than invented as PASS | PASS | grant-type omission test, CI #157/#160 |
-| Wrong issuer rejected after cryptographic verification | PASS | `test/oauth-access-token.test.ts`, CI #160 |
-| Wrong MCP audience/resource rejected after cryptographic verification | PASS | `test/oauth-access-token.test.ts`, CI #160 |
-| Expired/invalid expiry rejected after cryptographic verification | PASS | `test/oauth-access-token.test.ts`, CI #160 |
-| Principal is created only after issuer/audience/expiry checks pass | PASS | `createPrincipalFromVerifiedAccessToken()`, CI #160 |
+| OAuth scope maps only to existing Grist capabilities | PASS | `test/oauth-principal.test.ts`, CI #157/#160/#163 |
+| Unknown OAuth scopes cannot expand bridge authority | PASS | unknown scopes are filtered out by `GRIST_CAPABILITIES`; CI #157/#160/#163 |
+| Stable opaque principal ID derives from verified issuer + subject | PASS | `oauthPrincipalId()` tests, CI #157/#160/#163 |
+| Raw upstream subject need not enter normal audit principal ID | PASS | opaque SHA-256-derived principal ID test, CI #157/#160/#163 |
+| Discovery evaluator fails on wrong issuer / insecure endpoint / missing S256 | PASS | `test/logto-mcp-compat.test.ts`, CI #157/#160/#163 |
+| Omitted metadata remains UNKNOWN rather than invented as PASS | PASS | grant-type omission test, CI #157/#160/#163 |
+| Wrong issuer rejected after cryptographic verification | PASS | `test/oauth-access-token.test.ts`, CI #160/#163 |
+| Wrong MCP audience/resource rejected after cryptographic verification | PASS | `test/oauth-access-token.test.ts`, CI #160/#163 |
+| Expired/invalid expiry rejected after cryptographic verification | PASS | `test/oauth-access-token.test.ts`, CI #160/#163 |
+| Principal is created only after issuer/audience/expiry checks pass | PASS | `createPrincipalFromVerifiedAccessToken()`, CI #160/#163 |
+| Missing/malformed bearer rejected before verifier invocation | PASS | `test/oauth-request-context.test.ts`, CI #163 |
+| Raw bearer is passed only to verifier, not to Principal/context factory | PASS | `test/oauth-request-context.test.ts`, CI #163 |
+| Failed token verification prevents context creation | PASS | `test/oauth-request-context.test.ts`, CI #163 |
+| Provider-neutral context boundary receives only the bounded Principal | PASS | `createOAuthMcpRequestContext()`, CI #163 |
 | Cryptographic JWT signature/JWKS validation | UNKNOWN | deliberately not implemented with ad-hoc crypto; live C4-P0 must use a maintained JOSE implementation |
-| Dynamic OAuth principal enters `GristContextFactory` | UNKNOWN | principal mapping seam exists; request-path integration remains to prove |
-| User A cannot reuse user B Grist context/cache | PASS | inherited from integrated C3 cross-user isolation tests; OAuth request-path coupling still requires a POC test |
-| OAuth bearer is never forwarded to Grist | UNKNOWN | must be demonstrated when request-path OAuth integration exists |
-| Static bearer cannot override OAuth principal in production OAuth mode | UNKNOWN | full request-path mode switch not implemented in this POC slice yet |
+| Actual Express `/mcp` path constructs a fresh OAuth principal/context | UNKNOWN | current production route still uses static development bearer; live POC wiring remains to prove |
+| User A cannot reuse user B Grist context/cache | PASS | inherited from integrated C3 cross-user isolation tests; OAuth request-path coupling still requires a live/integration test |
+| OAuth bearer is never used as an upstream Grist credential | UNKNOWN | boundary design prevents token propagation to context factory, but actual OAuth `/mcp` wiring must still demonstrate this end to end |
+| Static bearer cannot override OAuth principal in production OAuth mode | UNKNOWN | production OAuth mode is not implemented in this POC slice yet |
 
 ## ChatGPT draft-app evidence
 
@@ -109,6 +114,6 @@ doc.schema:write
 
 ## Current conclusion
 
-The repository-side POC harness passes the existing integration gate without weakening any authentication or authorization invariant. Provider-neutral discovery, scope mapping, opaque principal identity, and post-signature issuer/audience/expiry policy are now demonstrated. The selected architecture is **not yet declared compatible**: live Logto, ProConnect integration, RFC 8707 flow, cryptographic JWT/JWKS validation, dynamic request-path context creation, and ChatGPT interoperability remain mandatory UNKNOWNs.
+The repository-side POC harness passes the existing integration gate without weakening any authentication or authorization invariant. Provider-neutral discovery, scope mapping, opaque principal identity, post-signature issuer/audience/expiry policy, and bearer isolation at the context boundary are demonstrated. The selected architecture is **not yet declared compatible**: live Logto, ProConnect integration, RFC 8707 flow, cryptographic JWT/JWKS validation, actual `/mcp` OAuth wiring, and ChatGPT interoperability remain mandatory UNKNOWNs.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
