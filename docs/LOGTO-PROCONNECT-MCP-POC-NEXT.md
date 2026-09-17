@@ -4,7 +4,7 @@ This file is the durable handoff for continuing the live C4-P0 Logto / ProConnec
 
 Do not trust remembered GitHub state. At the start of a new execution, resolve exact `main`, read `AGENTS.md`, `docs/PRODUCT_VISION.md` and `docs/ROADMAP.md` at that SHA, then reconstruct open PRs, exact heads, CI, reviews and dependencies before making a durable transition.
 
-Do not paste ProConnect client secrets, OAuth tokens, authorization codes, cookies, Logto/database/admin credentials, or Grist API keys into GitHub, ChatGPT, issue comments, logs, evidence documents, or model-visible tool inputs.
+Do not paste ProConnect client secrets, OAuth tokens, authorization codes, cookies, Logto/database/admin credentials, Grist API keys, or raw provider subjects into GitHub, ChatGPT, issue comments, logs, evidence documents, or model-visible tool inputs.
 
 ## Current live checkpoint
 
@@ -31,47 +31,57 @@ Current durable PASS evidence includes:
 - canonical MCP API resource exists with exactly `doc:read`, `doc:write`, `doc.schema:write`;
 - `Default API = OFF` is visually confirmed;
 - ProConnect Internet/integration Fournisseur de Service application `Logto` exists with the exact Logto redirect URI;
-- the Logto generic social OIDC connector is saved successfully with ProConnect credentials handled locally;
+- the Logto generic social OIDC connector is saved with ProConnect credentials handled locally;
 - ProConnect is enabled in Logto Social sign-in;
-- `Require users to provide missing sign-up identifier = OFF`;
-- `Automatically link accounts with the same identifier = OFF`;
-- persistent third-party token storage remains OFF.
+- missing-identifier prompt, identifier auto-linking and persistent third-party token storage are OFF;
+- a real browser flow reaches ProConnect, completes required re-auth/MFA, returns to the exact Logto callback, and progresses through authorization-code exchange to ID-token processing.
 
 The durable evidence ledger is `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
 
-## Docker / nftables operational constraint
+## Current blocking diagnosis
 
-Persistent `/etc/nftables.conf` contains generic Docker bridge forwarding exceptions and passed syntax validation. The file begins with `flush ruleset`.
+The first live ProConnect login did **not** complete. After a successful return from ProConnect, Logto returned `Internal server error`.
 
-Do **not** manually restart/reload nftables while Docker is running merely to test persistence, because that would erase Docker-created chains until Docker recreates them. Systemd boot ordering is compatible with nftables loading first and Docker recreating its chains later. A controlled reboot remains UNKNOWN and is not the current blocker.
-
-## Exact next live step: first ProConnect login
-
-The ProConnect connector is now configured and visible in Logto's sign-in experience. The next step is to execute one complete login flow through the public Logto endpoint.
-
-Use a fresh/private browser session if useful to avoid reusing the Logto Admin Console session.
-
-Start at a Logto sign-in experience that shows the **ProConnect** social button, then:
-
-1. click **ProConnect**;
-2. confirm the browser is redirected to the ProConnect integration environment;
-3. authenticate with the intended test/integration identity;
-4. allow the browser to return to Logto;
-5. confirm that Logto completes account creation/sign-in without asking for an extra identifier;
-6. do not paste the returned URL if it contains authorization codes, state values, tokens or other transient credentials.
-
-For the first flow, only report sanitized observations:
+Sanitized server evidence:
 
 ```text
-Reached ProConnect: yes/no
-Authentication at ProConnect: success/failure
-Returned to Logto: yes/no
-Logto sign-in/account creation: success/failure
-Unexpected extra identifier prompt: yes/no
-Sanitized error text, if any
+POST /api/experience/verification/social/<connector>/verify
+TypeError: Invalid URL
+at parseUserInfoFromIdToken (.../connector-oidc/lib/index.js)
 ```
 
-If the flow succeeds, inspect the resulting Logto user only enough to establish that a social identity for IdP `proconnect` exists; do not record raw provider subject values in GitHub unless there is a demonstrated need. Then perform logout/re-login with the same ProConnect user and verify that Logto reuses the same user rather than creating a second account.
+The exact Logto `v1.43.0` source shows that this point executes:
+
+```text
+createRemoteJWKSet(new URL(config.idTokenVerificationConfig.jwksUri))
+```
+
+Therefore the current blocker is an invalid or empty `idTokenVerificationConfig.jwksUri` in the generic OIDC connector. Do not change client ID, client secret, callback URI, MFA, public MCP scopes, or bridge code to work around this.
+
+This is currently treated as a connector configuration defect, not as evidence that Logto and ProConnect are incompatible.
+
+## Exact next live step: obtain and configure ProConnect ID-token verification metadata
+
+From the VPS, retrieve only the non-secret discovery values needed for verification:
+
+```bash
+curl -fsS \
+  https://fca.integ01.dev-agentconnect.fr/api/v2/.well-known/openid-configuration \
+| python3 -c 'import json,sys; d=json.load(sys.stdin); print("issuer =", d.get("issuer")); print("jwks_uri =", d.get("jwks_uri")); print("id_token_signing_alg_values_supported =", d.get("id_token_signing_alg_values_supported"))'
+```
+
+These values are public metadata and safe to report. Do not report client credentials or token material.
+
+Then edit the Logto **ProConnect** generic OIDC connector and complete the **ID token verification** configuration using the exact discovery values:
+
+- `jwksUri`: exact `jwks_uri` from discovery;
+- `issuer`: exact `issuer` from discovery;
+- signing algorithm constraint only if the Logto UI requires it, using a value actually advertised by discovery;
+- do not invent an audience value: Logto `v1.43.0` already supplies the connector `clientId` as the ID-token verification audience.
+
+Save the connector and repeat the same first login flow. A successful repeat must reach Logto account/sign-in completion without an internal server error.
+
+If the Logto Admin Console does not expose obvious fields matching `jwksUri` / `issuer`, inspect or report the exact visible **ID token verification** section before changing anything else.
 
 ## ProConnect connector configuration boundary
 
@@ -96,12 +106,18 @@ Automatically link accounts with the same identifier: OFF
 
 Do not broaden ProConnect identity scopes or the public MCP scope vocabulary without a demonstrated need and the applicable project gate.
 
+## Docker / nftables operational constraint
+
+Persistent `/etc/nftables.conf` contains generic Docker bridge forwarding exceptions and passed syntax validation. The file begins with `flush ruleset`.
+
+Do **not** manually restart/reload nftables while Docker is running merely to test persistence, because that would erase Docker-created chains until Docker recreates them. Systemd boot ordering is compatible with nftables loading first and Docker recreating its chains later. A controlled reboot remains UNKNOWN and is not the current blocker.
+
 ## Mandatory evidence still UNKNOWN
 
 C4-P0 remains ACTIVE. Important UNKNOWNs include:
 
-- first complete Logto -> ProConnect -> Logto Authorization Code login;
-- stable identity mapping across two logins;
+- successful first complete Logto -> ProConnect -> Logto Authorization Code login after JWKS correction;
+- stable identity mapping across two successful logins;
 - logout/re-login behavior;
 - RFC 8707 `resource` accepted on authorization request;
 - RFC 8707 `resource` accepted on token request;
