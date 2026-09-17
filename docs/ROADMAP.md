@@ -244,10 +244,14 @@ Before implementation, require explicit decisions for:
 **Status: BLOCKED by C4/C5 for finalization**  
 **Priority: high**
 
-Work includes:
+### Integrated independent preparation
+
+- Grist upstream requests have an explicit 10-second abort timeout;
+- Node HTTP request reception is explicitly bounded to 120 seconds and header reception to 60 seconds without limiting MCP streaming response duration.
+
+### Remaining/finalization work
 
 - per-principal rate limiting;
-- explicit request and Grist upstream timeouts;
 - operational metrics and alerting;
 - structured audit export as needed;
 - secret/key rotation procedure;
