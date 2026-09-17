@@ -3,12 +3,12 @@
 **POC baseline:** 2026-09-17  
 **Architecture:** Logto OSS self-hosted as MCP-facing authorization server; ProConnect as upstream OIDC identity source; `grist-chatgpt` as provider-neutral OAuth resource server.
 
-Do not record client secrets, authorization codes, cookies, access tokens, refresh tokens, ID tokens, Grist API keys, database passwords, admin passwords, or other credentials in this file.
+Do not record client secrets, authorization codes, cookies, access tokens, refresh tokens, ID tokens, Grist API keys, database passwords, admin passwords, raw provider subjects, or other credentials in this file.
 
 Status vocabulary:
 
 - **PASS** — demonstrated with reproducible evidence;
-- **FAIL** — demonstrated incompatible or incorrect;
+- **FAIL** — demonstrated incompatible or incorrect for the tested state;
 - **UNKNOWN** — not yet demonstrated; absence of evidence is not promoted to PASS.
 
 ## Repository verification baseline
@@ -65,7 +65,7 @@ For OSS, the selected upstream path is Logto's generic **social OIDC connector**
 
 A non-production **Internet / integration** ProConnect Fournisseur de Service application named `Logto` has been created in the Espace Partenaires. Its registered redirect URI is the exact callback URI displayed by the Logto OIDC connector. No client ID, secret, token, code, cookie, or credential value is recorded here.
 
-The generic Logto OIDC connector has now been created successfully with the ProConnect integration values entered locally. The visible social sign-in configuration is:
+The generic Logto OIDC connector is created and enabled in Social sign-in. Visible POC settings are:
 
 ```text
 Button label: ProConnect
@@ -76,19 +76,50 @@ Require users to provide missing sign-up identifier: OFF
 Automatically link accounts with the same identifier: OFF
 ```
 
-The ProConnect connector is present in Logto's **Social sign-in** experience. This proves that Logto accepted the connector configuration syntactically and stored it. It does **not** yet prove a successful upstream OIDC login.
+### First live federation attempt
+
+A real sign-in was executed through Logto Live preview.
+
+Observed sanitized path:
+
+```text
+Logto -> ProConnect integration environment                    PASS
+ProConnect authentication, including required re-auth/MFA      PASS
+ProConnect -> exact Logto callback                             PASS
+Authorization-code exchange progressed to ID-token processing PASS
+Logto account/sign-in completion                              FAIL
+```
+
+The browser returned to the Logto callback successfully. Sanitized Logto logs then showed:
+
+```text
+POST /api/experience/verification/social/<connector>/verify
+TypeError: Invalid URL
+at parseUserInfoFromIdToken (.../connector-oidc/lib/index.js)
+```
+
+Inspection of the exact Logto `v1.43.0` connector source identifies the failing expression as:
+
+```text
+createRemoteJWKSet(new URL(config.idTokenVerificationConfig.jwksUri))
+```
+
+Therefore the first failed login is currently attributed to an invalid or empty `idTokenVerificationConfig.jwksUri` in the Logto connector configuration. This is a **connector configuration defect**, not evidence of architectural incompatibility with ProConnect. The next corrective step is to obtain the exact `issuer` and `jwks_uri` from the ProConnect Internet/integration discovery document, configure Logto ID-token verification, and repeat the same login.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| ProConnect integration client registered | PASS | operator created the non-production application and registered exact Logto callback URI |
-| Logto generic OIDC connector created | PASS | connector saved successfully with ProConnect integration values entered locally |
-| ProConnect connector enabled in Logto sign-in experience | PASS | `ProConnect` appears in Social sign-in configuration |
-| Missing-identifier prompt disabled for POC | PASS | operator disabled `Require users to provide missing sign-up identifier` |
-| Automatic identifier-based account linking disabled | PASS | operator left automatic linking disabled |
-| ProConnect issuer/discovery accepted during a live login | UNKNOWN | requires first complete login flow |
-| Authorization Code login Logto -> ProConnect -> Logto | UNKNOWN | requires live flow |
-| Same ProConnect user maps to stable Logto identity across repeated login | UNKNOWN | requires two sanitized login observations |
-| Logout/re-login does not create unintended bridge identity | UNKNOWN | requires live flow |
+| ProConnect integration client registered | PASS | non-production application created with exact Logto callback URI |
+| Logto generic OIDC connector created | PASS | connector saved with ProConnect integration values handled locally |
+| ProConnect connector enabled in Logto sign-in experience | PASS | `ProConnect` visible in Social sign-in |
+| Missing-identifier prompt disabled for POC | PASS | operator disabled the option |
+| Automatic identifier-based account linking disabled | PASS | option remains disabled |
+| Logto -> ProConnect authorization redirect | PASS | real browser flow reached ProConnect integration |
+| ProConnect authentication and return to Logto callback | PASS | real authentication completed and exact callback was reached |
+| Authorization-code exchange reaches ID-token processing | PASS | Logto stack entered `parseUserInfoFromIdToken` after callback |
+| ID-token JWKS verification configuration valid | FAIL | Logto `v1.43.0` raised `TypeError: Invalid URL` while constructing URL from configured `jwksUri` |
+| Complete Authorization Code login Logto -> ProConnect -> Logto | FAIL | current connector configuration stops during ID-token verification; correction pending |
+| Same ProConnect user maps to stable Logto identity across repeated login | UNKNOWN | requires successful first login plus second login |
+| Logout/re-login does not create unintended bridge identity | UNKNOWN | requires successful live flow |
 
 ## MCP-facing authorization-server behavior
 
@@ -143,8 +174,10 @@ All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth lo
 
 ## Current conclusion
 
-The live C4-P0 deployment has demonstrated the Logto/PostgreSQL runtime, HTTPS, protected admin access, Docker egress, first-admin creation, public discovery/PKCE metadata, the canonical non-default MCP resource with fixed permissions, the ProConnect integration client registration, and creation/activation of the Logto generic OIDC connector with conservative social-sign-in settings.
+The live C4-P0 deployment has demonstrated the Logto/PostgreSQL runtime, HTTPS, protected admin access, Docker egress, first-admin creation, public discovery/PKCE metadata, the canonical non-default MCP resource with fixed permissions, the ProConnect integration client registration, and a real Logto -> ProConnect -> Logto browser round trip through the callback.
 
-The architecture is **not yet declared compatible**. The next decisive evidence is the first complete Logto -> ProConnect -> Logto login, followed by a second login for stable identity mapping. Mandatory UNKNOWNs then remain for RFC 8707 live handling, audience/resource-bound tokens, JWT/JWKS validation, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
+The first complete ProConnect login is **not yet PASS**. The current failure is precisely localized to Logto `v1.43.0` ID-token verification configuration: the connector attempts to create a remote JWK set from an invalid/empty `jwksUri`. The next step is to configure the exact ProConnect discovery `jwks_uri` (and exact issuer) and repeat the login before judging interoperability.
+
+Mandatory UNKNOWNs after that still include stable identity across repeated login, RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
