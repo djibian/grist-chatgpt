@@ -44,9 +44,11 @@ Current live PASS evidence includes:
 - public OIDC discovery is coherent and uses the public HTTPS issuer/endpoints;
 - live discovery advertises PKCE `S256`;
 - live discovery advertises Authorization Code and refresh-token grant support;
-- the repository `probe:logto` metadata probe passes exact issuer, HTTPS auth/token/JWKS endpoints, PKCE `S256`, Authorization Code response and Authorization Code grant checks.
+- the repository `probe:logto` metadata probe passes exact issuer, HTTPS auth/token/JWKS endpoints, PKCE `S256`, Authorization Code response and Authorization Code grant checks;
+- the canonical MCP API resource `https://grist-chatgpt.loeildumaitre.fr/mcp` exists in Logto;
+- exactly the three fixed bridge permissions `doc:read`, `doc:write`, and `doc.schema:write` are present on that resource.
 
-Do not infer untested live properties from those metadata PASS results. RFC 8707 acceptance, live token audience binding, cryptographic JWT/JWKS verification, scope enforcement and ChatGPT refresh behavior remain separate evidence.
+Do not infer untested live properties from those metadata/configuration PASS results. RFC 8707 acceptance, live token audience binding, cryptographic JWT/JWKS verification, scope recovery/enforcement in live tokens and ChatGPT refresh behavior remain separate evidence.
 
 ## Docker / nftables incident and durable state
 
@@ -77,40 +79,37 @@ Important operational constraint: `/etc/nftables.conf` starts with `flush rulese
 
 Systemd ordering was inspected and is compatible with normal boot: `nftables.service` is enabled for `sysinit.target`, runs before `network-pre.target`, and Docker starts later under `multi-user.target`. The current boot began before nftables was installed/enabled, so an actual reboot persistence check is still UNKNOWN and should be done only as a deliberate controlled test.
 
-## Exact next product step
+## Exact next live step
 
-Before configuring ProConnect, create the MCP API resource in the Logto Admin Console.
+The MCP API resource and its three permissions are already created in Logto.
 
-Create this API resource:
+Current confirmed configuration:
 
 ```text
 Name:       grist-chatgpt MCP
 Identifier: https://grist-chatgpt.loeildumaitre.fr/mcp
-```
 
-Do **not** make it the default API for the POC. The live flow must demonstrate explicit RFC 8707 `resource` handling rather than hiding a missing resource request behind a default resource.
-
-Create exactly these public permissions/scopes:
-
-```text
+Permissions:
 doc:read
 doc:write
 doc.schema:write
 ```
 
-Suggested descriptions:
+Before moving to ProConnect, verify the resource's **Default API** setting in Logto Admin Console:
 
 ```text
-doc:read          Read Grist document data
-doc:write         Create or modify Grist document data
-doc.schema:write  Modify Grist document structure
+Console -> API resources -> grist-chatgpt MCP -> General -> Default API
 ```
+
+For this POC the setting must be **OFF**. Do not assume it is off merely because it was not intentionally enabled. If it is on, switch it off.
+
+Reason: the POC must demonstrate explicit RFC 8707 `resource` handling rather than allowing Logto to silently substitute a default audience when the client omits `resource`.
 
 Do not broaden or rename the public scope vocabulary without the human gate required by `AGENTS.md`.
 
-After creating the resource/scopes, record only sanitized evidence in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
+Once `Default API = OFF` is visually confirmed, record that sanitized fact in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`, then proceed to ProConnect federation.
 
-## Step after the MCP resource: ProConnect federation
+## Step after Default API verification: ProConnect federation
 
 For OSS, use Logto's generic **social OIDC connector**, not the commercial Enterprise SSO path.
 
@@ -137,6 +136,7 @@ Required live identity evidence after configuration:
 
 C4-P0 must remain ACTIVE until the POC contract's mandatory criteria pass. Important UNKNOWNs include:
 
+- confirmation that the MCP resource is not the Logto Default API;
 - ProConnect issuer/discovery accepted by Logto;
 - ProConnect Authorization Code login;
 - stable identity across repeated login;
