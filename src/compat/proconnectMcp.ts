@@ -8,17 +8,17 @@ export interface CompatibilityCheck {
 }
 
 export interface CompatibilityReport {
-  issuer?: string;
-  authorizationEndpoint?: string;
-  tokenEndpoint?: string;
-  introspectionEndpoint?: string;
+  issuer?: string | undefined;
+  authorizationEndpoint?: string | undefined;
+  tokenEndpoint?: string | undefined;
+  introspectionEndpoint?: string | undefined;
   checks: CompatibilityCheck[];
 }
 
 export interface SanitizedTokenResponse {
   httpStatus: number;
-  tokenType?: string;
-  expiresIn?: number;
+  tokenType?: string | undefined;
+  expiresIn?: number | undefined;
   hasAccessToken: boolean;
   hasRefreshToken: boolean;
   hasIdToken: boolean;
@@ -27,9 +27,9 @@ export interface SanitizedTokenResponse {
     aud?: unknown;
     scope?: unknown;
     exp?: unknown;
-  };
-  error?: string;
-  errorDescription?: string;
+  } | undefined;
+  error?: string | undefined;
+  errorDescription?: string | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -45,37 +45,20 @@ function stringArray(value: unknown): string[] | undefined {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-function checkEndpoint(
+function endpointCheck(
   metadata: Record<string, unknown>,
   field: string,
   id: string,
   label: string
 ): CompatibilityCheck {
-  const endpoint = optionalString(metadata[field]);
-  return endpoint
-    ? {
-        id,
-        status: "PASS",
-        summary: `${label} is advertised.`,
-        evidence: endpoint
-      }
-    : {
-        id,
-        status: "FAIL",
-        summary: `${label} is not advertised.`,
-        evidence: `Missing ${field}`
-      };
+  const value = optionalString(metadata[field]);
+  return value
+    ? { id, status: "PASS", summary: `${label} is advertised.`, evidence: value }
+    : { id, status: "FAIL", summary: `${label} is not advertised.`, evidence: `Missing ${field}` };
 }
 
-/**
- * Evaluate only facts that can be learned from OAuth/OIDC discovery metadata.
- * RFC 8707 resource-parameter acceptance and token audience binding require an
- * actual authorization/token flow and deliberately remain UNKNOWN here.
- */
 export function evaluateProConnectDiscovery(metadata: unknown): CompatibilityReport {
-  if (!isRecord(metadata)) {
-    throw new Error("Discovery metadata must be a JSON object.");
-  }
+  if (!isRecord(metadata)) throw new Error("Discovery metadata must be a JSON object.");
 
   const issuer = optionalString(metadata.issuer);
   const authorizationEndpoint = optionalString(metadata.authorization_endpoint);
@@ -88,20 +71,10 @@ export function evaluateProConnectDiscovery(metadata: unknown): CompatibilityRep
 
   const checks: CompatibilityCheck[] = [
     issuer
-      ? {
-          id: "issuer",
-          status: "PASS",
-          summary: "Issuer is advertised.",
-          evidence: issuer
-        }
-      : {
-          id: "issuer",
-          status: "FAIL",
-          summary: "Issuer is not advertised.",
-          evidence: "Missing issuer"
-        },
-    checkEndpoint(metadata, "authorization_endpoint", "authorization_endpoint", "Authorization endpoint"),
-    checkEndpoint(metadata, "token_endpoint", "token_endpoint", "Token endpoint")
+      ? { id: "issuer", status: "PASS", summary: "Issuer is advertised.", evidence: issuer }
+      : { id: "issuer", status: "FAIL", summary: "Issuer is not advertised.", evidence: "Missing issuer" },
+    endpointCheck(metadata, "authorization_endpoint", "authorization_endpoint", "Authorization endpoint"),
+    endpointCheck(metadata, "token_endpoint", "token_endpoint", "Token endpoint")
   ];
 
   if (pkceMethods?.includes("S256")) {
@@ -123,14 +96,13 @@ export function evaluateProConnectDiscovery(metadata: unknown): CompatibilityRep
       id: "pkce_s256",
       status: "UNKNOWN",
       summary: "Discovery does not advertise PKCE methods.",
-      evidence: "code_challenge_methods_supported is absent; a live compatibility test is required."
+      evidence: "code_challenge_methods_supported is absent; run a live compatibility test."
     });
   }
 
-  const authorizationCodeAdvertised =
-    responseTypes?.includes("code") || grants?.includes("authorization_code");
+  const authCode = responseTypes?.includes("code") || grants?.includes("authorization_code");
   checks.push(
-    authorizationCodeAdvertised
+    authCode
       ? {
           id: "authorization_code",
           status: "PASS",
@@ -141,60 +113,62 @@ export function evaluateProConnectDiscovery(metadata: unknown): CompatibilityRep
           id: "authorization_code",
           status: "UNKNOWN",
           summary: "Authorization Code flow is not explicit in discovery metadata.",
-          evidence: "The ProConnect service-provider documentation still documents Authorization Code Flow; verify live behavior."
+          evidence: "ProConnect documentation describes it; verify live behavior."
         }
   );
 
-  checks.push({
-    id: "rfc8707_authorize_resource",
-    status: "UNKNOWN",
-    summary: "RFC 8707 resource acceptance at /authorize cannot be proven from discovery metadata.",
-    evidence: "Run the baseline/resource/MCP authorization variants with a registered integration client."
-  });
-  checks.push({
-    id: "rfc8707_token_resource",
-    status: "UNKNOWN",
-    summary: "RFC 8707 resource acceptance at /token cannot be proven from discovery metadata.",
-    evidence: "Complete an authorization flow and exchange the code with the same resource parameter."
-  });
-  checks.push({
-    id: "resource_audience_binding",
-    status: "UNKNOWN",
-    summary: "MCP-resource audience binding cannot be proven from discovery metadata.",
-    evidence: "Inspect only sanitized access-token claims or introspection results after a successful live flow."
-  });
-
-  if (metadata.authorization_response_iss_parameter_supported === true) {
-    checks.push({
-      id: "rfc9207_iss",
-      status: "PASS",
-      summary: "RFC 9207 authorization-response issuer parameter is advertised.",
-      evidence: "authorization_response_iss_parameter_supported=true"
-    });
-  } else {
-    checks.push({
-      id: "rfc9207_iss",
+  checks.push(
+    {
+      id: "rfc8707_authorize_resource",
       status: "UNKNOWN",
-      summary: "RFC 9207 authorization-response issuer behavior is not positively advertised.",
-      evidence: "Verify the authorization callback response during the live probe."
-    });
-  }
-
-  if (introspectionEndpoint) {
-    checks.push({
-      id: "introspection",
-      status: "PASS",
-      summary: "An introspection endpoint is advertised.",
-      evidence: introspectionEndpoint
-    });
-  } else {
-    checks.push({
-      id: "introspection",
+      summary: "RFC 8707 resource acceptance at /authorize cannot be proven from discovery metadata.",
+      evidence: "Run baseline/resource/MCP authorization variants with an integration client."
+    },
+    {
+      id: "rfc8707_token_resource",
       status: "UNKNOWN",
-      summary: "No introspection endpoint is advertised in the supplied metadata.",
-      evidence: "ProConnect documents Resource Server introspection separately; verify the integration metadata/client registration."
-    });
-  }
+      summary: "RFC 8707 resource acceptance at /token cannot be proven from discovery metadata.",
+      evidence: "Exchange a live authorization code using the same resource parameter."
+    },
+    {
+      id: "resource_audience_binding",
+      status: "UNKNOWN",
+      summary: "MCP-resource audience binding cannot be proven from discovery metadata.",
+      evidence: "Use sanitized JWT claims or token introspection after a live flow."
+    }
+  );
+
+  checks.push(
+    metadata.authorization_response_iss_parameter_supported === true
+      ? {
+          id: "rfc9207_iss",
+          status: "PASS",
+          summary: "RFC 9207 authorization-response issuer parameter is advertised.",
+          evidence: "authorization_response_iss_parameter_supported=true"
+        }
+      : {
+          id: "rfc9207_iss",
+          status: "UNKNOWN",
+          summary: "RFC 9207 authorization-response issuer behavior is not positively advertised.",
+          evidence: "Verify the callback response during the live probe."
+        }
+  );
+
+  checks.push(
+    introspectionEndpoint
+      ? {
+          id: "introspection",
+          status: "PASS",
+          summary: "An introspection endpoint is advertised.",
+          evidence: introspectionEndpoint
+        }
+      : {
+          id: "introspection",
+          status: "UNKNOWN",
+          summary: "No introspection endpoint is advertised in the supplied metadata.",
+          evidence: "ProConnect documents Resource Server introspection separately."
+        }
+  );
 
   const bridgeScopes = ["doc:read", "doc:write", "doc.schema:write"];
   const advertisedBridgeScopes = bridgeScopes.filter((scope) => scopes?.includes(scope));
@@ -204,7 +178,7 @@ export function evaluateProConnectDiscovery(metadata: unknown): CompatibilityRep
     summary:
       advertisedBridgeScopes.length === bridgeScopes.length
         ? "All existing bridge scopes are advertised by the authorization server."
-        : "The existing bridge scopes are not all advertised; provider-specific scope handling remains unproven.",
+        : "The existing bridge scopes are not all advertised; scope handling remains unproven.",
     evidence: `scopes_supported=${JSON.stringify(scopes ?? [])}`
   });
 
@@ -231,18 +205,13 @@ function decodeJwtPayload(token: string): Record<string, unknown> | undefined {
   const parts = token.split(".");
   if (parts.length !== 3 || !parts[1]) return undefined;
   try {
-    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
-    const parsed: unknown = JSON.parse(payload);
+    const parsed: unknown = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
     return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }
 }
 
-/**
- * Return evidence useful for protocol compatibility without ever returning raw
- * access, refresh or ID tokens.
- */
 export function sanitizeTokenResponse(
   httpStatus: number,
   body: unknown
@@ -258,16 +227,21 @@ export function sanitizeTokenResponse(
   }
 
   const accessToken = optionalString(body.access_token);
-  const claims = accessToken ? decodeJwtPayload(accessToken) : undefined;
+  const tokenType = optionalString(body.token_type);
+  const refreshToken = optionalString(body.refresh_token);
+  const idToken = optionalString(body.id_token);
+  const error = optionalString(body.error);
+  const errorDescription = optionalString(body.error_description);
   const expiresIn = typeof body.expires_in === "number" ? body.expires_in : undefined;
+  const claims = accessToken ? decodeJwtPayload(accessToken) : undefined;
 
   return {
     httpStatus,
-    ...(optionalString(body.token_type) ? { tokenType: optionalString(body.token_type) } : {}),
+    ...(tokenType ? { tokenType } : {}),
     ...(expiresIn !== undefined ? { expiresIn } : {}),
     hasAccessToken: Boolean(accessToken),
-    hasRefreshToken: Boolean(optionalString(body.refresh_token)),
-    hasIdToken: Boolean(optionalString(body.id_token)),
+    hasRefreshToken: Boolean(refreshToken),
+    hasIdToken: Boolean(idToken),
     ...(claims
       ? {
           accessTokenClaims: {
@@ -278,9 +252,7 @@ export function sanitizeTokenResponse(
           }
         }
       : {}),
-    ...(optionalString(body.error) ? { error: optionalString(body.error) } : {}),
-    ...(optionalString(body.error_description)
-      ? { errorDescription: optionalString(body.error_description) }
-      : {})
+    ...(error ? { error } : {}),
+    ...(errorDescription ? { errorDescription } : {})
   };
 }
