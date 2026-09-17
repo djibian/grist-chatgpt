@@ -11,6 +11,16 @@ Status vocabulary:
 - **FAIL** — demonstrated incompatible or incorrect;
 - **UNKNOWN** — not yet demonstrated; absence of evidence is not promoted to PASS.
 
+## Repository verification baseline
+
+The first complete repository-side harness passed CI run **#157** on exact head:
+
+```text
+c28aa33c9a87611f60c8fb79599349e2f4ba8e8c
+```
+
+That run passed `npm ci`, production dependency audit, TypeScript check, the full test suite, and build. Later documentation-only evidence updates must pass their own exact-head CI before integration.
+
 ## Reproducible environment
 
 | Requirement | Status | Evidence |
@@ -18,7 +28,7 @@ Status vocabulary:
 | Exact Logto version pinned | PASS | `infra/poc/logto/docker-compose.yml` pins `ghcr.io/logto-io/logto:1.43.0` |
 | PostgreSQL version pinned | PASS | POC compose pins PostgreSQL `16.15-alpine` |
 | PostgreSQL persistence | PASS | named `logto-postgres` volume in POC compose |
-| Secrets excluded from committed configuration | PASS | committed `.env.example` contains placeholders only; real `.env` remains ignored |
+| Secrets excluded from committed configuration | PASS | committed `.env.example` contains placeholders only; `infra/poc/logto/.gitignore` excludes the real `.env` |
 | Core/Admin/Postgres bound to loopback | PASS | POC compose publishes only `127.0.0.1` ports |
 | Public HTTPS reverse proxy works | UNKNOWN | requires live deployment |
 | Admin Console protected by infrastructure control | UNKNOWN | requires live deployment/network configuration |
@@ -53,9 +63,9 @@ doc.schema:write
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Discovery issuer/endpoints/JWKS contract | UNKNOWN | `npm run probe:logto -- metadata --issuer ...` prepared; live endpoint required |
-| PKCE `S256` advertised | UNKNOWN | probe prepared; live discovery required |
-| Authorization Code response/grant support | UNKNOWN | probe prepared; live discovery/flow required |
+| Discovery issuer/endpoints/JWKS contract | UNKNOWN | `npm run probe:logto -- metadata --issuer ...` prepared and tested; live endpoint required |
+| PKCE `S256` advertised | UNKNOWN | evaluator/probe tested; live discovery required |
+| Authorization Code response/grant support | UNKNOWN | evaluator/probe tested; live discovery/flow required |
 | RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request |
 | RFC 8707 `resource` accepted on token request | UNKNOWN | requires live OAuth exchange |
 | Access token bound to canonical MCP audience/resource | UNKNOWN | requires cryptographically validated live token claims |
@@ -68,11 +78,12 @@ doc.schema:write
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| OAuth scope maps only to existing Grist capabilities | UNKNOWN | unit tests added on POC branch; awaiting exact-head CI |
-| Unknown OAuth scopes cannot expand bridge authority | UNKNOWN | unit tests added; awaiting CI |
-| Stable opaque principal ID derives from verified issuer + subject | UNKNOWN | unit tests added; awaiting CI |
-| Raw upstream subject need not enter normal audit principal ID | UNKNOWN | unit tests added; awaiting CI |
-| Discovery evaluator fails on wrong issuer / insecure endpoint / missing S256 | UNKNOWN | unit tests added; awaiting CI |
+| OAuth scope maps only to existing Grist capabilities | PASS | `test/oauth-principal.test.ts`, CI #157 |
+| Unknown OAuth scopes cannot expand bridge authority | PASS | unknown scopes are filtered out by `GRIST_CAPABILITIES`; CI #157 |
+| Stable opaque principal ID derives from verified issuer + subject | PASS | `oauthPrincipalId()` tests, CI #157 |
+| Raw upstream subject need not enter normal audit principal ID | PASS | opaque SHA-256-derived principal ID test, CI #157 |
+| Discovery evaluator fails on wrong issuer / insecure endpoint / missing S256 | PASS | `test/logto-mcp-compat.test.ts`, CI #157 |
+| Omitted metadata remains UNKNOWN rather than invented as PASS | PASS | grant-type omission test, CI #157 |
 | Cryptographic JWT signature/JWKS validation | UNKNOWN | deliberately not implemented with ad-hoc crypto; live C4-P0 must use a maintained JOSE implementation |
 | Wrong issuer / expired token rejected cryptographically | UNKNOWN | requires JWT validation slice/live fixture |
 | Dynamic OAuth principal enters `GristContextFactory` | UNKNOWN | principal mapping seam exists; request-path integration remains to prove |
@@ -94,6 +105,6 @@ doc.schema:write
 
 ## Current conclusion
 
-The repository-side POC harness is being prepared without weakening any authentication or authorization invariant. The selected architecture is **not yet declared compatible**: live Logto, ProConnect integration, resource/audience binding, cryptographic token validation, and ChatGPT interoperability remain mandatory UNKNOWNs.
+The repository-side POC harness passes the existing integration gate without weakening any authentication or authorization invariant. The selected architecture is **not yet declared compatible**: live Logto, ProConnect integration, resource/audience binding, cryptographic token validation, and ChatGPT interoperability remain mandatory UNKNOWNs.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
