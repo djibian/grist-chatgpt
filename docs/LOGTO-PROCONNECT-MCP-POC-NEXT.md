@@ -46,7 +46,8 @@ Current live PASS evidence includes:
 - live discovery advertises Authorization Code and refresh-token grant support;
 - the repository `probe:logto` metadata probe passes exact issuer, HTTPS auth/token/JWKS endpoints, PKCE `S256`, Authorization Code response and Authorization Code grant checks;
 - the canonical MCP API resource `https://grist-chatgpt.loeildumaitre.fr/mcp` exists in Logto;
-- exactly the three fixed bridge permissions `doc:read`, `doc:write`, and `doc.schema:write` are present on that resource.
+- exactly the three fixed bridge permissions `doc:read`, `doc:write`, and `doc.schema:write` are present on that resource;
+- the MCP resource's `Default API` setting is visually confirmed **OFF**, so the POC does not rely on an implicit default audience.
 
 Do not infer untested live properties from those metadata/configuration PASS results. RFC 8707 acceptance, live token audience binding, cryptographic JWT/JWKS verification, scope recovery/enforcement in live tokens and ChatGPT refresh behavior remain separate evidence.
 
@@ -79,15 +80,14 @@ Important operational constraint: `/etc/nftables.conf` starts with `flush rulese
 
 Systemd ordering was inspected and is compatible with normal boot: `nftables.service` is enabled for `sysinit.target`, runs before `network-pre.target`, and Docker starts later under `multi-user.target`. The current boot began before nftables was installed/enabled, so an actual reboot persistence check is still UNKNOWN and should be done only as a deliberate controlled test.
 
-## Exact next live step
+## Exact next live step: ProConnect federation
 
-The MCP API resource and its three permissions are already created in Logto.
-
-Current confirmed configuration:
+The MCP API resource and permissions are fully configured for the POC:
 
 ```text
 Name:       grist-chatgpt MCP
 Identifier: https://grist-chatgpt.loeildumaitre.fr/mcp
+Default API: OFF
 
 Permissions:
 doc:read
@@ -95,21 +95,9 @@ doc:write
 doc.schema:write
 ```
 
-Before moving to ProConnect, verify the resource's **Default API** setting in Logto Admin Console:
+This preserves the requirement to prove explicit RFC 8707 `resource` handling rather than silently substituting a default audience.
 
-```text
-Console -> API resources -> grist-chatgpt MCP -> General -> Default API
-```
-
-For this POC the setting must be **OFF**. Do not assume it is off merely because it was not intentionally enabled. If it is on, switch it off.
-
-Reason: the POC must demonstrate explicit RFC 8707 `resource` handling rather than allowing Logto to silently substitute a default audience when the client omits `resource`.
-
-Do not broaden or rename the public scope vocabulary without the human gate required by `AGENTS.md`.
-
-Once `Default API = OFF` is visually confirmed, record that sanitized fact in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`, then proceed to ProConnect federation.
-
-## Step after Default API verification: ProConnect federation
+The next live step is now ProConnect federation.
 
 For OSS, use Logto's generic **social OIDC connector**, not the commercial Enterprise SSO path.
 
@@ -125,6 +113,8 @@ Configure Logto with locally handled secret values only:
 
 The ProConnect client secret must remain outside Git and outside model-visible conversation content.
 
+Do not broaden or rename the public scope vocabulary without the human gate required by `AGENTS.md`.
+
 Required live identity evidence after configuration:
 
 1. complete Logto -> ProConnect -> Logto login;
@@ -136,7 +126,6 @@ Required live identity evidence after configuration:
 
 C4-P0 must remain ACTIVE until the POC contract's mandatory criteria pass. Important UNKNOWNs include:
 
-- confirmation that the MCP resource is not the Logto Default API;
 - ProConnect issuer/discovery accepted by Logto;
 - ProConnect Authorization Code login;
 - stable identity across repeated login;
