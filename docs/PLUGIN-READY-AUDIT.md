@@ -1,79 +1,53 @@
 # Plugin-ready audit — Grist Community / DINUM
 
-Status: architectural decision record and product-readiness audit, 2026-09-16.
+**Status:** current product-readiness audit  
+**Audit date:** 2026-09-17  
+**Audit baseline:** `main` after C1, C2, C3, ProConnect/MCP compatibility research and the independent C6 timeout preparation.
 
-Audit basis: `feat/v0.6-document-ui` after the validated v0.6 document-UI tranche. This document records product direction and target architecture; it does not by itself change runtime behavior.
+This document is an assessment of the current repository and remaining gaps. It does not change runtime behavior, select an OAuth/identity provider, select credential persistence/encryption, add scopes, or create an institutional commitment.
 
-## Executive decision
+## Executive assessment
 
-`grist-chatgpt` is intended to provide the MCP/authentication layer that is missing from **Grist Community**, with the first production target being the Grist Community instance operated for the DINUM / La Suite numérique environment.
+`grist-chatgpt` has moved beyond the original single-client architecture prototype. The bounded Grist business surface, MCP contract, credential abstraction and per-principal context isolation are now integrated.
 
-The project is not intended to compete with or replace Grist's official MCP server where that server is available and sufficient. Hosted Grist and self-hosted editions that provide the official MCP/OAuth integration should normally use the official integration. The bridge is specifically valuable where Grist Community exposes the REST API but does not provide the official MCP/OAuth stack.
-
-The target product is therefore:
-
-> A secure multi-user MCP bridge that lets ChatGPT/Codex operate one configured Grist Community instance through bounded semantic tools, while preserving Grist's own user permissions as the upstream authority.
-
-The long-term product contract is **MCP-first**:
+The critical path is no longer a Grist feature problem. It is an **identity and production-readiness problem**:
 
 ```text
-Primary product contract : MCP
-Development compatibility: GPT Actions / OpenAPI
-Target Grist edition      : Grist Community
-Initial deployment target : DINUM instance
-Initial tenancy model     : multi-user, one Grist instance
+C1 Credential abstraction       DONE
+C2 MCP contract v1              DONE
+C3 User-aware Grist context     DONE
+C4 OAuth MCP identity           BLOCKED by human identity-provider decision
+C5 Secure Grist onboarding      BLOCKED by C4 + human persistence/encryption decisions
+C6 Production hardening         BLOCKED for finalization by C4/C5
+C7 Reviewer fixture             BLOCKED by C4/C5
+C8 Submission package           BLOCKED by C6/C7
 ```
 
-GPT Actions remain useful as a development and product-discovery surface during the prototype phase, but architectural decisions should no longer be driven primarily by OpenAPI/GPT Actions constraints.
+The product target remains a multi-user MCP bridge for **one configured Grist Community DINUM instance**. Each authenticated production user must execute upstream Grist work with that user's own Grist API key; Grist remains authoritative for ACLs and the bridge may only reduce authority.
 
-## Resolved identity decision
+## Current readiness summary
 
-For a multi-user production deployment, each authenticated `grist-chatgpt` user will execute Grist operations with **that user's own Grist API key**.
-
-This decision resolves the main upstream-identity question. A shared technical Grist account with bridge-reimplemented ACLs is not the target product model.
-
-Consequences:
-
-- Grist remains authoritative for the user's actual document/workspace permissions;
-- the bridge does not recreate Grist ACLs;
-- bridge scopes/capabilities can still reduce authority below what the Grist key technically allows;
-- audit can attribute bridge operations to a stable authenticated principal and a verified Grist identity;
-- upstream requests are executed with the same user's Grist identity rather than a shared service identity;
-- credentials, clients, resource discovery and caches must be isolated by user.
-
-The effective authority for one operation is the intersection of:
-
-```text
-permissions of the current user's Grist API key
-∩ deployment policy for this DINUM bridge
-∩ principal resource grants
-∩ operation capability / OAuth scope
-```
-
-The bridge may only reduce authority. It must never grant authority that the user's Grist identity does not possess.
-
-## Plugin-ready status
-
-| Domain | Status | Assessment |
+| Domain | Current status | Assessment |
 | --- | --- | --- |
-| Product positioning | Green | Clear Community-edition gap; first target is DINUM |
-| Public remote MCP over HTTPS | Green | Already validated end-to-end to Grist Community DINUM |
-| Grist business layer | Green | Reads, records, schema and bounded document UI are implemented |
-| Internal authorization model | Green | `AccessPolicy` + principals + capabilities + audit already exist |
-| MCP risk annotations | Green/amber | Current hints are broadly correct; full-surface invariants still need enforcement |
-| MCP public contracts | Amber | Functional surface is strong, but titles, outputs and typed errors need hardening |
-| OAuth ChatGPT/Codex -> bridge | Red / blocking | Static MCP bearer is still the prototype mechanism |
-| Per-user Grist credential execution | Red / blocking | Current runtime still uses one process-wide `GRIST_API_KEY` |
-| Reviewer environment | Red | Dedicated synthetic identity/data fixture still required |
-| Production operations | Amber | HTTPS/systemd/Caddy baseline is solid; rate limits, monitoring and release discipline need formalization |
-| Plugin documentation | Amber | Direction is now documented; contracts and submission evidence still need completion |
-| Privacy / Terms / Support | Red / pre-submission | Public artifacts/URLs still required |
-| Apps SDK UI | Not required | Initial MCP-only plugin is the intended minimal product |
-| Skills | Not required initially | May be added later only if they provide clear user value |
+| Product positioning | Green | MCP-first bridge for the Grist Community gap; initial target remains one configured DINUM instance |
+| Public remote MCP over HTTPS | Green for prototype | End-to-end public bridge validation already exists; production identity remains unfinished |
+| Grist business layer | Green | Records, schema, discovery and bounded document-UI operations are implemented |
+| Bounded-operation security model | Green | No generic HTTP, raw SQL or arbitrary model-visible `/apply`/UserAction escape hatch |
+| Credential abstraction (C1) | Green | `GristCredentialProvider` / `GristClientFactory` seam integrated; static provider preserves development deployment |
+| Principal context isolation (C3) | Green | Credential-derived clients, discovery caches, access policies and service graphs are fresh per principal context |
+| MCP contract v1 (C2) | Green | Registry-driven metadata, full-surface contract checks, structured stable successes and typed error direction integrated |
+| OAuth ChatGPT/Codex -> bridge (C4) | Red / blocking | Production still uses static bearer principals; provider/architecture selection is human-gated |
+| Per-user Grist credential onboarding (C5) | Red / blocking | Runtime seam exists, but secure collection/storage/disconnect is not implemented and storage/encryption are human-gated |
+| ProConnect direct MCP compatibility | Ruled out for assessed configuration | Assessed ProConnect configuration disables RFC 8707 Resource Indicators required by MCP 2026-07-28 |
+| Production timeouts | Partial green | Grist upstream abort timeout and inbound HTTP receive/header limits are integrated |
+| Rate limiting / observability / release controls | Amber/red | Remaining C6 work; several parts depend on final dynamic-principal and deployment choices |
+| Reviewer fixture | Red | Synthetic reviewer identity/data and reproducible positive/negative scenarios remain blocked by identity/onboarding |
+| Submission package | Red / later | Publisher/domain/privacy/support/reviewer requirements must be revalidated at submission time |
+| Apps SDK UI / skills | Not required initially | MCP-only remains sufficient for first product unless a demonstrated need changes scope |
 
-## Current architecture assets to preserve
+## Integrated architecture to preserve
 
-The existing architecture already contains the correct core policy boundaries:
+The current architecture is no longer a singleton Grist visibility model.
 
 ```text
 MCP / GPT Actions
@@ -82,47 +56,42 @@ MCP / GPT Actions
 Principal + capabilities
        |
        v
-AuthorizationService
+GristContextFactory
        |
-       v
-AuthorizedGristService
+       +--> GristClientFactory
+       |        |
+       |        v
+       |   GristCredentialProvider
        |
-       v
-GristService
-       |
-       v
-GristClient
-       |
-       v
-Grist Community
+       +--> credential-derived GristClient
+       +--> private GristResourceDiscovery cache
+       +--> AccessPolicy
+       +--> AuthorizationService
+       +--> AuthorizedGristService
+                    |
+                    v
+                GristService
+                    |
+                    v
+          Grist Community DINUM
 ```
 
-Important assets that should be preserved:
+`DeploymentResourcePolicy` contains only deployment-level document/workspace ceilings and is safe to share. Every `GristContextFactory.create(principal)` call creates fresh credential-derived state for that principal. The factory deliberately does not keep a cross-principal context cache.
 
-- `AccessPolicy` defines the deployment-level Grist resource boundary;
-- `Principal` and `AuthorizationService` separate client identity, resource grants and capabilities;
-- `AuthorizedGristService` centralizes authorization and structured audit before business operations;
-- the capability vocabulary is already Grist-aligned: `doc:read`, `doc:write`, `doc.schema:write`;
-- destructive operations target explicit record/table/column identifiers rather than arbitrary filters;
-- raw SQL, arbitrary HTTP and arbitrary `/apply` / UserActions are not model-visible;
-- partial non-atomic writes are surfaced explicitly and must not be blindly replayed;
-- document UI writes use bounded operations and normalized post-write verification;
-- MCP tools already use `readOnlyHint`, `destructiveHint` and `openWorldHint`;
-- HTTPS MCP transport, reverse proxying, loopback binding, host validation and secret separation have already been validated against the DINUM Grist Community instance.
+The current development deployment still resolves both static principals through one configured `GRIST_API_KEY` via `StaticApiKeyCredentialProvider`. That is a backward-compatible development substitution, not the final multi-user credential model.
 
-The project therefore does **not** need a rewrite of its Grist business layer. The principal remaining work is identity, per-user credential execution, public MCP contract hardening and production/reviewer readiness.
+## Effective authorization model
 
-## Two distinct authentication layers
+Production authority remains the intersection of:
 
-The product must keep two concepts separate.
+```text
+current user's Grist permissions
+∩ deployment resource policy
+∩ principal resource grants
+∩ required operation capability / OAuth scope
+```
 
-### 1. ChatGPT/Codex -> grist-chatgpt
-
-The current static `MCP_BEARER_TOKEN` is appropriate for prototype validation but is not the intended public multi-user identity model.
-
-The plugin-ready target is MCP-compatible OAuth 2.1 authentication that produces a dynamic bridge `Principal` with stable identity, resource grants and scopes/capabilities.
-
-The existing capability names are candidates for plugin OAuth scopes:
+Current bridge capability vocabulary:
 
 ```text
 doc:read
@@ -130,480 +99,199 @@ doc:write
 doc.schema:write
 ```
 
-The OAuth/MCP implementation must follow the current MCP authorization contract at implementation time, including the then-current protected-resource metadata, authorization-server metadata, token validation requirements, issuer/audience/expiry validation and scope handling.
+No current work authorizes changing that public scope set.
 
-Public MCP tools that require authentication should expose the corresponding MCP security metadata. Authentication challenges should use the current MCP mechanism (including `mcp/www_authenticate` metadata where required by the specification/client contract) rather than ad-hoc model instructions.
+Important invariants already present:
 
-The static bearer mechanism can remain available as a development or controlled-deployment compatibility mode, but it must not define the public plugin identity model.
+- destructive operations use named, bounded targets;
+- partial/non-atomic writes are explicit and must not be blindly replayed;
+- ambiguous UI writes are independently re-read and verified;
+- functional document/table/column/record/page/widget IDs may remain model-visible when needed for safe follow-up calls;
+- credentials and session secrets never belong in model-visible inputs/outputs or audit payloads.
 
-### 2. grist-chatgpt -> Grist Community
+## C1 — credential abstraction: integrated
 
-Grist Community does not provide the official Grist OAuth/MCP integration used by editions that include Connected Apps.
+The earlier audit described a future credential-provider seam. That seam now exists.
 
-For the DINUM Community target, the bridge will therefore obtain the API key belonging to the authenticated user and use that credential for upstream Grist requests.
+`StaticApiKeyCredentialProvider` preserves the current development deployment, while `GristClientFactory` accepts a principal-aware credential context. The remaining production work is **not** to redesign Grist business operations; it is to supply a user-aware credential provider after secure onboarding/persistence decisions are made.
 
-The following concepts must remain distinct:
+The production invariant remains:
 
-```text
-who authenticated to the plugin
-        !=
-what scopes the plugin principal was granted
-        !=
-which Grist credential is used upstream
-        !=
-which resources Grist actually allows that credential to access
-```
+> a principal may receive only the Grist credential associated with that same authenticated user.
 
-## Credential architecture
+## C2 — MCP contract v1: integrated
 
-The current process-wide `GRIST_API_KEY` and singleton `GristClient` are intentionally prototype substitutions.
+MCP is the normative public product direction. The operation registry now carries product-level metadata used to keep public MCP definitions and authorization intent aligned.
 
-The product target should introduce a credential abstraction such as:
+Integrated direction includes:
 
-```text
-Principal
-   |
-   v
-GristCredentialProvider
-   |
-   v
-credential belonging to this user
-   |
-   v
-GristClient / service context for that principal
-```
+- user-intent-oriented titles/descriptions;
+- risk annotations checked across the surface;
+- structured success results where stable/useful;
+- typed error categories without secrets/stacks;
+- text-only error envelopes where success `outputSchema` validation would otherwise make recoverable tool errors become protocol failures;
+- preservation of explicit partial/ambiguous write semantics.
 
-A `StaticApiKeyCredentialProvider` can preserve the current single-user deployment while a production user-aware provider is introduced.
+Further contract refinement may happen later, but C2 is not the current blocking dependency.
 
-A user-aware provider must guarantee that one principal can never retrieve another principal's credential.
+## C3 — user-aware Grist context: integrated
 
-### Credential lifecycle
+The earlier singleton discovery/cache risk has been removed architecturally.
 
-A production credential record should minimally associate:
+For each principal context the bridge creates fresh:
 
-- bridge principal ID;
-- verified Grist user identity;
-- encrypted Grist API key;
-- non-secret credential fingerprint;
-- creation timestamp;
-- last successful validation timestamp;
-- optional revocation/disconnection metadata.
+- `GristClient`;
+- `GristResourceDiscovery` cache;
+- `AccessPolicy`;
+- `AuthorizationService`;
+- Grist service/UI adapter graph;
+- `AuthorizedGristService` bound to that exact principal.
 
-The encryption key must be held in infrastructure secret management, not in the repository and not alongside encrypted application data in an equivalent trust boundary.
+Cross-user tests demonstrate that resources learned through one synthetic user's credential do not appear in another principal's discovery/cache state.
 
-The bridge should support explicit disconnection that deletes the stored credential association. Grist-level API-key revocation/regeneration remains independently available to the user.
+This means C5 can later provide different per-user credentials without first redesigning cache isolation.
 
-Because a Grist Community API key is a powerful account credential rather than a narrowly delegated OAuth token, the product must clearly document that revoking/regenerating it may affect other integrations using the same key.
+## C4 — OAuth MCP identity: current blocking gate
 
-## Secure Grist credential onboarding
+Production MCP still authenticates with a static bearer principal. The target is an OAuth-authenticated dynamic `Principal` whose token is validated for issuer, resource/audience, expiry and scopes as required by the current MCP authorization contract.
 
-A Grist API key must **never** be exposed to the model or passed as an MCP tool argument.
+The decision package is maintained in `docs/OAUTH-IDP-DECISION.md`.
 
-It must not appear in:
+### ProConnect compatibility finding
 
-- ChatGPT/Codex conversation content;
-- MCP tool inputs or outputs;
-- `structuredContent`;
-- audit events;
-- general application logs;
-- error payloads;
-- OpenAPI/GPT Actions parameters.
+Repository compatibility work established for the assessed public ProConnect configuration:
 
-The intended product flow is a separate secure onboarding page owned by `grist-chatgpt`:
+- PKCE `S256` support is present;
+- RFC 8707 Resource Indicators are explicitly disabled (`resourceIndicators: { enabled: false }`).
 
-```text
-OAuth-authenticated plugin user
-        |
-        v
-"Connect your Grist account"
-        |
-        v
-secure bridge-owned browser form
-        |
-        v
-bridge validates key directly against configured DINUM Grist
-        |
-        v
-verified Grist identity associated with principal
-        |
-        v
-encrypted credential storage
-```
+MCP `2026-07-28` requires the MCP client to send the target `resource` and requires resource-bound token acquisition. Therefore **direct ProConnect as the MCP-facing authorization server is ruled out for the assessed configuration**.
 
-The bridge should validate the supplied key directly against the configured DINUM Grist instance before storing it. The Grist profile endpoint available to API-key-authenticated clients is a natural validation primitive, subject to re-checking against the deployed DINUM Grist version before implementation.
+This finding does not select a replacement architecture and does not decide whether ProConnect remains the upstream identity source.
 
-Failed validation must not persist the credential.
+### Human decision still required
 
-## User isolation and access-policy refactor
+Provider-specific C4 implementation must not start until an authorized human decides at least:
 
-The current singleton `GristClient` and `AccessPolicy` discovery cache are constructed under one process-wide Grist API key.
+- whether ProConnect is required as the production identity source;
+- whether an MCP-specific authorization server should federate to ProConnect or another identity/provider should be used;
+- who operates a separate authorization server (managed/self-hosted/either);
+- whether only ChatGPT/Codex pre-registration is required or broader MCP client registration interoperability is required;
+- acceptable refresh/reauthentication behavior;
+- ownership of any production OAuth/ProConnect registration or institutional approval.
 
-That model is unsafe for a multi-user deployment unless all user-derived state becomes credential-aware.
+## C5 — secure Grist onboarding: blocked
 
-It must be impossible for a document discovered under user A's key to become visible to user B merely because it was cached earlier.
+The credential seam is ready, but secure per-user credential lifecycle is intentionally not implemented before the human decisions on persistence/encryption.
 
-The target conceptual separation is:
+Required production behavior remains:
 
-```text
-DeploymentPolicy
-  -> which DINUM documents/workspaces this bridge may expose at all
+1. authenticate the bridge user;
+2. collect the user's Grist API key outside the model conversation/tool surface;
+3. validate it directly against the configured DINUM Grist instance;
+4. associate verified Grist identity with the authenticated principal;
+5. store credential material encrypted at rest;
+6. resolve it only for that principal's upstream requests;
+7. provide disconnect/removal and lifecycle/revalidation handling;
+8. never log, audit, return or prompt the credential through model-visible surfaces.
 
-UserResourceAccess
-  -> what the current user's Grist credential can actually access
+Persistence technology and encryption/key-management architecture are explicit human gates.
 
-Principal grants/scopes
-  -> what the current plugin authorization permits
-```
+## C6 — production hardening
 
-Any Grist client, document discovery result, workspace/document cache or authorization input derived from a user's API key must be isolated by principal/credential or reconstructed safely for the current request/session.
+C6 cannot be finalized before C4/C5, but identity-independent timeout preparation is integrated.
 
-Authorization must fail closed whenever any layer denies access.
+### Integrated
 
-## One DINUM instance, not arbitrary Grist multi-tenancy
+- Grist upstream requests use an explicit 10-second abort timeout;
+- inbound Node HTTP request reception is bounded to 120 seconds;
+- inbound HTTP header reception is bounded to 60 seconds;
+- these receive-side limits do not cap MCP streaming response duration.
 
-The initial product is deliberately:
+### Remaining
 
-```text
-many authenticated users
-        |
-        v
-one grist-chatgpt deployment
-        |
-        v
-one configured Grist Community DINUM instance
-```
-
-It is **not** initially:
-
-```text
-one universal router
-        |
-        +--> arbitrary Grist instance A
-        +--> arbitrary Grist instance B
-        +--> arbitrary Grist instance C
-```
-
-This matters for both security and product scope. The stable public MCP endpoint can represent one institutional service boundary while each user authenticates individually and operates through their own Grist identity.
-
-Do not introduce tenant routing, user-supplied Grist base URLs or arbitrary instance discovery unless a future product decision explicitly broadens the target.
-
-This also preserves the existing SSRF boundary: `GRIST_BASE_URL` remains deployment configuration rather than model/user-controlled tool input.
-
-## MCP tool-contract readiness
-
-The current MCP surface is functionally strong but should be hardened into a stable public contract before submission.
-
-### Preserve
-
-- named bounded tools rather than generic proxy primitives;
-- precise destructive annotations;
-- `openWorldHint: false` for operations confined to the configured private Grist environment;
-- semantic operations and stable functional IDs;
-- post-write verification for UI operations;
-- explicit partial-write reporting;
-- structural inspection before complex modification;
-- server-side authorization independent of model behavior.
-
-### Improve
-
-Each public MCP tool should have a complete product-level contract including:
-
-- stable tool name;
-- user-intent-oriented title;
-- user-intent-oriented description;
-- explicit input schema;
-- explicit output schema where useful;
-- structured results (`structuredContent` or the current equivalent) rather than relying only on JSON serialized into text;
-- required OAuth capability/scope;
-- read-only/destructive/open-world annotations;
-- stable typed error behavior.
-
-Descriptions should explain user intent and constraints, not internal Grist `UserAction` implementation details such as `AddView` or `CreateViewSection` unless that detail is genuinely useful to a developer debugging the bridge.
-
-Open-ended metadata dictionaries such as broad `fields: Record<string, unknown>` surfaces should be reviewed. They can remain where Grist flexibility materially requires them, but a public v1 contract should prefer documented semantic fields where practical so the model is not effectively handed an undocumented metadata escape hatch.
-
-### Functional identifiers
-
-Document, table, column, record, page and widget identifiers are legitimate model-visible data when they are needed for safe follow-up calls.
-
-The contract should explicitly tell clients to reuse identifiers returned by discovery/read tools rather than invent or guess them.
-
-## Operation registry as the normative source
-
-`src/operations/registry.ts` already centralizes capability, category, read-only and destructive metadata.
-
-The plugin-ready architecture should extend this pattern so security and tool metadata cannot drift independently.
-
-Target direction:
-
-```text
-OperationDefinition
-  - capability / OAuth scope
-  - category
-  - readOnly
-  - destructive
-  - openWorld
-  - title
-  - description
-  - input contract
-  - output contract
-          |
-          v
-MCP registration + authorization + tests + help
-```
-
-CI should assert the relevant annotations and scope mapping across the **entire MCP surface**, not only selected schema tools.
-
-Future operations should fail CI if they are missing required policy metadata.
-
-## MCP annotation semantics
-
-MCP annotations must describe the **real operation**, not a desired approval UX:
-
-- reads: `readOnlyHint: true`;
-- state-changing operations: `readOnlyHint: false`;
-- record/table/column deletion and future difficult-to-reverse destructive actions: `destructiveHint: true`;
-- tools confined to the configured private Grist environment: `openWorldHint: false`.
-
-These annotations are not authorization controls. OAuth scopes, principal grants, deployment policy and Grist ACLs remain the enforcement layers.
-
-GPT Actions' `x-openai-isConsequential` flag belongs only to the temporary GPT Actions approval UX and must not redefine the MCP risk semantics or the bridge's security model.
-
-## Error contract
-
-Public MCP errors should evolve from arbitrary message strings toward a stable typed contract, for example:
-
-```json
-{
-  "code": "PAGE_NOT_FOUND",
-  "message": "The requested Grist page does not exist.",
-  "retryable": false,
-  "resource": { "type": "page", "id": 4 }
-}
-```
-
-The exact shape is not fixed yet, but the contract must preserve the important existing invariants:
-
-- partial non-atomic writes are explicit;
-- completed batches/items are available for reconciliation where appropriate;
-- ambiguous writes must carry an equivalent of `retryWholeOperation: false`;
-- invalid inputs and authorization failures are distinguishable from upstream infrastructure failures;
-- internal stack traces, secrets and irrelevant infrastructure identifiers must not leak;
-- functional IDs required for safe follow-up/reconciliation may remain visible.
-
-Errors should be designed for deterministic client behavior, reviewer tests and auditability rather than for exposing implementation diagnostics.
-
-## Deployment readiness
-
-The deployment baseline is already stronger than a typical proof of concept.
-
-Validated characteristics include:
-
-```text
-Internet HTTPS
-    |
-    v
-Caddy reverse proxy
-    |
-    v
-Node service bound to loopback
-    |
-    v
-MCP host validation
-    |
-    v
-Grist Community DINUM
-```
-
-The current deployment also keeps service secrets outside the Git checkout and uses process supervision. CI currently validates dependency installation/audit, type checking, tests and build.
-
-Before plugin production, formalize or add:
-
-- per-principal rate limiting;
-- explicit inbound and upstream timeouts;
-- health, latency and error metrics;
-- alerting;
-- structured audit export where institutionally required;
+- per-principal rate limiting after dynamic principal semantics are final;
+- operational metrics and alerting;
+- structured audit export where required;
+- secret/key rotation procedure;
 - documented deployment and rollback procedure;
-- production secret rotation;
-- protected release workflow and protected `main` policy;
-- synthetic smoke tests after deployment;
-- incident ownership and support escalation.
+- protected release workflow / `main` protections;
+- post-deploy synthetic smoke tests.
 
-Not every item is necessarily a formal OpenAI submission requirement; they are normal requirements for a service allowed to perform institutional writes.
+Do not pre-select institutional monitoring, secret-management or deployment products merely to close these bullets.
 
-## Reviewer environment
+## C7 — reviewer fixture
 
-Reviewer access must not depend on real educational or administrative DINUM data.
+The reviewer environment remains blocked by C4/C5 because a realistic reviewer must authenticate without using real educational/administrative identities or data and must receive a safely isolated Grist credential/data fixture.
 
-Prepare a dedicated synthetic Grist environment/account and reproducible scenarios. Reviewer credentials must satisfy the current OpenAI requirements at submission time and should not depend on inaccessible private-network steps or interactive barriers that prevent independent review.
+Planned positive scenarios include:
 
-Candidate positive scenarios already exercised during development include:
-
-1. inspect document structure, relations, pages and widgets;
+1. inspect structure, relations, pages and widgets;
 2. query/filter records;
-3. create a table with four columns and twelve records;
-4. update bounded data/schema state;
-5. create a page, add two widgets, configure direct `select-by` and verify through independent re-read.
+3. create a table, columns and records;
+4. perform bounded data/schema updates;
+5. create a page, add widgets, configure direct `select-by`, and verify by independent re-read.
 
-Candidate negative scenarios include:
+Planned negative scenarios include:
 
-1. write attempted with only `doc:read` scope -> rejected before upstream mutation;
-2. document outside deployment/principal grant -> rejected;
-3. invalid/nonexistent page, widget or select-by source -> no unintended write and stable error;
-4. invalid/duplicate destructive identifiers -> rejected before execution;
-5. simulated partial write -> completed work reported and whole-operation replay explicitly discouraged.
+1. insufficient scope for write;
+2. resource outside deployment/principal permission;
+3. invalid/nonexistent UI linkage target with no unintended write.
 
-At least the then-current required positive and negative scenarios should become both automated integration tests and reviewer instructions.
+These scenarios should become both automated integration coverage and reviewer instructions once identity/onboarding are available.
 
-## Submission and publisher readiness
+## C8 — submission package
 
-Before public submission, re-check the current OpenAI process rather than relying indefinitely on this snapshot.
+Submission-specific requirements change independently of this repository and must be revalidated close to submission.
 
-The expected workstream includes:
+Expected package areas include:
 
-- stable production HTTPS MCP endpoint;
-- MCP-compatible OAuth authentication;
-- verified OpenAI developer/organization identity;
-- required app-management permissions in the OpenAI organization;
-- domain ownership verification using the then-current challenge mechanism;
-- plugin name, description, logo and example prompts;
-- public product/support site;
-- privacy policy;
-- terms of use;
-- support contact and incident ownership;
-- countries/availability settings;
+- stable public HTTPS MCP endpoint;
+- developer/publisher identity and required permissions;
+- domain verification;
+- public metadata and example prompts;
+- support contact/website;
+- privacy policy and terms;
 - reviewer credentials and instructions;
-- required positive and negative reproducible test cases;
-- tool scan/review and remediation of any findings before publication.
+- availability/country settings;
+- tool/security scan findings;
+- accurate non-misleading relationship statements regarding Grist Labs, DINUM / La Suite numérique and OpenAI.
 
-The relationship to Grist Labs and DINUM / La Suite numérique must remain explicit and non-misleading. Until agreed otherwise, this project is an independent integration, not an official Grist Labs or DINUM product.
+The repository must not claim an official institutional relationship that has not been explicitly established.
 
-## Documentation doctrine
+## Deliberate non-goals and deferred breadth
 
-The authoritative project documents should consistently express:
+The current critical path does not include:
 
-```text
-Primary product contract : MCP
-Development compatibility: GPT Actions / OpenAPI
-Target platform          : Grist Community DINUM
-Upstream identity        : each user's own Grist API key
-```
-
-Statements implying that a shared technical Grist account is the preferred product target should be removed. A static process-wide API key remains only a prototype/deployment compatibility implementation.
-
-Historical validation documents may retain the architecture that existed at the time, provided they are clearly labeled as historical snapshots.
-
-## Deliberate non-goals for the next tranche
-
-Do not broaden the Grist feature surface merely to appear complete before solving identity.
-
-In particular, layout mutation, page/widget deletion and further UI operations are lower priority than authentication and per-user credential isolation once v0.6 is stabilized.
-
-Do not introduce:
-
+- arbitrary multi-instance Grist routing;
 - generic HTTP forwarding;
 - raw SQL;
-- arbitrary `/apply` / UserActions;
-- model-visible Grist credentials;
-- bridge-managed recreation of Grist ACLs;
-- user-supplied Grist base URLs;
-- arbitrary multi-tenant routing across unrelated Grist instances unless a future product decision explicitly requires it.
+- arbitrary UserActions or generic `/apply` access;
+- user/ACL administration;
+- layout mutation;
+- page/widget deletion;
+- generated executable custom widgets;
+- Apps SDK UI;
+- skills.
 
-## Roadmap
+Additional Grist feature breadth should not displace identity/security readiness unless the authoritative roadmap changes.
 
-### P0 — stabilize v0.6
+## Current critical-path conclusion
 
-Complete, validate and merge the current bounded document-UI tranche without expanding the feature surface unnecessarily.
+The repository has the core Grist/MCP service architecture needed to proceed. C1-C3 are integrated and the direct-ProConnect compatibility uncertainty has been materially reduced.
 
-### P1 — MCP becomes normative
+The next blocking transition is now explicitly human:
 
-Treat MCP as the primary public product contract. Keep GPT Actions as a compatibility/development adapter while custom-GPT testing remains useful.
+> choose and durably record the production identity-source / MCP authorization-server architecture for C4.
 
-### P2 — credential abstraction
+Until that gate is resolved, useful autonomous work should be limited to genuinely independent low-risk preparation already permitted by the roadmap and documentation/consistency fixes. It must not silently commit to a provider, persistence/encryption architecture, new scopes, a changed Grist credential model, new generic/destructive power, or an institutional obligation.
 
-Introduce `GristCredentialProvider` and a credential-aware `GristClient`/service-context factory.
+## Authoritative companion documents
 
-Preserve the current static API-key deployment through `StaticApiKeyCredentialProvider` or equivalent, but make per-user credentials the production model.
-
-### P3 — user-aware Grist context
-
-Separate deployment policy from user resource discovery. Ensure all Grist clients, document/workspace discovery and caches are isolated by authenticated user credential.
-
-### P4 — OAuth 2.1 MCP identity
-
-Replace the static production MCP principal with OAuth-authenticated dynamic principals and explicit scopes/capabilities. Implement the then-current MCP protected-resource/authentication contract and tool security metadata.
-
-### P5 — secure Grist onboarding
-
-Implement the separate secure web flow for collecting, validating, encrypting, storing, rotating/disconnecting and revalidating per-user Grist API keys.
-
-### P6 — stable MCP v1 contract
-
-Add product titles/descriptions, structured outputs, output schemas where useful, typed errors, explicit identifier guidance and registry-driven security metadata.
-
-### P7 — production hardening
-
-Add rate limits, timeouts, observability, protected releases, secret rotation, deployment rollback and operational evidence.
-
-### P8 — reviewer fixture
-
-Provide synthetic Grist data, reviewer identity/credential flow and the required positive/negative reproducible scenarios.
-
-### P9 — publisher package
-
-Prepare domain verification, publisher identity, support, privacy policy, terms, public metadata, example prompts and availability settings.
-
-### P10 — submission and publication
-
-Submit the MCP plugin through the then-current OpenAI process, complete tool scanning/review, remediate findings and publish only after approval.
-
-## Architectural target
-
-```text
-                 ChatGPT / Codex
-                        |
-                     OAuth 2.1
-                        |
-                        v
-                grist-chatgpt MCP
-                        |
-              dynamic user Principal
-               scopes + resource grants
-                        |
-                        v
-              AuthorizationService
-                        |
-                        v
-           AuthorizedGristService
-                        |
-                        v
-            GristCredentialProvider
-                        |
-             per-user Grist API key
-                        |
-                        v
-             credential-aware client
-                        |
-                        v
-             DeploymentPolicy
-              + user ACL view
-                        |
-                        v
-             REST + bounded actions
-                        |
-                        v
-              Grist Community DINUM
-```
-
-## Core invariant
-
-> ChatGPT/Codex authenticates the user to the bridge; the bridge authenticates that same user to Grist Community with the user's own API key; Grist remains authoritative for upstream permissions; and the bridge may only reduce authority through deployment policy, OAuth scopes, explicit grants and bounded semantic operations.
-
-## References to re-check before implementation/submission
-
-- OpenAI plugin submission documentation;
-- OpenAI/MCP authentication documentation;
-- current MCP authorization specification;
-- Grist Community REST API and API-key documentation;
-- Grist official MCP / Connected Apps documentation, to preserve the Community-vs-Full-edition product boundary.
+- `AGENTS.md` — execution contract and human gates;
+- `docs/PRODUCT_VISION.md` — product target and invariants;
+- `docs/ROADMAP.md` — eligibility/dependencies;
+- `docs/ARCHITECTURE.md` — current and target architecture;
+- `docs/SECURITY.md` — security doctrine;
+- `docs/OAUTH-IDP-DECISION.md` — C4 human decision package;
+- `docs/PROCONNECT-MCP-COMPAT-RESULTS.md` — current direct-ProConnect compatibility evidence;
+- `docs/OPENAI-SUBMISSION.md` — submission planning, to be revalidated near submission.
