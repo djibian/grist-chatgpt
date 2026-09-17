@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
 
 import {
   evaluateProConnectDiscovery,
@@ -167,6 +167,7 @@ async function authorizeCommand(): Promise<void> {
     encoding: "utf8",
     mode: 0o600
   });
+  await chmod(sessionFile, 0o600);
 
   console.log(
     JSON.stringify(
@@ -175,7 +176,7 @@ async function authorizeCommand(): Promise<void> {
         authorizationUrl: url.toString(),
         sessionFile,
         next:
-          "Open authorizationUrl in a browser. Record whether ProConnect accepts the request. If it returns a code to the registered redirect URI, run the exchange command locally with that code."
+          "Open authorizationUrl in a browser. If the registered callback returns a code, keep it local in an environment variable and run the exchange command; never pass the code on the command line."
       },
       null,
       2
@@ -183,12 +184,34 @@ async function authorizeCommand(): Promise<void> {
   );
 }
 
+async function removeSessionFile(sessionFile: string): Promise<void> {
+  try {
+    await unlink(sessionFile);
+  } catch (error: unknown) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : undefined;
+    if (code !== "ENOENT") {
+      console.error(`Warning: could not remove probe session file ${sessionFile}.`);
+    }
+  }
+}
+
 async function exchangeCommand(): Promise<void> {
-  const code = requireOption("--code");
   const sessionFile = option("--session") ?? DEFAULT_SESSION_FILE;
+  const authorizationCodeEnv =
+    option("--authorization-code-env") ?? "PROCONNECT_AUTHORIZATION_CODE";
   const clientSecretEnv =
     option("--client-secret-env") ?? "PROCONNECT_CLIENT_SECRET";
+  const code = process.env[authorizationCodeEnv];
   const clientSecret = process.env[clientSecretEnv];
+
+  if (!code) {
+    throw new Error(
+      `Environment variable ${authorizationCodeEnv} must contain the local authorization code.`
+    );
+  }
   if (!clientSecret) {
     throw new Error(
       `Environment variable ${clientSecretEnv} must contain the integration client secret.`
@@ -221,6 +244,8 @@ async function exchangeCommand(): Promise<void> {
   });
 
   const text = await response.text();
+  await removeSessionFile(sessionFile);
+
   let raw: unknown;
   try {
     raw = text ? JSON.parse(text) : {};
@@ -236,7 +261,7 @@ async function exchangeCommand(): Promise<void> {
         resource: session.resource,
         sanitizedTokenResponse: sanitized,
         note:
-          "Raw access, refresh and ID tokens are deliberately never printed or persisted by this probe."
+          "Raw access, refresh and ID tokens are never printed or persisted. JWT-shaped claim fields are decoded diagnostics only and are not signature validation."
       },
       null,
       2
@@ -257,14 +282,17 @@ Commands:
             [--resource URI] [--scope "openid ..."] [--session FILE]
     Build an authorization URL and save ephemeral state/PKCE material locally.
 
-  exchange --code CODE [--session FILE] [--client-secret-env ENV]
-    Exchange an authorization code using the exact parameters represented by
-    the saved probe session. Token values are never printed or persisted.
+  exchange [--session FILE] [--authorization-code-env ENV] [--client-secret-env ENV]
+    Exchange an authorization code read from an environment variable using the exact
+    parameters represented by the saved probe session. Token values are never printed
+    or persisted.
 
 Defaults:
-  discovery: ${DEFAULT_DISCOVERY_URL}
-  session:   ${DEFAULT_SESSION_FILE}
-  variant:   mcp
+  discovery:              ${DEFAULT_DISCOVERY_URL}
+  session:                ${DEFAULT_SESSION_FILE}
+  variant:                mcp
+  authorization code env: PROCONNECT_AUTHORIZATION_CODE
+  client secret env:      PROCONNECT_CLIENT_SECRET
 
 Recommended A/B sequence:
   1. baseline  (documented OIDC parameters only)

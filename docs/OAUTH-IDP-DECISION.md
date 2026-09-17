@@ -1,9 +1,8 @@
 # C4 OAuth / identity-provider decision package
 
-**Status:** research and human-decision input only — this document does **not** select an authorization-server product or authorize provider-specific implementation.  
-**Initial research date:** 2026-09-16  
-**Compatibility update:** 2026-09-17  
-**Project baseline:** C1, C2 and C3 integrated; direct ProConnect has been evaluated against MCP 2026-07-28 and is not viable as the MCP-facing authorization server in the current ProConnect configuration. C4 core implementation remains blocked by the human choice of the intermediary authorization-server architecture/provider.
+**Status:** research and human-decision input only — this document does **not** select an identity provider or authorize provider-specific implementation.  
+**Research date:** 2026-09-16  
+**Project baseline:** C1, C2 and C3 integrated; C4 core implementation blocked by the human identity-provider decision.
 
 ## Decision to make
 
@@ -30,8 +29,6 @@ Grist Community DINUM
 
 This decision concerns **ChatGPT/Codex -> grist-chatgpt** authentication only. It does not change the already selected **grist-chatgpt -> Grist** model: each production user must still execute upstream work with that user's own Grist API key, and Grist remains authoritative for upstream ACLs.
 
-The preferred institutional identity source remains ProConnect unless a separate human decision changes that. The compatibility work recorded in `docs/PROCONNECT-MCP-COMPAT-RESULTS.md` establishes that ProConnect cannot currently serve **directly** as the MCP authorization server because its current OIDC provider disables RFC 8707 Resource Indicators.
-
 The public bridge scope vocabulary remains unchanged:
 
 - `doc:read`
@@ -49,8 +46,7 @@ Whichever option is selected must preserve these invariants:
 5. OAuth tokens, Grist API keys and session secrets must never become model-visible tool data, audit payloads or general logs.
 6. User-derived Grist clients, discovery results and caches remain isolated through the C3 principal-context boundary.
 7. No new public scopes are introduced as part of this decision.
-8. No provider-specific production implementation starts until the remaining authorization-server choice is made explicitly by a human.
-9. The selected MCP-facing authorization server must support RFC 8707 Resource Indicators and produce tokens demonstrably intended for the canonical MCP resource.
+8. No provider-specific production implementation starts until the selection is made explicitly by a human.
 
 ## Current MCP authorization baseline
 
@@ -104,45 +100,32 @@ Current ChatGPT app flows support OAuth for remote MCP servers. OpenAI documents
 
 Therefore **pre-registration is a viable client-registration category to investigate**, rather than assuming CIMD or DCR is mandatory for ChatGPT. Exact behavior for the final custom MCP app should still be validated in a real draft app before production commitment.
 
-## ProConnect compatibility result
+## ProConnect facts established from current public documentation
 
-ProConnect remains a strong candidate for the **institutional identity source**, but the compatibility tranche in `docs/PROCONNECT-MCP-COMPAT-RESULTS.md` establishes that it cannot currently be used directly as the MCP authorization server while remaining conformant with MCP 2026-07-28.
+ProConnect is a plausible **identity source**, but direct use as the MCP authorization server is not yet established by the evidence below.
 
-### Positive evidence
-
-Current public ProConnect implementation evidence establishes that:
+Current ProConnect service-provider documentation establishes that:
 
 - it implements OpenID Connect Authorization Code Flow;
-- it supports PKCE with `S256` (`pkce.methods: ["S256"]`);
-- its repository contains end-to-end PKCE scenarios;
-- its discovery DTO includes `code_challenge_methods_supported`;
-- it exposes/implements token introspection for Resource Server use;
 - service providers receive a pre-registered `client_id` and `client_secret`;
 - redirect URIs are registered explicitly and must match exactly;
+- it publishes OpenID Connect discovery metadata;
 - it issues access tokens and refresh tokens;
-- production use involves a ProConnect service-provider registration process / DataPass and production client credentials.
+- its documented access token lifetime is about one hour;
+- its documented refresh-token lifetime is about two hours, after which the user must authenticate again;
+- production use involves a ProConnect service-provider registration process / DataPass and production client credentials;
+- its documented scopes are primarily identity/claim scopes such as `openid`, `email`, `uid`, `siret`, `roles`, etc.
 
-PKCE is therefore **not** the blocker identified by this evaluation.
+Current public ProConnect documentation reviewed for this package does **not establish** all of the following MCP-specific requirements:
 
-### Blocking evidence
+- advertised PKCE `S256` support compatible with the MCP client's mandatory check;
+- RFC 8707 `resource` handling and an MCP-resource audience on the resulting access token;
+- issuance/enforcement of the bridge scopes `doc:read`, `doc:write`, `doc.schema:write`;
+- RFC 9207 authorization-response `iss` behavior;
+- CIMD or DCR support (not required if pre-registration is used, but relevant to generic MCP clients);
+- whether the short refresh-token lifetime is acceptable for the intended ChatGPT user experience.
 
-The current public ProConnect OIDC-provider configuration explicitly contains:
-
-```text
-resourceIndicators: { enabled: false }
-```
-
-MCP 2026-07-28 requires OAuth Resource Indicators (RFC 8707) so that the client requests an access token for the canonical MCP resource. A direct ProConnect authorization-server architecture therefore lacks the mandatory MCP resource-indicator/audience-binding mechanism in the current configuration.
-
-This is stronger evidence than a documentation omission: the relevant feature is explicitly disabled in the implementation assessed on 2026-09-17.
-
-A live integration probe remains useful only if:
-
-- ProConnect later enables Resource Indicators;
-- there is evidence that the deployed environment differs from the assessed public configuration;
-- a later release must be revalidated end-to-end.
-
-It is **not required merely to decide the current architecture**.
+Absence from the public pages is **not evidence that ProConnect lacks these capabilities**. These points must be confirmed from live metadata, a controlled integration test, or ProConnect support before direct-ProConnect architecture can be considered protocol-compatible.
 
 ## Candidate architecture A — ProConnect directly as the MCP authorization server
 
@@ -159,21 +142,23 @@ ChatGPT / Codex
 grist-chatgpt resource server
 ```
 
-### Current status
+### What this would preserve
 
-**Not viable with the current ProConnect OIDC-provider configuration.**
+- the authentication UX is directly based on the institutional identity service;
+- client registration could potentially use ChatGPT's user-defined/pre-registered OAuth client path;
+- no extra authorization-server product is inserted solely for the bridge.
 
-Reason: RFC 8707 Resource Indicators are disabled, while MCP 2026-07-28 requires the client to use them to identify the target MCP resource.
+### What must be proven before selection
 
-This architecture may be reconsidered only if ProConnect enables Resource Indicators and the resulting tokens can be shown to be bound to the canonical `grist-chatgpt` MCP resource.
+- ProConnect metadata and endpoints satisfy the MCP PKCE requirement;
+- authorization/token requests accept the MCP `resource` parameter and resulting tokens are audience-bound to the bridge;
+- a stable mapping/enforcement model exists for the unchanged bridge scope vocabulary;
+- the access token can be validated by `grist-chatgpt` with issuer, audience, expiry and scopes suitable for resource-server use;
+- ChatGPT can use the registered ProConnect client and exact callback successfully;
+- the refresh/re-authentication behavior is acceptable;
+- the required ProConnect registration/DataPass is institutionally acceptable and owned by an identified party.
 
-Its advantages remain relevant if that changes in the future:
-
-- authentication UX directly based on the institutional identity service;
-- no extra authorization-server product solely for the bridge;
-- potentially simple pre-registered ChatGPT OAuth client integration.
-
-Architecture A is therefore **closed for the current decision, but revalidatable on a future ProConnect change**.
+Until those points are answered, this is a candidate, not an implementation assumption.
 
 ## Candidate architecture B — dedicated MCP authorization server federated to ProConnect
 
@@ -202,13 +187,13 @@ The dedicated authorization server would be responsible for MCP-facing behavior 
 
 - protected-resource-compatible issuer/discovery metadata;
 - PKCE support;
-- RFC 8707 `resource` / audience binding;
+- `resource` / audience binding;
 - bridge scopes;
 - access/refresh-token lifetimes and rotation;
 - supported client-registration mechanism(s);
 - token issuer/JWKS or introspection contract consumed by `grist-chatgpt`.
 
-Questions for the human decision include which authorization-server implementation should be used, whether it may be managed externally or should be self-hosted, who operates it, and whether federating to ProConnect creates acceptable institutional obligations.
+Questions for the human decision include whether that authorization server may be self-hosted or managed, who operates it, and whether federating to ProConnect creates acceptable institutional obligations.
 
 No specific authorization-server product is selected by this document.
 
@@ -227,7 +212,7 @@ ChatGPT / Codex
 grist-chatgpt
 ```
 
-This avoids depending on ProConnect as the identity source, but changes the institutional identity model. The human decision would need to establish whether that is acceptable for the DINUM/education deployment, what user population is intended, and what operational/data-governance obligations the selected provider creates.
+This avoids depending on ProConnect protocol characteristics for MCP authentication, but changes the source of bridge identity. The human decision would need to establish whether that is acceptable for the DINUM/education deployment, what user population is intended, and what operational/data-governance obligations the selected provider creates.
 
 No provider is selected here.
 
@@ -237,38 +222,59 @@ The bridge could in principle implement or host its own authorization-server fun
 
 The current MCP TypeScript SDK guidance favors a dedicated identity provider for new servers rather than its frozen legacy authorization-server helpers. Selecting an embedded/custom authorization server should therefore be an explicit human architecture decision, not an incidental extension of `src/server.ts`.
 
-## Compatibility probe retained for revalidation
+## Compatibility questions to resolve experimentally
 
-The repository now contains a bounded compatibility probe:
+Before selecting a provider-specific architecture, perform a small non-production compatibility probe covering:
 
-- `src/compat/proconnectMcp.ts`;
-- `tools/proconnect-mcp-probe.ts`;
-- `docs/PROCONNECT-MCP-COMPAT.md`;
-- `docs/PROCONNECT-MCP-COMPAT-RESULTS.md`.
+1. **ChatGPT callback / registration**
+   - create a draft custom MCP app;
+   - record the exact callback URI;
+   - verify the intended pre-registration/CIMD/DCR path.
 
-It can inspect discovery metadata and execute controlled authorization variants for:
+2. **Authorization-server metadata**
+   - issuer;
+   - authorization and token endpoints;
+   - `code_challenge_methods_supported` including `S256`;
+   - supported scopes;
+   - supported token-endpoint authentication methods;
+   - refresh/offline-access capability;
+   - RFC 9207 capability if advertised.
 
-1. baseline Authorization Code flow;
-2. PKCE S256;
-3. RFC 8707 `resource`;
-4. MCP-shaped PKCE + `resource`.
+3. **Authorization request**
+   - PKCE challenge accepted;
+   - MCP `resource` parameter accepted;
+   - requested bridge scopes accepted or an explicit mapping exists;
+   - exact ChatGPT redirect URI accepted.
 
-Raw access tokens, refresh tokens and ID tokens are not written to probe output or committed files.
+4. **Token response / validation**
+   - access token expiry;
+   - refresh token behavior and rotation;
+   - issuer validation;
+   - token is bound to the canonical MCP resource/audience;
+   - effective scopes can be recovered and enforced;
+   - another-resource token is rejected.
 
-The live procedure should be used if direct ProConnect is reconsidered after a provider change. No production registration or DataPass commitment should be made merely to run such a revalidation without explicit human approval.
+5. **Bridge behavior**
+   - verified token maps to a dynamic `Principal`;
+   - principal scopes reduce authority correctly;
+   - `GristContextFactory` receives that exact principal;
+   - MCP/OAuth token is never forwarded to Grist;
+   - static bearer development mode remains an explicitly separate compatibility path if retained.
+
+No production registration, DataPass submission or institutional commitment should be made merely to run this decision process without explicit human approval.
 
 ## Human decision questions
 
-A human must now answer these questions before `feat/oauth-mcp` becomes eligible:
+A human must answer at least these questions before `feat/oauth-mcp` becomes eligible:
 
-1. **Identity source:** should ProConnect remain the production identity source? The current product direction strongly favors yes, but this remains an explicit institutional choice.
-2. **OAuth architecture:** given that direct ProConnect is currently incompatible with mandatory RFC 8707, should the project adopt a dedicated MCP authorization server federated to ProConnect (architecture B), another identity/authorization provider (C), or a bridge-owned authorization server (D)?
-3. **Authorization-server product/operator:** if architecture B is selected, which product/service should implement the MCP-facing authorization server, and may it be managed externally, self-hosted, or either subject to evaluation?
-4. **Client population:** is production interoperability required only for ChatGPT/Codex with a pre-registered OAuth client, or also for generic MCP clients that benefit from CIMD/DCR?
-5. **Session UX:** what refresh/re-authentication policy is acceptable for the intended users?
-6. **Institutional ownership:** who is authorized to register the production ProConnect/OAuth applications and accept any DataPass or equivalent institutional obligations?
+1. **Identity source:** Must production users authenticate through ProConnect, or may another identity source be used?
+2. **OAuth architecture:** Should ProConnect be tested/used directly as the MCP authorization server, or should an MCP-specific authorization server sit in front of/federate to the chosen identity source?
+3. **Authorization-server operator:** If a separate server is used, may it be managed externally, must it be self-hosted, or is either acceptable subject to later evaluation?
+4. **Client population:** Is production interoperability required only for ChatGPT/Codex with a pre-registered OAuth client, or also for generic MCP clients that benefit from CIMD/DCR?
+5. **Session UX:** Is a provider requiring frequent reauthentication (for example because refresh credentials expire quickly) acceptable?
+6. **Institutional ownership:** Who is authorized to register the production OAuth/ProConnect application and accept any DataPass or equivalent institutional obligations?
 
-The human decision should select an **architecture and authorization-server category/provider** without altering the existing bridge scope vocabulary or Grist credential model unless a separate explicit decision authorizes that.
+The human decision should select an **architecture and provider category/provider**, not alter the existing bridge scope vocabulary or Grist credential model unless a separate explicit decision authorizes that.
 
 ## Decision record template
 
@@ -279,7 +285,7 @@ Decision date:
 Decision owner:
 Identity source:
 OAuth authorization server / provider:
-Architecture: federated dedicated AS / other
+Architecture: direct / federated dedicated AS / other
 Client registration mechanism: CIMD / pre-registration / DCR compatibility
 Expected ChatGPT callback model:
 Token validation: JWT+JWKS / introspection / other
@@ -315,11 +321,3 @@ Once this record is filled by an authorized human decision, update `docs/ROADMAP
 - Refresh-token behavior: https://partenaires.proconnect.gouv.fr/docs/fournisseur-service/refresh-token
 - Scope / claims documentation: https://partenaires.proconnect.gouv.fr/docs/fournisseur-service/scope-claims
 - ProConnect domain/environment values: https://partenaires.proconnect.gouv.fr/docs/ressources/valeur_ac_domain
-- Public federation implementation assessed on 2026-09-17: `proconnect-gouv/federation` commit `0ddb96fc538834409866dd6c8c7d1313cff44e6d`
-- Public OIDC provider configuration: `back/libs/oidc-provider/src/services/oidc-provider-config.service.ts`
-- Public discovery DTO: `quality/cypress/support/api/dto/get-discovery.dto.ts`
-
-### Repository compatibility evidence
-
-- `docs/PROCONNECT-MCP-COMPAT.md`
-- `docs/PROCONNECT-MCP-COMPAT-RESULTS.md`
