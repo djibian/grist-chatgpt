@@ -37,54 +37,94 @@ Current durable PASS evidence includes:
 - a real browser flow reaches ProConnect, completes required re-auth/MFA, and returns to the exact Logto callback;
 - ProConnect public discovery `issuer` and `jwks_uri` are configured in Logto ID-token verification;
 - Logto successfully verifies the ProConnect ID token via remote JWKS/issuer and completes a full Live preview sign-in;
-- Logto displays a successful-login page with a user identifier; the identifier value is intentionally not recorded.
+- a second completed flow with the same ProConnect identity returns the same Logto user ID and creates no duplicate Logto user.
 
 The durable evidence ledger is `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
 
-## Resolved federation blocker
+## Phase 2 identity result
 
-The first live ProConnect login failed after callback with:
-
-```text
-TypeError: Invalid URL
-at parseUserInfoFromIdToken (.../connector-oidc/lib/index.js)
-```
-
-Exact Logto `v1.43.0` source localized this to construction of the configured `jwksUri` URL. The ProConnect discovery values were then retrieved and the connector's ID-token verification configuration corrected with:
+The initial federation blocker was a missing/invalid `jwksUri` in the generic OIDC connector. It was corrected using exact ProConnect discovery metadata:
 
 ```text
 issuer   = https://fca.integ01.dev-agentconnect.fr/api/v2
 jwks_uri = https://fca.integ01.dev-agentconnect.fr/api/v2/jwks
 ```
 
-After that correction, the same Live preview login completed successfully. ProConnect reused the active upstream session, so the successful repeat did not require another credential/MFA prompt. No token or identifier value was recorded.
+After that correction, complete Logto -> ProConnect -> Logto sign-in succeeds. A second completed authorization flow with the same upstream identity returns the same Logto user identifier, and no additional Logto user account is created. Raw user/provider identifiers are intentionally not recorded.
 
-## Exact next live step: prove stable identity mapping
+Stable identity mapping across repeated completed login flows is therefore PASS.
 
-The first complete federation login is now PASS. The next step is to prove that the **same ProConnect user maps back to the same Logto user** on a second completed login.
+Explicit upstream logout/re-authentication lifecycle behavior remains secondary evidence and may be tested later, but it is no longer the blocking next step.
 
-Do not paste the displayed Logto user ID into chat or GitHub. Compare it locally only.
+## Exact next live step: Phase 3 MCP resource / RFC 8707 proof
 
-Recommended sequence:
-
-1. note the currently displayed Logto user ID privately, without copying it into chat/Git;
-2. end/restart the Logto Live preview sign-in session so a new Logto authorization flow is started;
-3. choose **ProConnect** again and complete the flow with the same ProConnect identity;
-4. it is acceptable if ProConnect reuses its own authenticated session and does not prompt again for credentials/MFA;
-5. after successful return, compare the new displayed Logto user ID with the first one locally;
-6. also check the Logto Admin Console user list if useful to confirm that the repeat did not create an additional user account.
-
-Only report sanitized evidence:
+The next blocking proof is Logto acting as the MCP-facing authorization server for the canonical resource:
 
 ```text
-Second ProConnect round trip: success/failure
-Same Logto user ID as first successful login: yes/no
-Additional Logto user account created unexpectedly: yes/no/unknown
-Extra identifier prompt: yes/no
-Sanitized error text, if any
+https://grist-chatgpt.loeildumaitre.fr/mcp
 ```
 
-If the same Logto user is reused, stable identity mapping can move to PASS. If a different Logto user is created, stop and diagnose identity linkage before proceeding to MCP resource/token tests.
+with exactly:
+
+```text
+doc:read
+doc:write
+doc.schema:write
+```
+
+Do **not** use Logto Live preview as evidence for this resource flow: the built-in demo app may request Logto-specific resources and does not prove issuance for the canonical MCP resource.
+
+### Required preparation in Logto
+
+1. Create one bounded **User** global role for the POC test identity, with exactly the already-approved MCP resource permissions:
+
+```text
+doc:read
+doc:write
+doc.schema:write
+```
+
+2. Assign that role only to the existing ProConnect-backed Logto test user. Logto global API-resource permissions are role-derived; requesting a scope does not by itself grant it.
+
+3. Create a dedicated non-production OAuth/OIDC test application/client suitable for Authorization Code + PKCE `S256`. Prefer a client with a loopback/local callback so authorization codes and tokens remain local and are never pasted into chat/Git.
+
+No new public scope is being introduced by this step; it only assigns the three scopes already fixed by the authoritative architecture for the test identity.
+
+### Required live proof
+
+Run a fresh Authorization Code + PKCE flow that explicitly includes:
+
+```text
+resource=https://grist-chatgpt.loeildumaitre.fr/mcp
+scope=openid offline_access doc:read doc:write doc.schema:write
+```
+
+The proof must establish, without recording raw token material:
+
+- Logto accepts the explicit RFC 8707 `resource` on the authorization request;
+- the token exchange completes for that resource;
+- the returned access token is a JWT for the canonical MCP resource rather than an opaque/default-resource token;
+- validated token diagnostics show the canonical MCP resource in the token audience/resource binding;
+- the three requested bridge scopes are present/recoverable as granted permissions;
+- signature/issuer/expiry claims can be validated against Logto's standard JWKS/discovery metadata;
+- refresh-token behavior can be observed later without exposing token values.
+
+Use only sanitized diagnostics such as:
+
+```text
+Authorization request with explicit resource: PASS/FAIL
+Token exchange: PASS/FAIL
+JWT access token: yes/no
+Issuer matches Logto: yes/no
+Audience/resource matches canonical MCP resource: yes/no
+Granted scopes include doc:read/doc:write/doc.schema:write: yes/no
+Signature verifies against Logto JWKS: yes/no
+Refresh token issued when requested: yes/no
+```
+
+Do not paste any authorization code, access token, refresh token, ID token, cookie or client secret.
+
+If Logto rejects `resource` or cannot issue a resource-bound token despite correct configuration, stop and diagnose before changing `Default API` or weakening the POC requirement.
 
 ## ProConnect connector configuration boundary
 
@@ -121,11 +161,11 @@ Do **not** manually restart/reload nftables while Docker is running merely to te
 
 C4-P0 remains ACTIVE. Important UNKNOWNs include:
 
-- stable identity mapping across two successful ProConnect/Logto logins;
-- logout/re-login behavior without unintended new identity;
+- explicit upstream logout/re-authentication lifecycle semantics;
 - RFC 8707 `resource` accepted on authorization request;
 - RFC 8707 `resource` accepted on token request;
 - live access token bound to the canonical MCP resource;
+- fixed bridge scopes present/recoverable in the live resource token;
 - standard JWT/JWKS validation of actual Logto-issued access tokens by the bridge;
 - actual OAuth `/mcp` request path constructing a fresh dynamic Principal/context;
 - wrong-resource rejection on the live MCP path;
