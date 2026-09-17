@@ -73,7 +73,15 @@ Further document-UI breadth is not the current critical path.
                    Plugin submission
 ```
 
-C1, C2 and C3 are integrated. The C4 protocol research and identity-provider decision package is also integrated in `docs/OAUTH-IDP-DECISION.md`. Core OAuth implementation is now blocked on the explicit human decision selecting the identity-provider approach; no provider-specific C4 implementation is eligible until that decision is made durable.
+C1, C2 and C3 are integrated. The C4 protocol/identity decision package is integrated in `docs/OAUTH-IDP-DECISION.md`, and the ProConnect compatibility tranche is recorded in `docs/PROCONNECT-MCP-COMPAT-RESULTS.md`.
+
+The compatibility result narrows the human gate:
+
+- ProConnect remains the preferred institutional identity source unless a later human decision changes that;
+- direct ProConnect as the MCP-facing authorization server is not viable with the current ProConnect configuration because RFC 8707 Resource Indicators are explicitly disabled;
+- core C4 implementation is therefore blocked on the human choice of the intermediary authorization-server architecture/provider, not on further proof of the current direct-ProConnect option.
+
+No provider-specific C4 implementation is eligible until that remaining decision is made durable.
 
 ## C1 — Credential abstraction
 
@@ -171,7 +179,7 @@ Make clients, resource discovery, deployment policy intersection and caches safe
 
 ## C4 — OAuth MCP identity
 
-**Status: BLOCKED by human identity-provider decision**  
+**Status: BLOCKED by human authorization-server decision**  
 **Priority: blocking**  
 **Suggested branch after decision:** `feat/oauth-mcp`
 
@@ -179,27 +187,52 @@ Make clients, resource discovery, deployment policy intersection and caches safe
 
 Replace the production MCP static bearer principal with OAuth-authenticated dynamic principals and explicit scopes.
 
-### Decision package
+### Decision package and compatibility evidence
 
-The protocol research, candidate architecture categories, compatibility probes and human decision questions are integrated in `docs/OAUTH-IDP-DECISION.md`.
+The protocol research and human decision questions are integrated in `docs/OAUTH-IDP-DECISION.md`.
 
-That document deliberately does not select an identity provider or authorization-server architecture. The decision record in that document must be completed by an authorized human decision and the resulting choice made durable before provider-specific core implementation starts.
+The direct-ProConnect compatibility tranche is integrated on the current research branch through:
 
-### Design/research work allowed now
+- `docs/PROCONNECT-MCP-COMPAT.md`;
+- `docs/PROCONNECT-MCP-COMPAT-RESULTS.md`;
+- the reusable `probe:proconnect` tooling.
 
-Research and documentation may continue to clarify:
+Current evidence establishes:
 
-- the current MCP/OAuth 2.1 protocol requirements;
-- protected-resource metadata and challenge behavior;
-- token validation requirements (issuer/audience/expiry/scopes);
-- concrete identity-provider options and tradeoffs for the DINUM deployment;
-- mapping from OAuth scopes to the existing `doc:read`, `doc:write`, `doc.schema:write` vocabulary without changing that public scope set.
+- ProConnect implements PKCE S256;
+- ProConnect's current OIDC-provider configuration explicitly disables `resourceIndicators`;
+- MCP 2026-07-28 requires RFC 8707 Resource Indicators;
+- architecture A (direct ProConnect as the MCP authorization server) is therefore not viable in the current configuration.
 
-Research may reduce uncertainty, but it must not silently become a provider selection or provider-specific production implementation.
+A live ProConnect integration client is no longer required merely to establish that current architectural result. The live probe is retained for revalidation if ProConnect changes its configuration or a deployed environment is shown to differ.
 
 ### Human gate
 
-Identity-provider selection is a human decision. Autonomous implementation must stop before choosing or committing to a provider or provider-specific production architecture.
+The remaining human decision is now narrower:
+
+- whether ProConnect remains the production identity source;
+- which MCP-facing authorization-server architecture/provider should sit between ChatGPT/Codex and `grist-chatgpt` if ProConnect remains the identity source;
+- whether that authorization server may be managed externally, must be self-hosted, or either subject to evaluation;
+- which client-registration and session/refresh model is acceptable;
+- who owns the resulting institutional registrations/obligations.
+
+Autonomous implementation must stop before choosing or committing to that provider/architecture.
+
+### Design/research work allowed now
+
+Research and documentation may continue to compare concrete intermediary authorization-server options against the fixed MCP requirements:
+
+- protected-resource metadata and challenge behavior;
+- PKCE S256;
+- RFC 8707 `resource` and audience binding;
+- issuer/audience/expiry/scope token validation;
+- bridge-scope representation for `doc:read`, `doc:write`, `doc.schema:write` without changing that public scope set;
+- refresh/session behavior;
+- pre-registration/CIMD/DCR compatibility;
+- self-hosted vs managed operational implications;
+- federation to ProConnect where architecture B is considered.
+
+Research may reduce uncertainty, but it must not silently select the provider or create institutional commitments.
 
 ### Core implementation after the human decision
 
@@ -324,7 +357,9 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The C4 decision package is integrated. The next critical-path transition is the human identity-provider decision documented in `docs/OAUTH-IDP-DECISION.md`. No core C4 OAuth implementation is eligible until that decision is made durable. Independent low-risk preparation may continue only where the roadmap already permits it and where it does not assume the outcome of the human gate.
+The ProConnect compatibility boundary is now established: direct ProConnect is not currently a conforming MCP authorization-server option because RFC 8707 Resource Indicators are disabled. The next critical-path transition is the human selection of the intermediary authorization-server architecture/provider documented in `docs/OAUTH-IDP-DECISION.md`. No core C4 OAuth implementation is eligible until that decision is made durable.
+
+Independent low-risk research may continue only where it does not assume the outcome of that human gate.
 
 ## Controller integration order
 
