@@ -76,35 +76,31 @@ Require users to provide missing sign-up identifier: OFF
 Automatically link accounts with the same identifier: OFF
 ```
 
-### First live federation attempt
+### Live federation attempts
 
-A real sign-in was executed through Logto Live preview.
-
-Observed sanitized path:
+The first real sign-in reached ProConnect, completed required re-authentication/MFA, returned to the exact Logto callback, and progressed through authorization-code exchange to ID-token processing. It then failed in Logto with:
 
 ```text
-Logto -> ProConnect integration environment                    PASS
-ProConnect authentication, including required re-auth/MFA      PASS
-ProConnect -> exact Logto callback                             PASS
-Authorization-code exchange progressed to ID-token processing PASS
-Logto account/sign-in completion                              FAIL
-```
-
-The browser returned to the Logto callback successfully. Sanitized Logto logs then showed:
-
-```text
-POST /api/experience/verification/social/<connector>/verify
 TypeError: Invalid URL
 at parseUserInfoFromIdToken (.../connector-oidc/lib/index.js)
 ```
 
-Inspection of the exact Logto `v1.43.0` connector source identifies the failing expression as:
+Inspection of Logto `v1.43.0` localized the failure to:
 
 ```text
 createRemoteJWKSet(new URL(config.idTokenVerificationConfig.jwksUri))
 ```
 
-Therefore the first failed login is currently attributed to an invalid or empty `idTokenVerificationConfig.jwksUri` in the Logto connector configuration. This is a **connector configuration defect**, not evidence of architectural incompatibility with ProConnect. The next corrective step is to obtain the exact `issuer` and `jwks_uri` from the ProConnect Internet/integration discovery document, configure Logto ID-token verification, and repeat the same login.
+The ProConnect Internet/integration discovery document was then read. Public verification metadata was configured in Logto using the exact discovery values:
+
+```text
+issuer   = https://fca.integ01.dev-agentconnect.fr/api/v2
+jwks_uri = https://fca.integ01.dev-agentconnect.fr/api/v2/jwks
+```
+
+A repeated Live preview sign-in then completed successfully and Logto displayed its successful-login page with a Logto user identifier. The raw identifier is intentionally not recorded. ProConnect reused the already-authenticated upstream session, so no second credential/MFA prompt was required for this successful repeat; this does not weaken the successful OIDC round-trip evidence.
+
+This demonstrates that Logto can verify the ProConnect ID token using the configured remote JWKS and issuer and can complete account creation/sign-in.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
@@ -115,11 +111,12 @@ Therefore the first failed login is currently attributed to an invalid or empty 
 | Automatic identifier-based account linking disabled | PASS | option remains disabled |
 | Logto -> ProConnect authorization redirect | PASS | real browser flow reached ProConnect integration |
 | ProConnect authentication and return to Logto callback | PASS | real authentication completed and exact callback was reached |
-| Authorization-code exchange reaches ID-token processing | PASS | Logto stack entered `parseUserInfoFromIdToken` after callback |
-| ID-token JWKS verification configuration valid | FAIL | Logto `v1.43.0` raised `TypeError: Invalid URL` while constructing URL from configured `jwksUri` |
-| Complete Authorization Code login Logto -> ProConnect -> Logto | FAIL | current connector configuration stops during ID-token verification; correction pending |
-| Same ProConnect user maps to stable Logto identity across repeated login | UNKNOWN | requires successful first login plus second login |
-| Logout/re-login does not create unintended bridge identity | UNKNOWN | requires successful live flow |
+| Authorization-code exchange reaches ID-token processing | PASS | Logto entered ID-token processing after callback |
+| ProConnect discovery issuer/JWKS configured for ID-token verification | PASS | exact public discovery `issuer` and `jwks_uri` configured in connector |
+| ProConnect ID-token verification through remote JWKS/issuer | PASS | repeated flow completed only after JWKS/issuer correction and reached successful Logto sign-in |
+| Complete Authorization Code login Logto -> ProConnect -> Logto | PASS | Logto Live preview reported successful sign-in and displayed a Logto user ID |
+| Same ProConnect user maps to stable Logto identity across repeated successful login | UNKNOWN | requires a second completed login and local comparison of the Logto user ID/account |
+| Logout/re-login does not create unintended bridge identity | UNKNOWN | requires explicit repeat after ending/restarting the Logto preview session |
 
 ## MCP-facing authorization-server behavior
 
@@ -160,9 +157,11 @@ The Logto Admin Console contains the canonical MCP API resource with exactly the
 
 Repository CI demonstrates bounded OAuth scope mapping, opaque principal derivation, issuer/audience/expiry policy checks after verification, malformed bearer rejection, verifier-before-context ordering, and Principal-only context construction. Cross-user Grist context/cache isolation is inherited from integrated C3 tests.
 
+The ProConnect JWKS PASS above proves **upstream ProConnect ID-token verification inside Logto**. It is separate from the still-UNKNOWN requirement that `grist-chatgpt` validate actual Logto-issued access tokens using standard JWT/JWKS verification.
+
 Still UNKNOWN live:
 
-- standard cryptographic JWT/JWKS validation on actual Logto keys;
+- standard cryptographic JWT/JWKS validation of actual Logto-issued access tokens by the bridge;
 - actual Express `/mcp` constructing a fresh OAuth principal/context;
 - wrong-resource and insufficient-scope rejection on the live MCP request path;
 - proof that the OAuth bearer never becomes an upstream Grist credential;
@@ -174,10 +173,10 @@ All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth lo
 
 ## Current conclusion
 
-The live C4-P0 deployment has demonstrated the Logto/PostgreSQL runtime, HTTPS, protected admin access, Docker egress, first-admin creation, public discovery/PKCE metadata, the canonical non-default MCP resource with fixed permissions, the ProConnect integration client registration, and a real Logto -> ProConnect -> Logto browser round trip through the callback.
+The live C4-P0 deployment now demonstrates a complete non-production **Logto -> ProConnect -> Logto Authorization Code federation login**. The initial failure was a connector configuration defect: missing/invalid ProConnect JWKS metadata. After configuring the exact ProConnect discovery `jwks_uri` and `issuer`, Logto completed ID-token verification and successful sign-in.
 
-The first complete ProConnect login is **not yet PASS**. The current failure is precisely localized to Logto `v1.43.0` ID-token verification configuration: the connector attempts to create a remote JWK set from an invalid/empty `jwksUri`. The next step is to configure the exact ProConnect discovery `jwks_uri` (and exact issuer) and repeat the login before judging interoperability.
+The immediate next identity proof is stable identity mapping: repeat the successful login with the same ProConnect user and verify locally that Logto reuses the same user/account rather than creating a second one, without recording the raw user/provider identifier.
 
-Mandatory UNKNOWNs after that still include stable identity across repeated login, RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
+Mandatory UNKNOWNs still include stable repeated identity, RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation of Logto access tokens, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
