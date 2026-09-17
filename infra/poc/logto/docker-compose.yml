@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: logto
+      POSTGRES_USER: logto
+      POSTGRES_PASSWORD: ${LOGTO_DB_PASSWORD:?set LOGTO_DB_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logto -d logto"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - logto-postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:55432:5432"
+
+  logto:
+    image: ghcr.io/logto-io/logto:1.43.0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: postgresql://logto:${LOGTO_DB_PASSWORD}@postgres:5432/logto
+      TRUST_PROXY_HEADER: "1"
+      ENDPOINT: ${LOGTO_ENDPOINT:?set LOGTO_ENDPOINT in .env}
+      ADMIN_ENDPOINT: ${LOGTO_ADMIN_ENDPOINT:?set LOGTO_ADMIN_ENDPOINT in .env}
+    ports:
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
+    volumes:
+      - logto-connectors:/etc/logto/packages/core/connectors
+
+volumes:
+  logto-postgres:
+  logto-connectors:
