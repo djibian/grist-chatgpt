@@ -39,7 +39,7 @@ Further document-UI breadth is not the current critical path.
              |
              v
  C4-P0 Logto/ProConnect MCP POC
-          ELIGIBLE
+          ACTIVE
              |
              v
  C4 OAuth MCP identity
@@ -65,7 +65,7 @@ Further document-UI breadth is not the current critical path.
  Plugin submission
 ```
 
-C1, C2 and C3 are integrated. The C4 human identity-provider gate is now resolved and recorded in `docs/OAUTH-IDP-DECISION.md`.
+C1, C2 and C3 are integrated. The C4 human identity-provider gate is resolved and recorded in `docs/OAUTH-IDP-DECISION.md`.
 
 Selected architecture:
 
@@ -75,7 +75,7 @@ Selected architecture:
 - Auth0 EU is the SaaS fallback and Curity Standard the commercial self-hosted fallback;
 - direct ProConnect as MCP-facing authorization server remains ruled out for the currently assessed configuration because RFC 8707 Resource Indicators are disabled.
 
-The next critical-path work is the bounded Logto/ProConnect/ChatGPT interoperability POC. Full C4 implementation is intentionally blocked until that POC proves the mandatory MCP properties.
+The repository-side C4-P0 harness is integrated. The current critical-path work is now the live non-production Logto/ProConnect/ChatGPT interoperability evidence required by `docs/LOGTO-PROCONNECT-MCP-POC.md`. Full C4 implementation remains blocked until those mandatory checks pass.
 
 ## C1 — Credential abstraction
 
@@ -111,9 +111,9 @@ Integrated result:
 
 ## C4-P0 — Logto / ProConnect / MCP interoperability POC
 
-**Status: ELIGIBLE**  
+**Status: ACTIVE**  
 **Priority: blocking / highest**  
-**Suggested branch:** `poc/logto-proconnect-mcp`
+**POC branch used for repository harness:** `poc/logto-proconnect-mcp`
 
 ### Goal
 
@@ -124,6 +124,27 @@ Authoritative POC contract:
 ```text
 docs/LOGTO-PROCONNECT-MCP-POC.md
 ```
+
+### Integrated repository harness
+
+The repository now contains:
+
+- provider-neutral OAuth identity -> dynamic `Principal` mapping;
+- OAuth scope reduction to the existing Grist capability vocabulary;
+- post-signature issuer, audience/resource and expiry policy checks;
+- a bearer -> verifier -> bounded principal/context boundary;
+- credential-free Logto discovery/PKCE metadata evaluation;
+- a pinned non-production Logto OSS + PostgreSQL Compose environment;
+- local secret exclusion and loopback-only service exposure;
+- a durable `PASS / FAIL / UNKNOWN` evidence ledger in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
+
+The integrated harness deliberately does not promote live-dependent checks to PASS.
+
+### Current live dependency
+
+The next POC step requires a non-production Logto HTTPS environment plus a ProConnect integration client configured outside Git. The live evidence must then cover Logto -> ProConnect login, RFC 8707 resource handling, audience binding, standard JWT/JWKS verification on the actual keys, `/mcp` OAuth behavior and draft ChatGPT connectivity/refresh.
+
+No production ProConnect/DataPass commitment is implied or authorized by this POC step.
 
 ### Required proof
 
@@ -270,7 +291,7 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The C4 human gate is resolved. `C4-P0` is the next blocking chantier. Full C4 OAuth integration must not start until the POC exit criteria are met.
+The C4 human gate is resolved and the repository-side C4-P0 harness is integrated. C4-P0 remains ACTIVE until the mandatory live POC evidence is PASS. Full C4 OAuth integration must not start before those exit criteria are met.
 
 ## Controller integration order
 
