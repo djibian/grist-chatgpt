@@ -142,7 +142,9 @@ Live Logto discovery and the repository metadata probe have demonstrated exact i
 
 The Logto Admin Console contains the canonical MCP API resource with exactly the three required permissions, and the operator visually confirmed `Default API = OFF`.
 
-A bounded global **User** role named `grist-chatgpt-poc` has now been created with exactly those three already-approved MCP permissions and assigned only to the existing ProConnect-backed POC user. This prepares the test identity for resource-token issuance without broadening the public scope vocabulary or granting the role by default.
+A bounded global **User** role named `grist-chatgpt-poc` has been created with exactly those three already-approved MCP permissions and assigned only to the existing ProConnect-backed POC user. This prepares the test identity for resource-token issuance without broadening the public scope vocabulary or granting the role by default.
+
+A dedicated non-production **third-party Native app** named `grist-chatgpt-poc-pkce` has now been created in Logto using the Authorization Code flow. Its loopback redirect URI `http://127.0.0.1:8765/callback` was accepted and saved. The client is intended solely for the public-client PKCE/RFC 8707 proof and does not introduce a client secret or new public scope.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
@@ -154,6 +156,7 @@ A bounded global **User** role named `grist-chatgpt-poc` has now been created wi
 | Required bridge permissions configured | PASS | exactly `doc:read`, `doc:write`, `doc.schema:write` present |
 | MCP API resource is not Default API | PASS | operator visually confirmed `Default API = OFF` |
 | Bounded POC user role configured | PASS | `grist-chatgpt-poc` User role contains exactly the three MCP permissions and is assigned only to the ProConnect-backed POC user |
+| Dedicated public/native PKCE test client configured | PASS | third-party Native app `grist-chatgpt-poc-pkce` uses Authorization Code and saved loopback redirect `http://127.0.0.1:8765/callback` |
 | RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request for the canonical MCP resource |
 | RFC 8707 `resource` accepted on token request | UNKNOWN | requires live OAuth exchange |
 | Access token bound to canonical MCP audience/resource | UNKNOWN | requires live token validation |
@@ -182,7 +185,7 @@ All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth lo
 
 The live C4-P0 deployment now demonstrates a complete non-production **Logto -> ProConnect -> Logto Authorization Code federation login with stable identity mapping across repeated completed flows**. The initial JWKS configuration defect is resolved, and a second completed flow reuses the same Logto user without creating a duplicate account.
 
-Phase 2 identity federation is therefore substantially proven. A bounded POC User role containing exactly the three fixed MCP permissions is also assigned to the existing ProConnect-backed test user. The next blocking proof on the critical path is Phase 3: create a dedicated non-production OAuth test client and exercise Logto as the MCP-facing authorization server with the canonical resource URI, explicit RFC 8707 `resource`, PKCE, the three fixed bridge scopes, and an access token demonstrably bound to that resource.
+Phase 2 identity federation is therefore substantially proven. A bounded POC User role containing exactly the three fixed MCP permissions is assigned to the existing ProConnect-backed test user, and a dedicated public/native Authorization Code test client with loopback callback is configured. The next blocking proof on the critical path is to run that client through a real PKCE `S256` flow with explicit RFC 8707 `resource`, then validate the resulting Logto access token against the canonical MCP resource and fixed bridge scopes.
 
 Mandatory UNKNOWNs still include RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation of Logto access tokens, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
 

@@ -37,7 +37,8 @@ Current durable PASS evidence includes:
 - ProConnect public discovery `issuer` and `jwks_uri` are configured in Logto ID-token verification;
 - Logto successfully verifies the ProConnect ID token via remote JWKS/issuer and completes a full Live preview sign-in;
 - a second completed flow with the same ProConnect identity returns the same Logto user ID and creates no duplicate Logto user;
-- a bounded global **User** role `grist-chatgpt-poc` exists with exactly `doc:read`, `doc:write`, `doc.schema:write` and is assigned only to the existing ProConnect-backed POC user.
+- a bounded global **User** role `grist-chatgpt-poc` exists with exactly `doc:read`, `doc:write`, `doc.schema:write` and is assigned only to the existing ProConnect-backed POC user;
+- dedicated third-party Native app `grist-chatgpt-poc-pkce` exists using Authorization Code with loopback redirect `http://127.0.0.1:8765/callback`.
 
 The durable evidence ledger is `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
 
@@ -56,7 +57,7 @@ Stable identity mapping across repeated completed login flows is therefore PASS.
 
 Explicit upstream logout/re-authentication lifecycle behavior remains secondary evidence and may be tested later, but it is no longer the blocking next step.
 
-## Phase 3 preparation already complete
+## Phase 3 preparation complete
 
 Canonical resource:
 
@@ -79,43 +80,41 @@ Completed preparation:
 3. `Default API = OFF` is confirmed.
 4. Global **User** role `grist-chatgpt-poc` created with exactly those three permissions.
 5. That role is assigned only to the existing ProConnect-backed POC user and is not a default role.
+6. Dedicated third-party **Native app** `grist-chatgpt-poc-pkce` created with Authorization Code flow.
+7. Loopback redirect URI `http://127.0.0.1:8765/callback` saved successfully.
 
-No new public scope has been introduced by the role step.
+The Native app is the dedicated public client for the live PKCE/RFC 8707 proof. Do not create a client secret for this test.
 
-## Exact next live step: create the dedicated OAuth/OIDC PKCE test client
+## Exact next live step: run the OAuth Authorization Code + PKCE resource flow
 
-Create one dedicated **non-production** Logto application/client for the Phase 3 proof. It must support Authorization Code + PKCE `S256` and use a loopback/local redirect URI so authorization codes and tokens stay local and are never pasted into chat/Git.
+Use the dedicated `grist-chatgpt-poc-pkce` client from the user's local PC, with a listener bound only to `127.0.0.1:8765`. Generate a fresh high-entropy PKCE verifier, derive the `S256` challenge, and a fresh `state` locally for each run. Do not paste the resulting authorization URL, code, verifier, tokens, cookies or raw identifiers into chat/Git if they contain transient/security material.
 
-Preferred characteristics:
-
-- application type suitable for a native/public client or other PKCE-only test client;
-- no client secret required for the local PKCE proof if Logto offers a public/native application type;
-- redirect URI on loopback, e.g. a local HTTP listener on `127.0.0.1` with a fixed test port/path;
-- no production hostname or bridge callback is required for this isolated resource-token proof.
-
-Do not use Logto Live preview as evidence for this resource flow: the built-in demo app may request Logto-specific resources and does not prove issuance for the canonical MCP resource.
-
-After the test client exists, run a fresh Authorization Code + PKCE flow that explicitly includes:
+The authorization request must explicitly include:
 
 ```text
 resource=https://grist-chatgpt.loeildumaitre.fr/mcp
 scope=openid offline_access doc:read doc:write doc.schema:write
+code_challenge_method=S256
 ```
+
+Then exchange the returned code locally at Logto's token endpoint using the same public client ID, exact loopback redirect URI, PKCE verifier, and the canonical `resource` value where supported/required by the token request.
 
 The proof must establish, without recording raw token material:
 
 - Logto accepts the explicit RFC 8707 `resource` on the authorization request;
+- the callback reaches the local listener with matching `state`;
 - the token exchange completes for that resource;
 - the returned access token is a JWT for the canonical MCP resource rather than an opaque/default-resource token;
 - validated token diagnostics show the canonical MCP resource in the token audience/resource binding;
 - the three requested bridge scopes are present/recoverable as granted permissions;
-- signature/issuer/expiry claims can be validated against Logto's standard JWKS/discovery metadata;
-- refresh-token issuance/behavior can be observed without exposing token values.
+- signature/issuer/expiry claims validate against Logto's standard JWKS/discovery metadata;
+- whether a refresh token is issued when `offline_access` is requested.
 
 Use only sanitized diagnostics such as:
 
 ```text
 Authorization request with explicit resource: PASS/FAIL
+Callback state matches: yes/no
 Token exchange: PASS/FAIL
 JWT access token: yes/no
 Issuer matches Logto: yes/no
@@ -125,7 +124,7 @@ Signature verifies against Logto JWKS: yes/no
 Refresh token issued when requested: yes/no
 ```
 
-Do not paste any authorization code, access token, refresh token, ID token, cookie, client secret, raw Logto user ID or raw provider subject.
+Do not paste any authorization code, access token, refresh token, ID token, cookie, client secret, PKCE verifier, raw Logto user ID or raw provider subject.
 
 If Logto rejects `resource` or cannot issue a resource-bound token despite correct configuration, stop and diagnose before changing `Default API` or weakening the POC requirement.
 
