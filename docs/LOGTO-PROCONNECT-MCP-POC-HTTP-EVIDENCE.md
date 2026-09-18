@@ -61,11 +61,47 @@ This proves the actual HTTP `/mcp` route accepts a freshly issued canonical Logt
 
 The fake Grist observed only the synthetic Grist credential sentinel. It did not observe the OAuth bearer.
 
-## Remaining HTTP negative proofs
+## Wrong resource / audience on HTTP path — PASS
 
-The actual HTTP path still requires two live negative resource/authorization checks using the already-integrated probe:
+A fresh, correctly signed Logto token was issued for the deliberately different POC resource rather than the canonical MCP resource. The same token first re-demonstrated the reusable bridge-seam negative evidence:
 
-1. `wrong-audience`: a validly signed Logto token for a deliberately different resource must be rejected by `/mcp` before any fake Grist request;
-2. `missing-write`: a canonical-resource token without `doc:write` must authenticate, but an MCP `tools/call` for `create_records` must be denied before any fake Grist mutation.
+```text
+Authorization request with wrong resource: PASS
+Callback state matches: yes
+Token exchange for wrong resource: PASS
+Wrong-resource token JWT/JWKS verification: PASS
+Token audience differs from canonical MCP resource: yes
+Bridge wrong-resource rejection: PASS
+Principal/context created after wrong-resource rejection: no
+```
 
-Only after those HTTP negative checks are PASS should the POC advance to the draft ChatGPT MCP app interoperability/refresh/revocation phase.
+The token was then presented unchanged to the actual HTTP `/mcp` route while the bridge remained configured for the canonical MCP resource. Sanitized diagnostics:
+
+```text
+MCP OAuth server starts without static bearer: PASS
+Wrong-resource bearer rejected on /mcp: PASS
+Wrong-resource request reaches fake Grist: no
+```
+
+Result: **PASS**.
+
+This proves the actual HTTP resource-server path rejects a cryptographically valid Logto token whose audience/resource does not match the canonical MCP resource. Rejection occurs before any request reaches the Grist boundary.
+
+No deployment/resource policy was weakened for the test: the canonical `MCP_RESOURCE_URI` remained unchanged, and the deliberately different token resource remained different.
+
+## Remaining HTTP negative proof
+
+Exactly one required HTTP authorization negative remains:
+
+- `missing-write`: a canonical-resource token without `doc:write` must authenticate successfully, but an MCP `tools/call` for `create_records` must be denied before any fake Grist mutation.
+
+Expected safe evidence includes:
+
+```text
+Reduced-scope bearer authenticates on /mcp: PASS
+Token missing doc:write: yes
+create_records rejected through MCP tools/call: PASS
+Fake Grist mutation requests observed: 0
+```
+
+Only after that HTTP negative check is PASS should the POC advance to the draft ChatGPT MCP app interoperability/refresh/revocation phase.
