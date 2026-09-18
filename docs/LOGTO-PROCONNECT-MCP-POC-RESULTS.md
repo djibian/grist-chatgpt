@@ -193,15 +193,38 @@ Refresh token issued when requested: yes
 
 Repository CI demonstrates bounded OAuth scope mapping, opaque principal derivation, issuer/audience/expiry policy checks after verification, malformed bearer rejection, verifier-before-context ordering, and Principal-only context construction. Cross-user Grist context/cache isolation is inherited from integrated C3 tests.
 
-The local JWKS PASS above proves standards-based cryptographic validation is possible on an actual Logto-issued resource token. It is separate from the still-UNKNOWN requirement that the deployed `grist-chatgpt` bridge perform that verification and construct the live dynamic principal/context itself.
+PR #40 integrated a provider-neutral remote-JWKS JWT verifier and a local bridge probe on `main` at `e3901c8d581804fa208cbfa50b0c22b7a6962596`. The verifier uses standards-based JWT/JWKS semantics with Node cryptography and no Logto SDK coupling. The probe accepts the real bearer only through a local environment variable, passes it through the existing OAuth request-context seam, and creates a real `GristContextFactory` context using a synthetic Grist credential sentinel; it makes no upstream Grist request and records no bearer or identity value.
 
-Still UNKNOWN live:
+A fresh real Logto-issued token for the canonical MCP resource was exercised through this integrated bridge probe. Sanitized diagnostics were:
 
-- standard cryptographic JWT/JWKS validation of actual Logto-issued access tokens by the bridge;
-- actual Express `/mcp` constructing a fresh OAuth principal/context;
-- wrong-resource and insufficient-scope rejection on the live MCP request path;
-- proof that the OAuth bearer never becomes an upstream Grist credential;
-- production OAuth mode preventing static-bearer override.
+```text
+Bridge JWT/JWKS verification: PASS
+Bridge issuer policy: PASS
+Bridge resource audience policy: PASS
+Bridge scope mapping: PASS
+Dynamic Principal created: PASS
+Principal-bound Grist context created: PASS
+Grist credential provider invoked with Principal context: yes
+Raw OAuth bearer reaches Grist credential provider: no
+```
+
+The same run also re-demonstrated the complete Phase 3 PKCE/resource/scopes/JWKS/refresh diagnostics without exposing transient token material.
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| Standard JWT/JWKS validation of actual Logto-issued access token by bridge verifier | PASS | integrated provider-neutral verifier accepted a freshly issued live token and verified it against Logto JWKS |
+| Bridge issuer policy on live token | PASS | integrated OAuth policy accepted the exact configured Logto issuer |
+| Bridge resource audience policy on live token | PASS | integrated OAuth policy accepted the canonical MCP resource audience |
+| Live OAuth scope mapping into bounded `Principal` capabilities | PASS | all three fixed scopes mapped through existing OAuth principal seam |
+| Dynamic OAuth `Principal` created from live token | PASS | probe created opaque `oauth:*` MCP principal without embedding bearer material |
+| Principal-bound C3 Grist context created | PASS | real `GristContextFactory` created a context for the dynamic principal |
+| OAuth bearer excluded from Grist credential-provider context | PASS | credential provider was invoked with Principal context and observed no raw bearer |
+| Actual Express `/mcp` constructs a fresh OAuth principal/context | UNKNOWN | production/deployed MCP route has not yet been rewired for OAuth |
+| Wrong-resource rejection on live OAuth request path | UNKNOWN | negative proof still required |
+| Insufficient-scope rejection on live OAuth request path | UNKNOWN | negative proof still required |
+| Production OAuth mode prevents static-bearer override | UNKNOWN | belongs to later `/mcp` OAuth wiring proof |
+
+The positive provider-neutral bridge boundary is therefore proven with an actual Logto-issued resource token. This proof is deliberately narrower than the eventual deployed `/mcp` behavior: it validates the exact reusable resource-server and C3 context seams without prematurely replacing the current static MCP route.
 
 ## ChatGPT draft-app evidence
 
@@ -209,10 +232,10 @@ All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth lo
 
 ## Current conclusion
 
-The live C4-P0 environment now demonstrates a complete non-production **Logto -> ProConnect -> Logto identity flow plus a real MCP-facing Authorization Code + PKCE `S256` resource-token flow**. The resulting Logto access token is a standards-verifiable JWT bound to the canonical MCP resource, carries exactly the three fixed bridge permissions after the third-party application permission boundary is configured, and can be accompanied by a refresh token when `offline_access` is requested with explicit consent.
+The live C4-P0 environment now demonstrates a complete non-production **Logto -> ProConnect -> Logto identity flow, a real MCP-facing Authorization Code + PKCE `S256` resource-token flow, and positive provider-neutral bridge validation of that real Logto token**. The resulting token is standards-verifiable, bound to the canonical MCP resource, carries the three fixed bridge permissions, maps to an opaque dynamic `Principal`, creates a principal-bound C3 Grist context, and is not forwarded into the Grist credential-provider boundary.
 
-Phase 3 authorization-server behavior is therefore substantially proven independently of ChatGPT. The next blocking proof on the critical path is Phase 4: make the provider-neutral bridge validate an actual Logto-issued access token through standard JWT/JWKS semantics, map it into the existing dynamic `Principal` / C3 context boundary, and then exercise the required negative resource/scope boundaries without ever using the OAuth bearer as a Grist credential.
+The next blocking proof on the critical path is negative authorization evidence: demonstrate rejection of a validly signed token with the wrong resource/audience, then demonstrate that a valid canonical-resource token with insufficient scope cannot obtain an operation requiring the missing capability. These tests must remain bounded to the POC seams until the evidence is complete.
 
-Mandatory UNKNOWNs still include bridge-side live JWT/JWKS validation and `/mcp` wiring, wrong-resource and insufficient-scope rejection on the live MCP path, the OAuth-vs-Grist credential boundary on that path, and ChatGPT interoperability/refresh/revocation.
+Mandatory UNKNOWNs still include the actual OAuth-enabled Express `/mcp` request path, wrong-resource and insufficient-scope rejection on that live request path, prevention of static-bearer override in production OAuth mode, and ChatGPT interoperability/refresh/revocation. The controlled reboot and explicit upstream logout/re-authentication lifecycle also remain operational/secondary UNKNOWNs.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
