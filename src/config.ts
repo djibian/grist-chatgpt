@@ -3,6 +3,18 @@ import {
   type GristCapability
 } from "./auth/principal.js";
 
+export type McpAuthConfig =
+  | {
+      mode: "static";
+      bearerToken: string;
+    }
+  | {
+      mode: "oauth";
+      issuer: string;
+      jwksUri: string;
+      resourceUri: string;
+    };
+
 export interface Config {
   gristBaseUrl: string;
   gristApiKey: string;
@@ -12,7 +24,7 @@ export interface Config {
   maxWriteRecords: number;
   writeBatchRecords: number;
   maxSchemaItems: number;
-  mcpBearerToken: string;
+  mcpAuth: McpAuthConfig;
   gptActionToken: string;
   mcpCapabilities: readonly GristCapability[];
   gptActionCapabilities: readonly GristCapability[];
@@ -42,6 +54,28 @@ function normalizeBaseUrl(value: string): string {
   }
   url.pathname = url.pathname.replace(/\/$/, "");
   return url.toString().replace(/\/$/, "");
+}
+
+function requiredHttpsUrl(name: string): string {
+  const value = required(name);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} must be a valid HTTPS URL.`);
+  }
+
+  if (
+    url.protocol !== "https:" ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error(
+      `${name} must use HTTPS without embedded credentials or a fragment.`
+    );
+  }
+  return value;
 }
 
 function parseCsv(value: string | undefined): string[] {
@@ -121,6 +155,33 @@ function requiredToken(name: string): string {
   return token;
 }
 
+function parseMcpAuth(): McpAuthConfig {
+  const mode = process.env.MCP_AUTH_MODE?.trim() || "static";
+
+  if (mode === "static") {
+    return {
+      mode,
+      bearerToken: requiredToken("MCP_BEARER_TOKEN")
+    };
+  }
+
+  if (mode === "oauth") {
+    if (process.env.MCP_BEARER_TOKEN?.trim()) {
+      throw new Error(
+        "MCP_BEARER_TOKEN must not be configured when MCP_AUTH_MODE=oauth."
+      );
+    }
+    return {
+      mode,
+      issuer: requiredHttpsUrl("OAUTH_ISSUER"),
+      jwksUri: requiredHttpsUrl("OAUTH_JWKS_URI"),
+      resourceUri: requiredHttpsUrl("MCP_RESOURCE_URI")
+    };
+  }
+
+  throw new Error('MCP_AUTH_MODE must be either "static" or "oauth".');
+}
+
 export function loadConfig(): Config {
   const port = Number(process.env.PORT ?? "3000");
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -144,9 +205,9 @@ export function loadConfig(): Config {
     );
   }
 
-  const mcpBearerToken = requiredToken("MCP_BEARER_TOKEN");
+  const mcpAuth = parseMcpAuth();
   const gptActionToken = requiredToken("GPT_ACTION_TOKEN");
-  if (gptActionToken === mcpBearerToken) {
+  if (mcpAuth.mode === "static" && gptActionToken === mcpAuth.bearerToken) {
     throw new Error("GPT_ACTION_TOKEN must differ from MCP_BEARER_TOKEN.");
   }
 
@@ -159,7 +220,7 @@ export function loadConfig(): Config {
     maxWriteRecords: parseLimit("GRIST_MAX_WRITE_RECORDS", 500),
     writeBatchRecords: parsePositiveInt("GRIST_WRITE_BATCH_RECORDS", 200),
     maxSchemaItems: parseLimit("GRIST_MAX_SCHEMA_ITEMS", 100),
-    mcpBearerToken,
+    mcpAuth,
     gptActionToken,
     mcpCapabilities: parseCapabilities(
       "MCP_CAPABILITIES",
