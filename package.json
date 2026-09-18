@@ -16,7 +16,8 @@
     "probe:proconnect": "tsx tools/proconnect-mcp-probe.ts",
     "probe:logto": "tsx tools/logto-mcp-probe.ts",
     "probe:oauth-bridge": "tsx tools/oauth-bridge-probe.ts",
-    "probe:oauth-negative": "tsx tools/oauth-negative-probe.ts"
+    "probe:oauth-negative": "tsx tools/oauth-negative-probe.ts",
+    "probe:mcp-http-oauth": "tsx tools/mcp-http-oauth-probe.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",
