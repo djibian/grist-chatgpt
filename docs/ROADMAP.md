@@ -75,7 +75,7 @@ Selected architecture:
 - Auth0 EU is the SaaS fallback and Curity Standard the commercial self-hosted fallback;
 - direct ProConnect as MCP-facing authorization server remains ruled out for the currently assessed configuration because RFC 8707 Resource Indicators are disabled.
 
-The repository-side C4-P0 harness is integrated. The current critical-path work is now the live non-production Logto/ProConnect/ChatGPT interoperability evidence required by `docs/LOGTO-PROCONNECT-MCP-POC.md`. Full C4 implementation remains blocked until those mandatory checks pass.
+C4-P0 has completed the live Logto/ProConnect identity, resource-token, JWT/JWKS, dynamic-Principal and OAuth-enabled `/mcp` positive/negative resource-server proofs. ChatGPT-facing RFC 9728 metadata, tool `securitySchemes`, runtime OAuth challenges, and a non-destructive public readiness probe are integrated. The remaining blocking evidence is now the real non-production ChatGPT MCP OAuth flow, including reconnect/refresh and revocation behavior. Full C4 implementation remains blocked until those mandatory checks pass.
 
 ## C1 — Credential abstraction
 
@@ -125,24 +125,48 @@ Authoritative POC contract:
 docs/LOGTO-PROCONNECT-MCP-POC.md
 ```
 
-### Integrated repository harness
+### Integrated repository harness and proven live seams
 
-The repository now contains:
+The repository and live POC evidence now cover:
 
 - provider-neutral OAuth identity -> dynamic `Principal` mapping;
 - OAuth scope reduction to the existing Grist capability vocabulary;
-- post-signature issuer, audience/resource and expiry policy checks;
-- a bearer -> verifier -> bounded principal/context boundary;
-- credential-free Logto discovery/PKCE metadata evaluation;
-- a pinned non-production Logto OSS + PostgreSQL Compose environment;
-- local secret exclusion and loopback-only service exposure;
-- a durable `PASS / FAIL / UNKNOWN` evidence ledger in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
+- standard JWT/JWKS verification plus issuer, audience/resource and expiry policy checks;
+- bearer -> verifier -> bounded principal/context construction;
+- principal-bound C3 `GristContextFactory` behavior without forwarding the OAuth bearer as a Grist credential;
+- wrong-resource rejection before Grist access;
+- insufficient-scope write rejection before mutation;
+- OAuth-enabled Express `/mcp` positive and negative request paths;
+- prevention of static-bearer override in OAuth mode;
+- Logto OSS + PostgreSQL non-production deployment;
+- ProConnect federation with stable identity mapping;
+- Authorization Code + PKCE `S256` with RFC 8707 canonical resource binding;
+- local refresh-token issuance with `offline_access` plus consent;
+- RFC 9728 protected-resource metadata and OAuth resource challenges;
+- root MCP tool `securitySchemes` with compatibility mirror;
+- runtime `_meta["mcp/www_authenticate"]` insufficient-scope challenges;
+- a safe public ChatGPT OAuth readiness probe.
 
-The integrated harness deliberately does not promote live-dependent checks to PASS.
+Durable evidence and the exact live handoff are in:
+
+```text
+docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md
+docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md
+docs/CHATGPT-OAUTH-READINESS.md
+docs/LOGTO-PROCONNECT-MCP-POC-NEXT.md
+```
 
 ### Current live dependency
 
-The next POC step requires a non-production Logto HTTPS environment plus a ProConnect integration client configured outside Git. The live evidence must then cover Logto -> ProConnect login, RFC 8707 resource handling, audience binding, standard JWT/JWKS verification on the actual keys, `/mcp` OAuth behavior and draft ChatGPT connectivity/refresh.
+The next mandatory POC work is an operator/live-client gate:
+
+1. deploy the current integrated `main` to the public non-production MCP endpoint;
+2. enable Logto 1.43 Dynamic app / CIMD with only the fixed `doc:read`, `doc:write`, `doc.schema:write` permissions;
+3. run `probe:chatgpt-oauth-readiness` against the public endpoint;
+4. connect the real ChatGPT developer/draft MCP client and record sanitized end-to-end OAuth evidence;
+5. demonstrate reconnect/refresh behavior and logout/revocation enforcement.
+
+The exact ChatGPT callback/client metadata observed during the live connection is authoritative; do not hard-code guessed client/callback values into bridge core.
 
 No production ProConnect/DataPass commitment is implied or authorized by this POC step.
 
@@ -291,7 +315,7 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The C4 human gate is resolved and the repository-side C4-P0 harness is integrated. C4-P0 remains ACTIVE until the mandatory live POC evidence is PASS. Full C4 OAuth integration must not start before those exit criteria are met.
+The C4 human gate is resolved and the repository-side C4-P0 harness is integrated. C4-P0 remains ACTIVE until the mandatory live ChatGPT POC evidence is PASS. Full C4 OAuth integration must not start before those exit criteria are met.
 
 ## Controller integration order
 
