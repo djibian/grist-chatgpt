@@ -29,7 +29,11 @@ import {
   createOAuthMcpRequestContext,
   OAuthRequestAuthenticationError
 } from "./auth/oauthRequestContext.js";
-import { createPrincipal, GRIST_CAPABILITIES } from "./auth/principal.js";
+import {
+  createPrincipal,
+  GRIST_CAPABILITIES,
+  type Principal
+} from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { DeploymentResourcePolicy } from "./grist/accessPolicy.js";
@@ -42,6 +46,7 @@ import {
 import { UiWriteVerificationError } from "./grist/uiActionsAdapter.js";
 import { registerCoreTools } from "./mcp/coreTools.js";
 import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
+import { installOAuthToolAuthChallenges } from "./mcp/oauthToolChallenge.js";
 import { installOAuthToolSecuritySchemes } from "./mcp/oauthToolSecurity.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
 import { registerUiTools } from "./mcp/uiTools.js";
@@ -118,10 +123,14 @@ function buildServer(grist: AuthorizedGristService): McpServer {
   return server;
 }
 
-function buildNodeMcpHandler(grist: AuthorizedGristService) {
+function buildNodeMcpHandler(
+  grist: AuthorizedGristService,
+  oauth?: { principal: Principal; resourceMetadataUrl: string }
+) {
   const handler = createMcpHandler(() => buildServer(grist));
   if (config.mcpAuth.mode === "oauth") {
     installOAuthToolSecuritySchemes(handler);
+    if (oauth) installOAuthToolAuthChallenges(handler, oauth);
   }
   return toNodeHandler(handler);
 }
@@ -361,7 +370,7 @@ app.all("/mcp", async (req, res) => {
       return;
     }
 
-    const { context } = await createOAuthMcpRequestContext({
+    const { context, principal } = await createOAuthMcpRequestContext({
       authorizationHeader: req.get("Authorization"),
       verifier: oauthMcpVerifier,
       policy: {
@@ -375,7 +384,10 @@ app.all("/mcp", async (req, res) => {
       contextFactory
     });
 
-    const oauthNodeHandler = buildNodeMcpHandler(context);
+    const oauthNodeHandler = buildNodeMcpHandler(context, {
+      principal,
+      resourceMetadataUrl: oauthProtectedResourceMetadataUrl(req)
+    });
     void oauthNodeHandler(req, res, req.body);
   } catch (error) {
     if (isOAuthVerifierAvailabilityFailure(error)) {
