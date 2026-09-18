@@ -13,10 +13,21 @@ import {
   registerUiActionApi
 } from "./actions/uiApi.js";
 import { AuditLogger } from "./audit/auditLogger.js";
+import { OAuthAccessTokenError } from "./auth/oauthAccessToken.js";
+import {
+  JwksAccessTokenVerifierError,
+  JwksOAuthAccessTokenVerifier
+} from "./auth/jwksAccessTokenVerifier.js";
+import { OAuthPrincipalError } from "./auth/oauthPrincipal.js";
+import {
+  createOAuthMcpRequestContext,
+  OAuthRequestAuthenticationError
+} from "./auth/oauthRequestContext.js";
 import { createPrincipal } from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { DeploymentResourcePolicy } from "./grist/accessPolicy.js";
+import type { AuthorizedGristService } from "./grist/authorizedService.js";
 import { GristContextFactory } from "./grist/contextFactory.js";
 import {
   GristClientFactory,
@@ -53,13 +64,17 @@ const contextFactory = new GristContextFactory(
   }
 );
 
-const mcpPrincipal = createPrincipal({
-  id: "mcp-client",
-  transport: "mcp",
-  documentIds: config.allowedDocumentIds,
-  workspaceIds: config.allowedWorkspaceIds,
-  capabilities: config.mcpCapabilities
-});
+const staticMcpPrincipal =
+  config.mcpAuth.mode === "static"
+    ? createPrincipal({
+        id: "mcp-client",
+        transport: "mcp",
+        documentIds: config.allowedDocumentIds,
+        workspaceIds: config.allowedWorkspaceIds,
+        capabilities: config.mcpCapabilities
+      })
+    : undefined;
+
 const gptPrincipal = createPrincipal({
   id: "chatgpt-actions",
   transport: "gpt-actions",
@@ -68,25 +83,56 @@ const gptPrincipal = createPrincipal({
   capabilities: config.gptActionCapabilities
 });
 
-// Static development principals still get startup contexts. The factory itself
-// is principal-aware and can later be called per authenticated OAuth principal.
-const mcpGrist = await contextFactory.create(mcpPrincipal);
+// Keep the historical static development MCP context only in explicit static
+// mode. OAuth mode creates a fresh Principal-bound context for every request.
+const staticMcpGrist = staticMcpPrincipal
+  ? await contextFactory.create(staticMcpPrincipal)
+  : undefined;
 const gptGrist = await contextFactory.create(gptPrincipal);
 
-function buildServer(): McpServer {
+const oauthMcpVerifier =
+  config.mcpAuth.mode === "oauth"
+    ? new JwksOAuthAccessTokenVerifier({ jwksUri: config.mcpAuth.jwksUri })
+    : undefined;
+
+function buildServer(grist: AuthorizedGristService): McpServer {
   const server = new McpServer({
     name: "grist-chatgpt",
     version: VERSION
   });
 
-  registerCoreTools(server, mcpGrist, {
+  registerCoreTools(server, grist, {
     maxReadRecords: config.maxReadRecords,
     maxWriteRecords: config.maxWriteRecords
   });
-  registerSchemaTools(server, mcpGrist, config.maxSchemaItems);
-  registerDiscoveryTools(server, mcpGrist);
-  registerUiTools(server, mcpGrist);
+  registerSchemaTools(server, grist, config.maxSchemaItems);
+  registerDiscoveryTools(server, grist);
+  registerUiTools(server, grist);
   return server;
+}
+
+function buildNodeMcpHandler(grist: AuthorizedGristService) {
+  return toNodeHandler(createMcpHandler(() => buildServer(grist)));
+}
+
+const staticMcpNodeHandler = staticMcpGrist
+  ? buildNodeMcpHandler(staticMcpGrist)
+  : undefined;
+
+function isOAuthAuthenticationFailure(error: unknown): boolean {
+  return (
+    error instanceof OAuthRequestAuthenticationError ||
+    error instanceof JwksAccessTokenVerifierError ||
+    error instanceof OAuthAccessTokenError ||
+    error instanceof OAuthPrincipalError
+  );
+}
+
+function isOAuthVerifierAvailabilityFailure(error: unknown): boolean {
+  return (
+    error instanceof JwksAccessTokenVerifierError &&
+    (error.code === "jwks_fetch_failed" || error.code === "invalid_jwks")
+  );
 }
 
 function publicBaseUrl(req: { get(name: string): string | undefined; protocol: string }): string {
@@ -180,8 +226,6 @@ function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> 
   return document;
 }
 
-const handler = createMcpHandler(() => buildServer());
-const nodeHandler = toNodeHandler(handler);
 const app = createMcpExpressApp({
   host: config.host,
   allowedHosts: [...config.mcpAllowedHosts]
@@ -258,21 +302,75 @@ app.get("/api/v1/documents/:documentId/pages/:pageId/widgets", async (req, res) 
   }
 });
 
-app.all("/mcp", (req, res) => {
-  if (
-    !isAuthorizedBearerHeader(req.get("Authorization"), config.mcpBearerToken)
-  ) {
-    res.setHeader("WWW-Authenticate", "Bearer");
-    res.status(401).json({ error: "Unauthorized" });
+app.all("/mcp", async (req, res) => {
+  if (config.mcpAuth.mode === "static") {
+    if (
+      !isAuthorizedBearerHeader(
+        req.get("Authorization"),
+        config.mcpAuth.bearerToken
+      )
+    ) {
+      res.setHeader("WWW-Authenticate", "Bearer");
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (!staticMcpNodeHandler) {
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
+
+    void staticMcpNodeHandler(req, res, req.body);
     return;
   }
 
-  void nodeHandler(req, res, req.body);
+  try {
+    if (!oauthMcpVerifier) {
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
+
+    const { context } = await createOAuthMcpRequestContext({
+      authorizationHeader: req.get("Authorization"),
+      verifier: oauthMcpVerifier,
+      policy: {
+        issuer: config.mcpAuth.issuer,
+        audience: config.mcpAuth.resourceUri
+      },
+      grant: {
+        documentIds: config.allowedDocumentIds,
+        workspaceIds: config.allowedWorkspaceIds
+      },
+      contextFactory
+    });
+
+    const oauthNodeHandler = buildNodeMcpHandler(context);
+    void oauthNodeHandler(req, res, req.body);
+  } catch (error) {
+    if (isOAuthVerifierAvailabilityFailure(error)) {
+      res.status(503).json({ error: "Authorization service unavailable" });
+      return;
+    }
+
+    if (isOAuthAuthenticationFailure(error)) {
+      const missingBearer =
+        error instanceof OAuthRequestAuthenticationError &&
+        error.code === "missing_bearer";
+      res.setHeader(
+        "WWW-Authenticate",
+        missingBearer ? "Bearer" : 'Bearer error="invalid_token"'
+      );
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 const httpServer = app.listen(config.port, config.host, () => {
   console.log(
-    `grist-chatgpt listening on http://${config.host}:${config.port} (MCP /mcp, GPT Actions /api/v1)`
+    `grist-chatgpt listening on http://${config.host}:${config.port} (MCP /mcp, GPT Actions /api/v1; MCP auth ${config.mcpAuth.mode})`
   );
 });
 
