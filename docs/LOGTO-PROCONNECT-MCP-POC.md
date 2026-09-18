@@ -1,6 +1,6 @@
 # Logto / ProConnect / MCP POC
 
-**Status:** POC definition.  
+**Status:** active non-production POC.  
 **Depends on:** human C4 architecture decision recorded in `docs/OAUTH-IDP-DECISION.md`.  
 **Purpose:** prove the selected OAuth architecture before full production-oriented C4 implementation.
 
@@ -48,7 +48,7 @@ This POC is non-production. It must not create a production DataPass, production
 https://grist-chatgpt.loeildumaitre.fr/mcp
 ```
 
-The implementation must make this configurable so the production resource URI can change without code changes.
+The implementation must keep this configurable so a future institutional resource URI can change without code changes.
 
 ## Phase 1 — reproducible Logto OSS environment
 
@@ -63,8 +63,6 @@ Required evidence:
 - health/restart procedure;
 - admin console access protected by infrastructure/network controls rather than exposed broadly to the Internet.
 
-A local/demo Docker Compose may be used for early verification, but the POC result must clearly distinguish demo setup from production guidance.
-
 ## Phase 2 — ProConnect federation
 
 Configure Logto's generic OIDC connector against the ProConnect integration environment.
@@ -74,7 +72,6 @@ Verify:
 - issuer/discovery resolution;
 - Authorization Code flow;
 - exact registered callback URI;
-- PKCE behavior where applicable on the Logto -> ProConnect leg;
 - successful login through ProConnect;
 - stable mapping of the same ProConnect user to the same Logto subject across repeated logins;
 - logout/re-login does not create an unintended new bridge identity.
@@ -114,11 +111,11 @@ Verify from live metadata/flows:
 
 Implement only the smallest bridge-side slice needed for the POC.
 
-The bridge configuration should be conceptually provider-neutral, for example:
+Provider-neutral configuration:
 
 ```text
 OAUTH_ISSUER
-OAUTH_JWKS_URI or discovery-derived JWKS
+OAUTH_JWKS_URI
 MCP_RESOURCE_URI
 ```
 
@@ -134,23 +131,26 @@ Validation must reject at least:
 
 A valid token must produce a dynamic `Principal` whose scopes feed the existing `AuthorizationService` and whose identity enters the existing C3 `GristContextFactory` boundary.
 
-## Phase 5 — ChatGPT draft app
+## Phase 5 — real ChatGPT MCP client
 
-Using a non-production/draft ChatGPT MCP app, verify the actual client behavior rather than relying only on documentation.
+Using a non-production/draft ChatGPT MCP app, verify actual client behavior rather than relying only on documentation.
+
+The selected live client-identification path is **CIMD** because current ChatGPT supports CIMD and Logto 1.43.0 advertises `client_id_metadata_document_supported=true` when Dynamic app is enabled. DCR or a pre-registered client remain fallbacks only if live interoperability proves CIMD unusable; they are not separate mandatory proofs when the selected CIMD path works.
 
 Required checks:
 
-- exact callback/redirect model;
-- pre-registered OAuth client works;
+- ChatGPT discovers RFC 9728 protected-resource metadata and the authorization server;
+- exact ChatGPT client metadata/callback model is observed from the live connection;
+- ChatGPT's CIMD client identity is accepted by Logto;
 - PKCE works end to end;
-- client sends/uses the MCP resource as expected;
+- RFC 8707 canonical resource propagates through authorization/token exchange;
 - initial login completes through Logto -> ProConnect;
 - subsequent MCP calls use the resulting bearer successfully;
-- refresh reconnects without avoidable user reauthentication;
-- logout/revocation behavior is understood;
-- ChatGPT never sees ProConnect credentials or Grist API keys.
-
-CIMD support should be checked as an interoperability bonus for generic MCP clients, but failure of CIMD alone does not block the initial ChatGPT path if pre-registration is fully conformant and usable.
+- resulting bearer creates the expected dynamic bridge `Principal`/C3 context;
+- refresh/reconnect works without avoidable user reauthentication;
+- logout/revocation behavior is understood and stops access as required;
+- ChatGPT never receives ProConnect credentials or Grist API keys;
+- the OAuth bearer never becomes the upstream Grist credential.
 
 ## Negative tests
 
@@ -163,11 +163,11 @@ At minimum prove:
 3. expired/invalid token -> standards-compatible authentication failure;
 4. user A OAuth principal cannot reuse user B Grist context/cache;
 5. OAuth token is never used as an upstream Grist credential;
-6. static bearer development mode cannot silently override an OAuth principal in production mode.
+6. static bearer development mode cannot silently override an OAuth principal in OAuth mode.
 
 ## Evidence format
 
-Create a durable result document during the POC, for example:
+Durable evidence belongs in:
 
 ```text
 docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md
@@ -181,7 +181,9 @@ Record PASS / FAIL / UNKNOWN with sanitized evidence. Never record:
 - access tokens;
 - refresh tokens;
 - ID tokens;
-- Grist API keys.
+- Grist API keys;
+- PKCE verifiers;
+- raw user/provider identifiers.
 
 For token claims, record only validated non-secret diagnostics needed to prove issuer/audience/scope/expiry behavior.
 
@@ -193,12 +195,14 @@ The POC passes only if all mandatory properties below are demonstrated:
 - Logto satisfies the MCP-facing PKCE and RFC 8707 resource flow;
 - access tokens are verifiably bound to the MCP resource;
 - bridge scopes are enforceable;
-- wrong-resource tokens are rejected;
-- refresh/durable ChatGPT connectivity is acceptable;
+- wrong-resource and insufficient-scope tokens are rejected correctly;
 - provider-neutral resource-server validation works;
 - OAuth identity maps safely into C3 principal isolation;
+- the selected ChatGPT CIMD/client flow completes end to end;
+- refresh/durable ChatGPT connectivity is acceptable;
+- logout/revocation semantics are demonstrated;
 - no credential/token boundary is crossed incorrectly.
 
-If a mandatory MCP property fails because of Logto, stop before broad C4 implementation and reopen the authorization-server product choice using the documented fallbacks (Auth0 EU / Curity Standard).
+If a mandatory MCP property fails because of Logto, stop before broad C4 implementation and reopen only the authorization-server product choice using the documented fallbacks (Auth0 EU / Curity Standard). Do not weaken MCP conformance to force a PASS.
 
 If the POC passes, the next tranche is the production-quality C4 OAuth integration plus its tests/documentation.
