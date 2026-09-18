@@ -144,7 +144,30 @@ The Logto Admin Console contains the canonical MCP API resource with exactly the
 
 A bounded global **User** role named `grist-chatgpt-poc` has been created with exactly those three already-approved MCP permissions and assigned only to the existing ProConnect-backed POC user. This prepares the test identity for resource-token issuance without broadening the public scope vocabulary or granting the role by default.
 
-A dedicated non-production **third-party Native app** named `grist-chatgpt-poc-pkce` has now been created in Logto using the Authorization Code flow. Its loopback redirect URI `http://127.0.0.1:8765/callback` was accepted and saved. The client is intended solely for the public-client PKCE/RFC 8707 proof and does not introduce a client secret or new public scope.
+A dedicated non-production **third-party Native app** named `grist-chatgpt-poc-pkce` uses Authorization Code with loopback redirect `http://127.0.0.1:8765/callback`. Its application permissions are now explicitly limited to the same three MCP API permissions.
+
+### Live Authorization Code + PKCE resource proof
+
+A local public-client test generated a fresh PKCE verifier/challenge and `state`, listened only on `127.0.0.1:8765`, sent the canonical RFC 8707 `resource` explicitly, exchanged the returned code locally, and inspected the resulting access token without recording any raw token/code/verifier or identity value.
+
+The first resource-bound run established successful authorization, callback-state matching, token exchange, JWT issuance, issuer match, canonical audience/resource binding, JWKS signature verification and valid expiry. The three `doc:*` permissions were initially absent from the token because the third-party application itself had not yet been granted those API permissions; after granting exactly the three fixed permissions to `grist-chatgpt-poc-pkce`, the repeated flow returned all three requested permissions.
+
+`offline_access` alone did not yield a refresh token in the observed third-party flow. Repeating the same request with explicit consent (`prompt=consent`) produced a refresh token. No token value was displayed or recorded.
+
+Final sanitized diagnostics were:
+
+```text
+Authorization request with explicit resource: PASS
+Callback state matches: yes
+Token exchange: PASS
+JWT access token: yes
+Issuer matches Logto: yes
+Audience/resource matches canonical MCP resource: yes
+Granted scopes include doc:read/doc:write/doc.schema:write: yes
+Signature verifies against Logto JWKS: yes
+Expiry valid: yes
+Refresh token issued when requested: yes
+```
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
@@ -157,17 +180,20 @@ A dedicated non-production **third-party Native app** named `grist-chatgpt-poc-p
 | MCP API resource is not Default API | PASS | operator visually confirmed `Default API = OFF` |
 | Bounded POC user role configured | PASS | `grist-chatgpt-poc` User role contains exactly the three MCP permissions and is assigned only to the ProConnect-backed POC user |
 | Dedicated public/native PKCE test client configured | PASS | third-party Native app `grist-chatgpt-poc-pkce` uses Authorization Code and saved loopback redirect `http://127.0.0.1:8765/callback` |
-| RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request for the canonical MCP resource |
-| RFC 8707 `resource` accepted on token request | UNKNOWN | requires live OAuth exchange |
-| Access token bound to canonical MCP audience/resource | UNKNOWN | requires live token validation |
-| Bridge scopes represented in a live access token | UNKNOWN | requires live token issuance |
-| Refresh/offline behavior suitable for ChatGPT | UNKNOWN | requires live ChatGPT flow |
+| Third-party app permission boundary configured | PASS | app is allowed exactly the same three MCP API permissions |
+| RFC 8707 `resource` accepted on authorization request | PASS | live public-client flow completed with explicit canonical resource |
+| RFC 8707 `resource` accepted on token request | PASS | live code exchange completed with explicit canonical resource |
+| Access token bound to canonical MCP audience/resource | PASS | validated JWT diagnostics matched the canonical MCP resource |
+| Bridge scopes represented in a live access token | PASS | repeated live token contained/recovered all three fixed permissions |
+| Standard JWT/JWKS verification of actual Logto access token outside bridge | PASS | live access-token signature verified against Logto JWKS; issuer and expiry also matched |
+| Refresh token can be issued for local public-client flow | PASS | `offline_access` plus explicit consent yielded a refresh token without exposing it |
+| Refresh/offline behavior suitable for ChatGPT | UNKNOWN | requires live ChatGPT flow and reconnect/refresh observation |
 
 ## Provider-neutral bridge seam
 
 Repository CI demonstrates bounded OAuth scope mapping, opaque principal derivation, issuer/audience/expiry policy checks after verification, malformed bearer rejection, verifier-before-context ordering, and Principal-only context construction. Cross-user Grist context/cache isolation is inherited from integrated C3 tests.
 
-The ProConnect JWKS PASS above proves **upstream ProConnect ID-token verification inside Logto**. It is separate from the still-UNKNOWN requirement that `grist-chatgpt` validate actual Logto-issued access tokens using standard JWT/JWKS verification.
+The local JWKS PASS above proves standards-based cryptographic validation is possible on an actual Logto-issued resource token. It is separate from the still-UNKNOWN requirement that the deployed `grist-chatgpt` bridge perform that verification and construct the live dynamic principal/context itself.
 
 Still UNKNOWN live:
 
@@ -179,14 +205,14 @@ Still UNKNOWN live:
 
 ## ChatGPT draft-app evidence
 
-All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth login, end-to-end PKCE/resource behavior, bearer use, refresh and revocation behavior.
+All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth login, end-to-end PKCE/resource behavior, bearer use, refresh/reconnect and revocation behavior.
 
 ## Current conclusion
 
-The live C4-P0 deployment now demonstrates a complete non-production **Logto -> ProConnect -> Logto Authorization Code federation login with stable identity mapping across repeated completed flows**. The initial JWKS configuration defect is resolved, and a second completed flow reuses the same Logto user without creating a duplicate account.
+The live C4-P0 environment now demonstrates a complete non-production **Logto -> ProConnect -> Logto identity flow plus a real MCP-facing Authorization Code + PKCE `S256` resource-token flow**. The resulting Logto access token is a standards-verifiable JWT bound to the canonical MCP resource, carries exactly the three fixed bridge permissions after the third-party application permission boundary is configured, and can be accompanied by a refresh token when `offline_access` is requested with explicit consent.
 
-Phase 2 identity federation is therefore substantially proven. A bounded POC User role containing exactly the three fixed MCP permissions is assigned to the existing ProConnect-backed test user, and a dedicated public/native Authorization Code test client with loopback callback is configured. The next blocking proof on the critical path is to run that client through a real PKCE `S256` flow with explicit RFC 8707 `resource`, then validate the resulting Logto access token against the canonical MCP resource and fixed bridge scopes.
+Phase 3 authorization-server behavior is therefore substantially proven independently of ChatGPT. The next blocking proof on the critical path is Phase 4: make the provider-neutral bridge validate an actual Logto-issued access token through standard JWT/JWKS semantics, map it into the existing dynamic `Principal` / C3 context boundary, and then exercise the required negative resource/scope boundaries without ever using the OAuth bearer as a Grist credential.
 
-Mandatory UNKNOWNs still include RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation of Logto access tokens, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
+Mandatory UNKNOWNs still include bridge-side live JWT/JWKS validation and `/mcp` wiring, wrong-resource and insufficient-scope rejection on the live MCP path, the OAuth-vs-Grist credential boundary on that path, and ChatGPT interoperability/refresh/revocation.
 
 Do not advance full C4 to production-oriented implementation until all mandatory exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
