@@ -51,7 +51,7 @@ docs/LOGTO-PROCONNECT-MCP-POC-NEGATIVE-EVIDENCE.md
 
 PR #44 integrated an explicit provider-neutral OAuth mode on the actual Express/MCP route. PR #45 integrated the sanitized HTTP probe.
 
-A fresh canonical Logto token produced:
+A fresh canonical Logto token proved:
 
 ```text
 MCP OAuth server starts without static bearer: PASS
@@ -64,63 +64,62 @@ OAuth bearer reaches fake Grist: no
 Synthetic Grist credential reaches fake Grist: yes
 ```
 
-The full sanitized evidence is recorded in:
+### Actual HTTP `/mcp` wrong-resource path — PASS
+
+A freshly issued, correctly signed Logto token for the deliberately different POC resource was presented to the bridge while `MCP_RESOURCE_URI` remained the canonical MCP resource.
+
+Sanitized diagnostics:
+
+```text
+MCP OAuth server starts without static bearer: PASS
+Wrong-resource bearer rejected on /mcp: PASS
+Wrong-resource request reaches fake Grist: no
+```
+
+The token was therefore rejected by the real HTTP resource-server path before any Grist request.
+
+Full sanitized HTTP evidence is recorded in:
 
 ```text
 docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md
 ```
 
-This proves the positive real request path, invalid-signature rejection, static-override prevention, request-bound Principal/C3 context construction, and OAuth/Grist credential separation.
+## Exact next step: final HTTP negative — missing `doc:write`
 
-## Exact next step: HTTP negative authorization proofs
+This is now the only required HTTP authorization negative remaining before the draft ChatGPT phase.
 
-Use the integrated command:
-
-```text
-npm run probe:mcp-http-oauth
-```
-
-with tokens kept only in local environment/process memory.
-
-Run the two remaining HTTP cases in this order.
-
-### 1. Wrong resource / audience
-
-Obtain a freshly issued, correctly signed Logto token for the existing deliberately different POC API resource. Then run the integrated HTTP probe with:
+Obtain a fresh canonical-resource token carrying:
 
 ```text
-MCP_HTTP_PROBE_CASE=wrong-audience
+doc:read
+doc.schema:write
 ```
 
-Expected sanitized result:
+and deliberately **not** `doc:write`.
 
-```text
-Wrong-resource bearer rejected on /mcp: PASS
-Fake Grist requests observed after wrong-resource rejection: 0
-```
-
-Do not weaken `MCP_RESOURCE_URI`, enable Default API, or alter the canonical resource to make the test pass.
-
-### 2. Missing `doc:write`
-
-Obtain a fresh canonical-resource token carrying `doc:read` and `doc.schema:write` but not `doc:write`. Then run:
+Keep the token only in local process/environment memory and run the integrated probe with:
 
 ```text
 MCP_HTTP_PROBE_CASE=missing-write
 ```
 
-Expected sanitized result:
+The probe must exercise the actual `/mcp` endpoint and invoke `create_records` through MCP `tools/call` against the loopback fake Grist boundary.
+
+Expected sanitized evidence:
 
 ```text
+MCP OAuth server starts without static bearer: PASS
 Reduced-scope bearer authenticates on /mcp: PASS
 Token missing doc:write: yes
 create_records rejected through MCP tools/call: PASS
 Fake Grist mutation requests observed: 0
 ```
 
-The exact output labels produced by the integrated probe are authoritative if they differ slightly from this summary. Record only sanitized PASS/FAIL/yes/no/counter evidence.
+The exact output labels produced by the integrated probe are authoritative if they differ slightly from this summary. The critical invariant is that the reduced-scope token authenticates to the canonical resource, but the write operation is denied and the fake Grist observes zero mutation requests.
 
-## After the two HTTP negative PASS results
+Do not add `doc:write`, broaden scopes, alter the canonical resource, or weaken authorization to make the test pass.
+
+## After the final HTTP negative PASS
 
 Update the durable results ledger and HTTP evidence document, then move C4-P0 to a non-production/draft ChatGPT MCP app and verify:
 
@@ -137,10 +136,9 @@ Update the durable results ledger and HTTP evidence document, then move C4-P0 to
 
 Mandatory/critical UNKNOWNs are now primarily:
 
-- wrong-resource rejection on the actual HTTP `/mcp` route;
 - insufficient-scope write rejection on the actual HTTP `/mcp` route;
 - draft ChatGPT callback/login/PKCE/resource/bearer/refresh/revocation behavior.
 
 Operational/secondary UNKNOWNs include controlled reboot confirmation for nftables + Docker + Logto persistence and explicit upstream ProConnect logout/re-authentication lifecycle semantics.
 
-The following are no longer UNKNOWN: Logto RFC 8707 behavior, canonical resource-token issuance, fixed-scope issuance, local refresh issuance, provider-neutral live JWT/JWKS verification, dynamic Principal/C3 context construction, wrong-resource and missing-write rejection at the reusable bridge seam, positive OAuth-enabled Express `/mcp` behavior, invalid-signature rejection on that route, static-bearer override prevention, and OAuth-bearer exclusion from the Grist credential path.
+The following are no longer UNKNOWN: Logto RFC 8707 behavior, canonical resource-token issuance, fixed-scope issuance, local refresh issuance, provider-neutral live JWT/JWKS verification, dynamic Principal/C3 context construction, wrong-resource and missing-write rejection at the reusable bridge seam, positive OAuth-enabled Express `/mcp` behavior, invalid-signature rejection on that route, static-bearer override prevention, OAuth-bearer exclusion from the Grist credential path, and wrong-resource rejection on the real HTTP `/mcp` path before any Grist request.
