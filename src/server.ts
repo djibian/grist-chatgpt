@@ -18,12 +18,18 @@ import {
   JwksAccessTokenVerifierError,
   JwksOAuthAccessTokenVerifier
 } from "./auth/jwksAccessTokenVerifier.js";
+import {
+  buildBearerChallenge,
+  buildOAuthProtectedResourceMetadata,
+  buildOAuthProtectedResourceMetadataUrl,
+  OAUTH_PROTECTED_RESOURCE_METADATA_PATH
+} from "./auth/oauthProtectedResource.js";
 import { OAuthPrincipalError } from "./auth/oauthPrincipal.js";
 import {
   createOAuthMcpRequestContext,
   OAuthRequestAuthenticationError
 } from "./auth/oauthRequestContext.js";
-import { createPrincipal } from "./auth/principal.js";
+import { createPrincipal, GRIST_CAPABILITIES } from "./auth/principal.js";
 import { isAuthorizedBearerHeader } from "./auth/staticBearer.js";
 import { loadConfig } from "./config.js";
 import { DeploymentResourcePolicy } from "./grist/accessPolicy.js";
@@ -141,6 +147,13 @@ function publicBaseUrl(req: { get(name: string): string | undefined; protocol: s
   return `${protocol}://${req.get("host")}`;
 }
 
+function oauthProtectedResourceMetadataUrl(req: {
+  get(name: string): string | undefined;
+  protocol: string;
+}): string {
+  return buildOAuthProtectedResourceMetadataUrl(publicBaseUrl(req));
+}
+
 function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> {
   const document = buildOpenApiDocument(baseUrl, {
     maxReadRecords: config.maxReadRecords,
@@ -238,6 +251,19 @@ app.get("/healthz", (_req, res) => {
     version: VERSION
   });
 });
+
+if (config.mcpAuth.mode === "oauth") {
+  const oauthAuth = config.mcpAuth;
+  app.get(OAUTH_PROTECTED_RESOURCE_METADATA_PATH, (_req, res) => {
+    res.json(
+      buildOAuthProtectedResourceMetadata({
+        resource: oauthAuth.resourceUri,
+        authorizationServer: oauthAuth.issuer,
+        scopes: GRIST_CAPABILITIES
+      })
+    );
+  });
+}
 
 // Register first so it shadows the compatibility OpenAPI route installed below.
 app.get("/openapi.json", (req, res) => {
@@ -356,9 +382,12 @@ app.all("/mcp", async (req, res) => {
       const missingBearer =
         error instanceof OAuthRequestAuthenticationError &&
         error.code === "missing_bearer";
+      const resourceMetadataUrl = oauthProtectedResourceMetadataUrl(req);
       res.setHeader(
         "WWW-Authenticate",
-        missingBearer ? "Bearer" : 'Bearer error="invalid_token"'
+        missingBearer
+          ? buildBearerChallenge(resourceMetadataUrl)
+          : buildBearerChallenge(resourceMetadataUrl, "invalid_token")
       );
       res.status(401).json({ error: "Unauthorized" });
       return;
