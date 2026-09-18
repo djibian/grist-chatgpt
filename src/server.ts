@@ -253,11 +253,12 @@ app.get("/healthz", (_req, res) => {
 });
 
 if (config.mcpAuth.mode === "oauth") {
+  const oauthAuth = config.mcpAuth;
   app.get(OAUTH_PROTECTED_RESOURCE_METADATA_PATH, (_req, res) => {
     res.json(
       buildOAuthProtectedResourceMetadata({
-        resource: config.mcpAuth.resourceUri,
-        authorizationServer: config.mcpAuth.issuer,
+        resource: oauthAuth.resourceUri,
+        authorizationServer: oauthAuth.issuer,
         scopes: GRIST_CAPABILITIES
       })
     );
