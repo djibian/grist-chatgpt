@@ -2,7 +2,7 @@
 
 This file is the durable restart point for C4-P0 Logto / ProConnect / MCP interoperability work.
 
-At every fresh execution, first resolve exact `main`, then read `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md`, `docs/LOGTO-PROCONNECT-MCP-POC.md`, the main results ledger, and this file. Reconstruct mutable GitHub facts before any durable transition.
+At every fresh execution, first resolve exact `main`, then read `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md`, `docs/LOGTO-PROCONNECT-MCP-POC.md`, the main results ledger, the HTTP evidence document, and this file. Reconstruct mutable GitHub facts before any durable transition.
 
 Never record ProConnect client secrets, OAuth tokens/codes/cookies, Logto/database/admin credentials, Grist API keys, raw Logto user IDs, raw provider subjects, or PKCE verifiers in GitHub, chat, logs, or evidence documents.
 
@@ -16,141 +16,113 @@ Admin auth   https://auth-poc-admin.loeildumaitre.fr
 MCP resource https://grist-chatgpt.loeildumaitre.fr/mcp
 ```
 
-The bridge deployment itself has not yet been converted to OAuth. Keep C4-P0 bounded; do not jump to full production C4.
+C4-P0 remains non-production and blocking. Full production-oriented C4 must not start until all mandatory POC checks are PASS.
 
 ## Durable PASS evidence
 
-### Environment and identity
+### Identity and authorization server
 
 - Logto/PostgreSQL works behind Caddy over public HTTPS.
-- Admin Console is infrastructure-restricted.
-- Docker outbound HTTPS/HIBP works after the nftables forwarding repair.
-- ProConnect integration application is configured with the exact Logto callback.
-- Logto generic OIDC federation through ProConnect succeeds.
-- Repeated successful login with the same ProConnect identity maps to the same Logto user without duplicate account creation.
+- ProConnect integration through Logto generic OIDC succeeds.
+- Repeated login with the same ProConnect identity maps to the same Logto user without duplicate account creation.
+- Authorization Code + PKCE `S256` works with the dedicated public/native test client.
+- RFC 8707 canonical `resource` is accepted on authorization and token exchange.
+- Logto issues a JWT access token bound to the canonical MCP resource.
+- `doc:read`, `doc:write`, and `doc.schema:write` are represented in the live token when requested and allowed.
+- Standard JWT/JWKS verification, exact issuer, and expiry checks pass.
+- `offline_access` plus explicit consent yields a refresh token in the local public-client flow.
 
-### MCP-facing authorization server
+### Provider-neutral bridge seam
 
-Canonical resource:
+A real Logto token has passed the integrated reusable bridge verifier/policy/principal/context path. The OAuth bearer never entered the Grist credential-provider boundary.
 
-```text
-https://grist-chatgpt.loeildumaitre.fr/mcp
-```
+Negative reusable-seam evidence is also PASS:
 
-Fixed scopes:
+- a validly signed wrong-resource token is rejected before Principal/context construction;
+- a canonical-resource token without `doc:write` maps to a reduced Principal and a write is rejected before any Grist mutation; the fake Grist observed exactly zero mutation requests.
 
-```text
-doc:read
-doc:write
-doc.schema:write
-```
-
-PASS evidence includes:
-
-- PKCE `S256` and Authorization Code flow;
-- explicit RFC 8707 `resource` accepted on authorization and token exchange;
-- JWT access token bound to the canonical MCP resource;
-- all three fixed scopes present when requested and allowed;
-- standard signature verification against Logto JWKS with matching issuer and valid expiry;
-- refresh token issuance for the local public-client flow with `offline_access` plus explicit consent.
-
-### Provider-neutral bridge positive path
-
-PR #40 integrated the standards-based remote-JWKS verifier and sanitized local bridge probe.
-
-A freshly issued real Logto token proved:
-
-```text
-Bridge JWT/JWKS verification: PASS
-Bridge issuer policy: PASS
-Bridge resource audience policy: PASS
-Bridge scope mapping: PASS
-Dynamic Principal created: PASS
-Principal-bound Grist context created: PASS
-Grist credential provider invoked with Principal context: yes
-Raw OAuth bearer reaches Grist credential provider: no
-```
-
-This is a real token through the reusable OAuth/C3 seams, not yet through the deployed Express `/mcp` route.
-
-### Provider-neutral bridge negative path
-
-PR #42 integrated the sanitized negative authorization probe. Live negative evidence is recorded in:
+Detailed negative evidence is recorded in:
 
 ```text
 docs/LOGTO-PROCONNECT-MCP-POC-NEGATIVE-EVIDENCE.md
 ```
 
-#### Wrong resource / audience — PASS
+### Actual HTTP `/mcp` positive path — PASS
 
-A validly signed Logto token for a deliberately different resource produced:
+PR #44 integrated an explicit provider-neutral OAuth mode on the actual Express/MCP route. PR #45 integrated the sanitized HTTP probe.
+
+A fresh canonical Logto token produced:
 
 ```text
-Wrong-resource token JWT/JWKS verification: PASS
-Token audience differs from canonical MCP resource: yes
-Bridge wrong-resource rejection: PASS
-Principal/context created after wrong-resource rejection: no
+MCP OAuth server starts without static bearer: PASS
+Missing bearer rejected on /mcp: PASS
+Static bearer can override OAuth principal in OAuth mode: no
+Invalid-signature bearer rejected on /mcp: PASS
+Valid Logto bearer reaches /mcp: PASS
+Dynamic Principal/context constructed on /mcp: PASS
+OAuth bearer reaches fake Grist: no
+Synthetic Grist credential reaches fake Grist: yes
 ```
 
-#### Missing `doc:write` — PASS
-
-A canonical-resource token requested only with `doc:read` and `doc.schema:write` produced:
+The full sanitized evidence is recorded in:
 
 ```text
-Insufficient-scope token JWT/JWKS verification: PASS
-Canonical MCP resource audience accepted: PASS
-Token/Principal missing doc:write: yes
-Reduced-scope dynamic Principal created: PASS
-doc:write operation rejected before mutation: PASS
-Authorization path performed local discovery reads: yes
+docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md
+```
+
+This proves the positive real request path, invalid-signature rejection, static-override prevention, request-bound Principal/C3 context construction, and OAuth/Grist credential separation.
+
+## Exact next step: HTTP negative authorization proofs
+
+Use the integrated command:
+
+```text
+npm run probe:mcp-http-oauth
+```
+
+with tokens kept only in local environment/process memory.
+
+Run the two remaining HTTP cases in this order.
+
+### 1. Wrong resource / audience
+
+Obtain a freshly issued, correctly signed Logto token for the existing deliberately different POC API resource. Then run the integrated HTTP probe with:
+
+```text
+MCP_HTTP_PROBE_CASE=wrong-audience
+```
+
+Expected sanitized result:
+
+```text
+Wrong-resource bearer rejected on /mcp: PASS
+Fake Grist requests observed after wrong-resource rejection: 0
+```
+
+Do not weaken `MCP_RESOURCE_URI`, enable Default API, or alter the canonical resource to make the test pass.
+
+### 2. Missing `doc:write`
+
+Obtain a fresh canonical-resource token carrying `doc:read` and `doc.schema:write` but not `doc:write`. Then run:
+
+```text
+MCP_HTTP_PROBE_CASE=missing-write
+```
+
+Expected sanitized result:
+
+```text
+Reduced-scope bearer authenticates on /mcp: PASS
+Token missing doc:write: yes
+create_records rejected through MCP tools/call: PASS
 Fake Grist mutation requests observed: 0
 ```
 
-The authorization layer therefore reduced authority correctly and denied the write before any mutation reached Grist.
+The exact output labels produced by the integrated probe are authoritative if they differ slightly from this summary. Record only sanitized PASS/FAIL/yes/no/counter evidence.
 
-## Exact next step: actual HTTP `/mcp` OAuth path
+## After the two HTTP negative PASS results
 
-The next blocking C4-P0 slice is no longer Logto configuration or local token validation. It is the real Express/MCP request path.
-
-Implement the smallest reversible POC server-edge OAuth mode. Requirements:
-
-1. Keep the bridge provider-neutral. Edge configuration should use the existing conceptual contract:
-
-```text
-OAUTH_ISSUER
-OAUTH_JWKS_URI
-MCP_RESOURCE_URI
-```
-
-2. Add an explicit authentication mode rather than silently mixing static development bearer and OAuth behavior.
-3. In OAuth mode, a request bearer must be verified cryptographically through the integrated JWKS verifier, then passed through the existing issuer/audience/expiry and scope mapping seams.
-4. Construct a fresh dynamic `Principal` and principal-bound C3 context for each authenticated MCP request.
-5. Do not forward the OAuth bearer to Grist or use it as a Grist credential.
-6. Do not add Logto SDK coupling, broaden public scopes, or choose C5 credential persistence.
-7. Preserve the static bearer only as an explicit development/backward-compatibility mode if still useful; OAuth mode must not permit it to override or replace the OAuth principal.
-
-### Required live HTTP evidence
-
-After the bounded implementation is integrated, exercise the actual `/mcp` route with sanitized diagnostics for:
-
-```text
-Valid Logto bearer reaches /mcp: PASS/FAIL
-JWT/JWKS authentication on /mcp: PASS/FAIL
-Dynamic Principal/context constructed on /mcp: PASS/FAIL
-Wrong-resource bearer rejected on /mcp: PASS/FAIL
-Expired/invalid bearer rejected on /mcp: PASS/FAIL
-Insufficient-scope operation rejected on /mcp: PASS/FAIL
-Static bearer can override OAuth principal in OAuth mode: yes/no
-OAuth bearer reaches Grist credential provider: yes/no
-```
-
-Expected safe values for the last two lines are `no`.
-
-Use a synthetic/fake Grist boundary where practical for negative evidence so authorization failures cannot mutate a real document.
-
-## After `/mcp` OAuth proof
-
-Only after the actual HTTP request path is PASS should the POC move to a non-production/draft ChatGPT MCP app and verify:
+Update the durable results ledger and HTTP evidence document, then move C4-P0 to a non-production/draft ChatGPT MCP app and verify:
 
 - exact ChatGPT callback/redirect model;
 - pre-registered client behavior;
@@ -159,19 +131,16 @@ Only after the actual HTTP request path is PASS should the POC move to a non-pro
 - bearer use on subsequent MCP calls;
 - refresh/reconnect without avoidable reauthentication;
 - logout/revocation behavior;
-- no ProConnect credential or Grist API key becomes model-visible.
+- no ProConnect credential, OAuth token, or Grist API key becomes model-visible.
 
-## Important remaining UNKNOWNs
+## Remaining important UNKNOWNs
 
-C4-P0 remains ACTIVE. Remaining important UNKNOWNs include:
+Mandatory/critical UNKNOWNs are now primarily:
 
-- actual OAuth-enabled Express `/mcp` positive path;
-- wrong-resource, expired/invalid, and insufficient-scope behavior on that HTTP route;
-- production/POC OAuth mode preventing static-bearer override;
-- ChatGPT callback/login/PKCE/resource/bearer/refresh/revocation behavior;
-- controlled reboot confirmation for nftables + Docker + Logto persistence;
-- explicit upstream ProConnect logout/re-authentication lifecycle semantics.
+- wrong-resource rejection on the actual HTTP `/mcp` route;
+- insufficient-scope write rejection on the actual HTTP `/mcp` route;
+- draft ChatGPT callback/login/PKCE/resource/bearer/refresh/revocation behavior.
 
-The following are no longer UNKNOWN: Logto RFC 8707 behavior, resource-bound token issuance, fixed-scope issuance, local refresh issuance, provider-neutral live JWT/JWKS verification, dynamic Principal/C3 context construction, OAuth-bearer exclusion from the Grist credential-provider context, wrong-resource rejection at the reusable bridge seam, and missing-`doc:write` rejection before Grist mutation.
+Operational/secondary UNKNOWNs include controlled reboot confirmation for nftables + Docker + Logto persistence and explicit upstream ProConnect logout/re-authentication lifecycle semantics.
 
-Full production-oriented C4 remains blocked until all mandatory POC exit criteria are PASS.
+The following are no longer UNKNOWN: Logto RFC 8707 behavior, canonical resource-token issuance, fixed-scope issuance, local refresh issuance, provider-neutral live JWT/JWKS verification, dynamic Principal/C3 context construction, wrong-resource and missing-write rejection at the reusable bridge seam, positive OAuth-enabled Express `/mcp` behavior, invalid-signature rejection on that route, static-bearer override prevention, and OAuth-bearer exclusion from the Grist credential path.
