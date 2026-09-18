@@ -6,6 +6,7 @@
   },
   "include": [
     "tools/oauth-bridge-probe.ts",
-    "tools/oauth-negative-probe.ts"
+    "tools/oauth-negative-probe.ts",
+    "tools/mcp-http-oauth-probe.ts"
   ]
 }
