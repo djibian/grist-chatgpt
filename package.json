@@ -11,11 +11,12 @@
     "dev": "node --env-file=.env --import tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=.env dist/server.js",
-    "check": "tsc -p tsconfig.json --noEmit",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.poc-tools.json",
     "test": "tsx --test test/*.test.ts",
     "probe:proconnect": "tsx tools/proconnect-mcp-probe.ts",
     "probe:logto": "tsx tools/logto-mcp-probe.ts",
-    "probe:oauth-bridge": "tsx tools/oauth-bridge-probe.ts"
+    "probe:oauth-bridge": "tsx tools/oauth-bridge-probe.ts",
+    "probe:oauth-negative": "tsx tools/oauth-negative-probe.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",
