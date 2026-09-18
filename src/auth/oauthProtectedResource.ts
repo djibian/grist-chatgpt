@@ -39,3 +39,17 @@ export function buildBearerChallenge(
   if (error) parameters.push(`error="${error}"`);
   return `Bearer ${parameters.join(", ")}`;
 }
+
+export function buildInsufficientScopeToolChallenge(
+  resourceMetadataUrl: string,
+  requiredScope: string
+): string {
+  const description = `Additional authorization is required for scope ${requiredScope}.`;
+  return [
+    "Bearer",
+    `resource_metadata="${quoteChallengeValue(resourceMetadataUrl)}",`,
+    'error="insufficient_scope",',
+    `error_description="${quoteChallengeValue(description)}",`,
+    `scope="${quoteChallengeValue(requiredScope)}"`
+  ].join(" ");
+}

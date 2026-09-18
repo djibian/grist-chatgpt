@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildBearerChallenge,
+  buildInsufficientScopeToolChallenge,
   buildOAuthProtectedResourceMetadata,
   buildOAuthProtectedResourceMetadataUrl,
   OAUTH_PROTECTED_RESOURCE_METADATA_PATH
@@ -49,6 +50,13 @@ test("advertises resource metadata in OAuth bearer challenges", () => {
   assert.equal(
     buildBearerChallenge(METADATA_URL, "invalid_token"),
     `Bearer resource_metadata="${METADATA_URL}", error="invalid_token"`
+  );
+});
+
+test("builds a tool-level insufficient-scope challenge with error description", () => {
+  assert.equal(
+    buildInsufficientScopeToolChallenge(METADATA_URL, "doc:write"),
+    `Bearer resource_metadata="${METADATA_URL}", error="insufficient_scope", error_description="Additional authorization is required for scope doc:write.", scope="doc:write"`
   );
 });
 
