@@ -142,6 +142,8 @@ Live Logto discovery and the repository metadata probe have demonstrated exact i
 
 The Logto Admin Console contains the canonical MCP API resource with exactly the three required permissions, and the operator visually confirmed `Default API = OFF`.
 
+A bounded global **User** role named `grist-chatgpt-poc` has now been created with exactly those three already-approved MCP permissions and assigned only to the existing ProConnect-backed POC user. This prepares the test identity for resource-token issuance without broadening the public scope vocabulary or granting the role by default.
+
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | Discovery issuer/endpoints/JWKS contract | PASS | public live discovery plus repository probe |
@@ -151,6 +153,7 @@ The Logto Admin Console contains the canonical MCP API resource with exactly the
 | MCP API resource configured in Logto | PASS | canonical identifier present |
 | Required bridge permissions configured | PASS | exactly `doc:read`, `doc:write`, `doc.schema:write` present |
 | MCP API resource is not Default API | PASS | operator visually confirmed `Default API = OFF` |
+| Bounded POC user role configured | PASS | `grist-chatgpt-poc` User role contains exactly the three MCP permissions and is assigned only to the ProConnect-backed POC user |
 | RFC 8707 `resource` accepted on authorization request | UNKNOWN | requires live OAuth request for the canonical MCP resource |
 | RFC 8707 `resource` accepted on token request | UNKNOWN | requires live OAuth exchange |
 | Access token bound to canonical MCP audience/resource | UNKNOWN | requires live token validation |
@@ -179,7 +182,7 @@ All ChatGPT-specific live checks remain UNKNOWN: callback registration, OAuth lo
 
 The live C4-P0 deployment now demonstrates a complete non-production **Logto -> ProConnect -> Logto Authorization Code federation login with stable identity mapping across repeated completed flows**. The initial JWKS configuration defect is resolved, and a second completed flow reuses the same Logto user without creating a duplicate account.
 
-Phase 2 identity federation is therefore substantially proven. Explicit upstream logout semantics remain useful secondary evidence, but the next blocking proof on the critical path is Phase 3: exercise Logto as the MCP-facing authorization server with the canonical resource URI, explicit RFC 8707 `resource`, PKCE, the three fixed bridge scopes, and an access token demonstrably bound to that resource.
+Phase 2 identity federation is therefore substantially proven. A bounded POC User role containing exactly the three fixed MCP permissions is also assigned to the existing ProConnect-backed test user. The next blocking proof on the critical path is Phase 3: create a dedicated non-production OAuth test client and exercise Logto as the MCP-facing authorization server with the canonical resource URI, explicit RFC 8707 `resource`, PKCE, the three fixed bridge scopes, and an access token demonstrably bound to that resource.
 
 Mandatory UNKNOWNs still include RFC 8707 live handling, audience/resource-bound tokens, bridge-side JWT/JWKS validation of Logto access tokens, actual OAuth `/mcp` wiring, live scope enforcement, and ChatGPT interoperability/refresh.
 
