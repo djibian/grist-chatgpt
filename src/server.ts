@@ -42,6 +42,7 @@ import {
 import { UiWriteVerificationError } from "./grist/uiActionsAdapter.js";
 import { registerCoreTools } from "./mcp/coreTools.js";
 import { registerDiscoveryTools } from "./mcp/discoveryTools.js";
+import { installOAuthToolSecuritySchemes } from "./mcp/oauthToolSecurity.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
 import { registerUiTools } from "./mcp/uiTools.js";
 import { operationHelp } from "./operations/registry.js";
@@ -118,7 +119,11 @@ function buildServer(grist: AuthorizedGristService): McpServer {
 }
 
 function buildNodeMcpHandler(grist: AuthorizedGristService) {
-  return toNodeHandler(createMcpHandler(() => buildServer(grist)));
+  const handler = createMcpHandler(() => buildServer(grist));
+  if (config.mcpAuth.mode === "oauth") {
+    installOAuthToolSecuritySchemes(handler);
+  }
+  return toNodeHandler(handler);
 }
 
 const staticMcpNodeHandler = staticMcpGrist
