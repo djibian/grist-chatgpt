@@ -18,7 +18,7 @@ Admin auth   https://auth-poc-admin.loeildumaitre.fr
 MCP resource https://grist-chatgpt.loeildumaitre.fr/mcp
 ```
 
-The bridge deployment itself has deliberately not been changed merely to host the Logto POC. Do not update the deployed `/mcp` route until the Phase 4 OAuth request-path proof actually requires it.
+The bridge deployment itself has deliberately not been changed merely to host the Logto POC. Do not update the deployed `/mcp` route until the bounded POC evidence requires that request-path proof.
 
 Current durable PASS evidence includes:
 
@@ -44,7 +44,12 @@ Current durable PASS evidence includes:
 - the resulting access token is a JWT bound to the canonical MCP resource;
 - all three fixed bridge permissions are present/recoverable in the live token;
 - the live token signature verifies against Logto JWKS, with matching issuer and valid expiry;
-- `offline_access` plus explicit consent yields a refresh token without exposing its value.
+- `offline_access` plus explicit consent yields a refresh token without exposing its value;
+- the integrated provider-neutral bridge verifier validates a freshly issued real Logto resource token against remote JWKS;
+- issuer, canonical resource audience and all three fixed scopes pass the existing bridge policy/mapping seams;
+- a dynamic opaque `oauth:*` MCP principal is created from the live token;
+- the real C3 `GristContextFactory` creates a principal-bound context;
+- the Grist credential provider receives only Principal context and does not receive the raw OAuth bearer.
 
 The durable evidence ledger is `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
 
@@ -90,7 +95,7 @@ Configured state:
 7. Loopback redirect URI `http://127.0.0.1:8765/callback` is saved.
 8. The third-party app permission boundary allows exactly the same three MCP API permissions.
 
-A local public-client flow then proved:
+A local public-client flow proved:
 
 ```text
 Authorization request with explicit resource: PASS
@@ -111,45 +116,47 @@ No authorization code, access token, refresh token, ID token, cookie, client sec
 
 Phase 3 MCP-facing authorization-server behavior is therefore substantially proven independently of ChatGPT.
 
-## Exact next step: Phase 4 provider-neutral bridge validation
+## Phase 4 positive bridge result
 
-The repository already contains the provider-neutral seams:
+The provider-neutral bridge verifier/probe was integrated on `main` by PR #40. The implementation:
 
-- `OAuthAccessTokenVerifier`;
-- post-verification issuer/audience/expiry enforcement;
-- OAuth scope -> bounded `Principal` mapping;
-- `createOAuthMcpRequestContext(...)`;
-- principal-aware C3 `GristContextFactory` isolation.
+- uses standard JWT/JWKS verification with Node cryptography and no proprietary Logto SDK;
+- accepts issuer/JWKS/resource as edge configuration;
+- never logs or returns the raw bearer;
+- passes only cryptographically verified claims into the existing OAuth policy/principal seams;
+- constructs a dynamic opaque MCP `Principal`;
+- creates a real principal-bound C3 `GristContextFactory` context;
+- uses a synthetic Grist credential sentinel for the POC and performs no upstream Grist request.
 
-The next bounded C4-P0 slice must prove those seams with an **actual Logto-issued resource token**, without turning this into full production C4.
-
-Implement the smallest standards-based JWT/JWKS verifier needed for the POC. Requirements:
-
-- use standard JWT/JWKS verification semantics, not a proprietary Logto SDK;
-- configure issuer/JWKS/resource at the edge;
-- never log or return the raw bearer;
-- pass only verified claims into the existing provider-neutral OAuth boundary;
-- construct a fresh dynamic `Principal` and C3 context from the verified identity;
-- do not change the per-user Grist credential architecture;
-- do not expose a new model-visible tool or broaden public scopes.
-
-Then exercise a freshly issued live token through that boundary and record only sanitized diagnostics proving:
+A freshly issued real Logto token for the canonical MCP resource was passed locally to the integrated probe. Sanitized evidence:
 
 ```text
-Bridge JWT/JWKS verification: PASS/FAIL
-Bridge issuer policy: PASS/FAIL
-Bridge resource audience policy: PASS/FAIL
-Bridge scope mapping: PASS/FAIL
-Dynamic Principal created: PASS/FAIL
-Principal-bound Grist context created: PASS/FAIL
-Raw OAuth bearer reaches Grist credential provider: yes/no
+Bridge JWT/JWKS verification: PASS
+Bridge issuer policy: PASS
+Bridge resource audience policy: PASS
+Bridge scope mapping: PASS
+Dynamic Principal created: PASS
+Principal-bound Grist context created: PASS
+Grist credential provider invoked with Principal context: yes
+Raw OAuth bearer reaches Grist credential provider: no
 ```
 
-Expected safe result for the last line is `no`.
+The same run also repeated the full Phase 3 positive diagnostics. No bearer, authorization code, refresh token, PKCE verifier, raw subject or Grist credential was exposed.
 
-After the positive bridge path is proven, add/execute the required negative evidence for wrong-resource and insufficient-scope tokens before proceeding to the ChatGPT draft-app phase.
+This establishes the positive provider-neutral resource-server/C3 boundary with an actual Logto-issued token. It does **not** yet establish the deployed Express `/mcp` OAuth request path, because that route remains deliberately on the current static development bearer until the bounded POC evidence is complete.
 
-Do not deploy full production OAuth behavior merely to obtain the Phase 4 proof. Keep the slice bounded to the POC contract in `docs/LOGTO-PROCONNECT-MCP-POC.md`.
+## Exact next step: negative authorization evidence
+
+The next blocking evidence is two negative tests, in this order:
+
+1. **Wrong resource/audience** — obtain or construct a validly signed Logto token whose audience/resource is not the canonical MCP resource, then demonstrate that the bridge policy rejects it before Principal/context construction. Do not weaken or change the canonical resource configuration merely to make the test pass.
+2. **Insufficient scope** — obtain a valid canonical-resource token carrying only a strict subset of the fixed public scopes, then demonstrate both that the reduced capabilities map correctly and that an operation requiring a missing capability is rejected by the existing authorization layer.
+
+The negative probes must continue to keep all raw token/code/verifier material local. Record only stable diagnostic results and safe error codes. A successful negative test means the unsafe request is **rejected**, not that the token exchange itself necessarily fails.
+
+Before changing Logto application permissions or user role assignments for the insufficient-scope test, prefer a reversible bounded test configuration that does not broaden any permission. Restore the POC client's three-permission state after the test if it is temporarily reduced.
+
+After both negative proofs are durable PASS, the next mandatory phase is the actual OAuth-enabled `/mcp` request-path proof and then the draft ChatGPT MCP app flow/refresh behavior. Do not start full production C4 implementation merely because the local bridge seam passes.
 
 ## ProConnect connector configuration boundary
 
@@ -187,16 +194,14 @@ Do **not** manually restart/reload nftables while Docker is running merely to te
 C4-P0 remains ACTIVE. Important UNKNOWNs include:
 
 - explicit upstream logout/re-authentication lifecycle semantics;
-- standard JWT/JWKS validation of actual Logto-issued access tokens by the bridge;
+- wrong-resource rejection with a live validly signed token;
+- insufficient-scope enforcement with a live canonical-resource token;
 - actual OAuth `/mcp` request path constructing a fresh dynamic Principal/context;
-- wrong-resource rejection on the live MCP path;
-- insufficient-scope rejection on the live MCP path;
-- proof on the live bridge path that OAuth bearer never becomes the upstream Grist credential;
 - production OAuth mode preventing static-bearer override;
 - ChatGPT callback/login/PKCE/resource/bearer/refresh/revocation behavior;
 - controlled reboot confirmation for nftables + Docker + Logto persistence.
 
-The RFC 8707 authorization/token flow, canonical resource binding, live fixed scopes and standards-based local JWT/JWKS validation are no longer UNKNOWN.
+The following are no longer UNKNOWN: RFC 8707 authorization/token handling, canonical resource binding, fixed-scope issuance, standard JWT/JWKS validation of an actual Logto token by the integrated provider-neutral bridge verifier, dynamic Principal construction, principal-bound C3 context construction, and proof that the raw OAuth bearer does not cross into the Grist credential-provider context.
 
 Full C4 implementation remains blocked until all mandatory POC exit criteria in `docs/LOGTO-PROCONNECT-MCP-POC.md` are PASS.
 
