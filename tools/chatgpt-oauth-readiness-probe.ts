@@ -3,6 +3,7 @@ import { OPERATION_REGISTRY } from "../src/operations/registry.js";
 const PROTOCOL_VERSION = "2026-07-28";
 const REQUIRED_SCOPES = ["doc:read", "doc:write", "doc.schema:write"] as const;
 const PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
+const CHATGPT_STABLE_CIMD_URL = "https://chatgpt.com/oauth/client.json";
 
 type JsonObject = Record<string, unknown>;
 
@@ -33,6 +34,15 @@ function stringArray(value: unknown): string[] | undefined {
   return Array.isArray(value) && value.every((item) => typeof item === "string")
     ? value
     : undefined;
+}
+
+function isHttpsUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 async function fetchJson(url: string, failureCode: string): Promise<JsonObject> {
@@ -248,6 +258,42 @@ async function run(): Promise<boolean> {
   printPass("Refresh-token grant advertised", refresh);
   printBoolean("RFC 9207 authorization-response issuer identification advertised", issuerIdentification);
 
+  let chatGptCimdChecks = true;
+  if (issuerIdentification) {
+    const chatGptCimd = await fetchJson(CHATGPT_STABLE_CIMD_URL, "chatgpt_cimd_fetch_failed");
+    const clientIdMatches = chatGptCimd.client_id === CHATGPT_STABLE_CIMD_URL;
+    const selectedTokenAuthMethod =
+      typeof chatGptCimd.token_endpoint_auth_method === "string"
+        ? chatGptCimd.token_endpoint_auth_method
+        : undefined;
+    const selectedTokenAuthSupported =
+      selectedTokenAuthMethod !== undefined && tokenAuthMethods.includes(selectedTokenAuthMethod);
+    const declaredClientMethods =
+      stringArray(chatGptCimd.token_endpoint_auth_methods_supported) ?? [];
+    const selectedMethodDeclared =
+      selectedTokenAuthMethod !== undefined && declaredClientMethods.includes(selectedTokenAuthMethod);
+    const redirectUris = stringArray(chatGptCimd.redirect_uris) ?? [];
+    const redirectsUsable = redirectUris.length > 0 && redirectUris.every(isHttpsUrl);
+    const privateKeyJwtJwksUsable =
+      selectedTokenAuthMethod !== "private_key_jwt" || isHttpsUrl(chatGptCimd.jwks_uri);
+
+    printPass("Stable ChatGPT CIMD reachable", true);
+    printPass("Stable ChatGPT CIMD client_id matches document URL", clientIdMatches);
+    printPass("ChatGPT selected token authentication method is declared by its CIMD", selectedMethodDeclared);
+    printPass("Authorization server supports ChatGPT selected token authentication method", selectedTokenAuthSupported);
+    printPass("ChatGPT CIMD redirect URIs are HTTPS", redirectsUsable);
+    printPass("ChatGPT private_key_jwt JWKS metadata is usable", privateKeyJwtJwksUsable);
+
+    chatGptCimdChecks =
+      clientIdMatches &&
+      selectedMethodDeclared &&
+      selectedTokenAuthSupported &&
+      redirectsUsable &&
+      privateKeyJwtJwksUsable;
+  } else {
+    console.log("Stable ChatGPT CIMD probe: SKIPPED (RFC 9207 issuer identification unavailable)");
+  }
+
   const unauthenticated = await postMcp({
     resourceUri,
     method: "server/discover"
@@ -291,6 +337,7 @@ async function run(): Promise<boolean> {
     pkceS256 &&
     authCode &&
     refresh &&
+    chatGptCimdChecks &&
     challengeOk &&
     authenticatedChecks
   );
