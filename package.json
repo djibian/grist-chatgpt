@@ -14,7 +14,8 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test test/*.test.ts",
     "probe:proconnect": "tsx tools/proconnect-mcp-probe.ts",
-    "probe:logto": "tsx tools/logto-mcp-probe.ts"
+    "probe:logto": "tsx tools/logto-mcp-probe.ts",
+    "probe:oauth-bridge": "tsx tools/oauth-bridge-probe.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",
