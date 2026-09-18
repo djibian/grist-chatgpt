@@ -43,6 +43,7 @@ test("adds mcp/www_authenticate when the OAuth principal lacks the tool capabili
     id: "oauth:test",
     transport: "mcp",
     documentIds: ["doc-1"],
+    workspaceIds: [],
     capabilities: ["doc:read"]
   });
   const handler = installOAuthToolAuthChallenges(
@@ -78,6 +79,7 @@ test("does not request OAuth step-up when the principal already has the capabili
     id: "oauth:test",
     transport: "mcp",
     documentIds: ["doc-1"],
+    workspaceIds: [],
     capabilities: ["doc:read", "doc:write"]
   });
   const originalBody = {
@@ -104,6 +106,7 @@ test("does not attach a challenge to a successful response even if a capability 
     id: "oauth:test",
     transport: "mcp",
     documentIds: ["doc-1"],
+    workspaceIds: [],
     capabilities: ["doc:read"]
   });
   const originalBody = {
