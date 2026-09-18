@@ -89,19 +89,59 @@ This proves the actual HTTP resource-server path rejects a cryptographically val
 
 No deployment/resource policy was weakened for the test: the canonical `MCP_RESOURCE_URI` remained unchanged, and the deliberately different token resource remained different.
 
-## Remaining HTTP negative proof
+## Missing `doc:write` on HTTP path — PASS
 
-Exactly one required HTTP authorization negative remains:
-
-- `missing-write`: a canonical-resource token without `doc:write` must authenticate successfully, but an MCP `tools/call` for `create_records` must be denied before any fake Grist mutation.
-
-Expected safe evidence includes:
+A fresh canonical-resource token was requested with only:
 
 ```text
-Reduced-scope bearer authenticates on /mcp: PASS
-Token missing doc:write: yes
-create_records rejected through MCP tools/call: PASS
+doc:read
+doc.schema:write
+```
+
+and deliberately without `doc:write`.
+
+The same token first re-demonstrated the reusable bridge-seam negative evidence:
+
+```text
+Authorization request without doc:write: PASS
+Callback state matches: yes
+Reduced-scope token exchange: PASS
+Insufficient-scope token JWT/JWKS verification: PASS
+Canonical MCP resource audience accepted: PASS
+Token/Principal missing doc:write: yes
+Reduced-scope dynamic Principal created: PASS
+doc:write operation rejected before mutation: PASS
+Authorization path performed local discovery reads: yes
 Fake Grist mutation requests observed: 0
 ```
 
-Only after that HTTP negative check is PASS should the POC advance to the draft ChatGPT MCP app interoperability/refresh/revocation phase.
+The token was then presented unchanged to the actual OAuth-enabled HTTP `/mcp` route. The probe invoked `create_records` through MCP `tools/call` against the loopback fake Grist boundary. Sanitized diagnostics:
+
+```text
+MCP OAuth server starts without static bearer: PASS
+Reduced-scope bearer authenticates on /mcp: PASS
+Token missing doc:write: yes
+doc:write tool rejected on /mcp: PASS
+Fake Grist mutation requests observed: 0
+OAuth bearer reaches fake Grist: no
+```
+
+Result: **PASS**.
+
+This proves scope reduction is enforced on the real HTTP MCP request path: a valid canonical bearer can authenticate and construct its reduced dynamic principal, but an operation requiring `doc:write` is denied before any Grist mutation. The fake Grist observed exactly zero mutation requests, and it never observed the OAuth bearer.
+
+## HTTP `/mcp` POC conclusion
+
+The mandatory local/live HTTP resource-server behaviors are now proven:
+
+- canonical resource bearer accepted;
+- JWT/JWKS, issuer, audience/resource and expiry validation applied;
+- dynamic request-bound Principal/C3 context constructed;
+- missing bearer rejected;
+- invalid-signature bearer rejected;
+- static development bearer cannot override OAuth mode;
+- wrong-resource bearer rejected before the Grist boundary;
+- insufficient-scope write rejected before any Grist mutation;
+- OAuth bearer never becomes or reaches the Grist credential boundary.
+
+The next C4-P0 critical-path phase is **real ChatGPT MCP client interoperability**, including callback/client behavior, PKCE/resource handling, Logto -> ProConnect login, subsequent bearer use, refresh/reconnect and revocation/logout behavior.
