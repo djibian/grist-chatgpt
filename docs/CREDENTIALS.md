@@ -21,6 +21,8 @@ Future user-aware providers are expected to:
 
 Persistence technology, encryption/key management and the secure onboarding flow are deliberately not chosen by this abstraction. Those remain later human-gated decisions.
 
+The minimum operator decision package is [C5-DECISION.md](C5-DECISION.md).
+
 ## Construction flow
 
 ```text
