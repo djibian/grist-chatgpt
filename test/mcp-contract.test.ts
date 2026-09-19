@@ -88,7 +88,17 @@ test("complete MCP surface is derived from the operation registry without annota
     OPERATION_REGISTRY.filter((operation) => operation.destructive)
       .map((operation) => operation.name)
       .sort(),
-    ["delete_columns", "delete_records", "delete_table"]
+    [
+      "delete_columns",
+      "delete_records",
+      "delete_table",
+      "rename_column",
+      "rename_page",
+      "update_columns",
+      "update_page_widget",
+      "update_records",
+      "update_tables"
+    ]
   );
   assert.ok(OPERATION_REGISTRY.every((operation) => operation.openWorld === false));
   assert.ok(
