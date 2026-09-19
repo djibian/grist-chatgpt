@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { assertDirectSelectByAllowed } from "../src/grist/selectBy.js";
-import { pageWidgetsOutputSchema } from "../src/mcp/outputSchemas.js";
+import { pageWidgetsOutputSchema, pagesOutputSchema } from "../src/mcp/outputSchemas.js";
 import { GristApiError } from "../src/grist/client.js";
 import { DocumentUiService } from "../src/grist/documentUi.js";
 
@@ -27,7 +27,8 @@ const views = {
       fields: {
         name: "Pilotage",
         type: "empty",
-        layoutSpec: "{\"children\":[1,2]}"
+        layoutSpec:
+          "{\"children\":[{\"leaf\":201,\"size\":60},{\"leaf\":202,\"size\":40}],\"collapsed\":[]}"
       }
     },
     { id: 102, fields: { name: "Détail", type: "empty", layoutSpec: "" } }
@@ -72,14 +73,29 @@ const sections = {
   ]
 };
 
-test("builds normalized pages, widgets, table IDs and select-by links", () => {
+test("builds normalized pages, widgets, layout and select-by links", () => {
   const service = new DocumentUiService();
   const context = service.build("doc-1", tables, pages, views, sections);
 
   assert.deepEqual(context.summary, { pageCount: 2, widgetCount: 2 });
   assert.equal(context.pages[0]?.id, 101);
   assert.equal(context.pages[0]?.name, "Pilotage");
-  assert.deepEqual(context.pages[0]?.layoutSpec, { children: [1, 2] });
+  assert.deepEqual(context.pages[0]?.layoutSpec, {
+    children: [{ leaf: 201, size: 60 }, { leaf: 202, size: 40 }],
+    collapsed: []
+  });
+  assert.deepEqual(context.pages[0]?.layoutNormalized, {
+    root: {
+      kind: "group",
+      children: [
+        { kind: "widget", widgetId: 201, size: 60 },
+        { kind: "widget", widgetId: 202, size: 40 }
+      ]
+    },
+    collapsedWidgetIds: [],
+    unplacedWidgetIds: []
+  });
+  assert.equal(context.pages[0]?.layoutNormalizationIncomplete, undefined);
   assert.equal(context.pages[0]?.widgets[0]?.tableId, "Enseignants");
   assert.equal(context.pages[0]?.widgets[1]?.tableId, "Eleves");
   assert.deepEqual(context.pages[0]?.widgets[1]?.sortColRefs, [3, -4]);
@@ -104,15 +120,30 @@ test("lists pages compactly and returns widgets for an explicit page", () => {
     type: "empty",
     indentation: 0,
     pagePos: 1,
-    layoutSpec: { children: [1, 2] },
+    layoutSpec: {
+      children: [{ leaf: 201, size: 60 }, { leaf: 202, size: 40 }],
+      collapsed: []
+    },
+    layoutNormalized: {
+      root: {
+        kind: "group",
+        children: [
+          { kind: "widget", widgetId: 201, size: 60 },
+          { kind: "widget", widgetId: 202, size: 40 }
+        ]
+      },
+      collapsedWidgetIds: [],
+      unplacedWidgetIds: []
+    },
     widgetCount: 2,
     widgetIds: [201, 202]
   });
+  assert.equal(pagesOutputSchema.safeParse(listed).success, true);
 
-  const widgets = service.getPageWidgets(context, 101) as {
-    widgets: Array<{ id: number }>;
-  };
+  const result = service.getPageWidgets(context, 101);
+  const widgets = result as { widgets: Array<{ id: number }> };
   assert.deepEqual(widgets.widgets.map((widget) => widget.id), [201, 202]);
+  assert.equal(pageWidgetsOutputSchema.safeParse(result).success, true);
 
   assert.throws(
     () => service.getPageWidgets(context, 999),
@@ -121,6 +152,38 @@ test("lists pages compactly and returns widgets for an explicit page", () => {
       error.status === 404 &&
       /Grist page 999 does not exist/.test(error.message)
   );
+});
+
+test("malformed raw page layout remains available but normalized output fails closed", () => {
+  const service = new DocumentUiService();
+  const malformedViews = {
+    records: [
+      {
+        id: 101,
+        fields: {
+          name: "Pilotage",
+          type: "empty",
+          layoutSpec: "{\"children\":[{\"leaf\":999},{\"leaf\":201},{\"leaf\":201}]}"
+        }
+      }
+    ]
+  };
+  const context = service.build("doc-1", tables, { records: [pages.records[0]] }, malformedViews, sections);
+  const page = context.pages[0]!;
+
+  assert.deepEqual(page.layoutSpec, {
+    children: [{ leaf: 999 }, { leaf: 201 }, { leaf: 201 }]
+  });
+  assert.deepEqual(page.layoutNormalized, {
+    root: {
+      kind: "group",
+      children: [{ kind: "widget", widgetId: 201 }]
+    },
+    collapsedWidgetIds: [],
+    unplacedWidgetIds: [202]
+  });
+  assert.equal(page.layoutNormalizationIncomplete, true);
+  assert.equal(JSON.stringify(page.layoutNormalized).includes("999"), false);
 });
 
 test("discovers only direct select-by sources accepted for each target", () => {

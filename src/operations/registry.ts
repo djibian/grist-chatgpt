@@ -229,7 +229,7 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     title: "List document pages",
     summary: "List Grist pages and their widget IDs without reading row data.",
     description:
-      "List pages in one Grist document, including stable page IDs, names, layout metadata and widget IDs, without reading user-table rows."
+      "List pages in one Grist document, including stable page/widget IDs and bounded normalized layout structure. Raw layoutSpec remains available for compatibility; malformed/stale layout state is marked incomplete rather than guessed. No user-table rows are read."
   },
   {
     name: "get_page_widgets",
@@ -240,9 +240,9 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     destructive: false,
     openWorld: false,
     title: "Inspect page widgets",
-    summary: "Inspect normalized page widget metadata, saved sort and select-by links.",
+    summary: "Inspect normalized page widget metadata, layout, saved sort and select-by links.",
     description:
-      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, description, native chart type, saved sort metadata, options, layout metadata and select-by links. directSelectByOptions advertises supported same-table cursor links. columnSelectByOptions advertises a stricter non-summary Ref/RefList subset using reusable sourceWidgetId/sourceColumnId/targetColumnId values. Both lists are bounded and carry explicit truncation flags; update_page_widget revalidates current metadata before writing."
+      "Inspect widgets on one Grist page, including stable widget IDs, bounded normalized page layout, widget type, table, title, description, native chart type, saved sort metadata, options and select-by links. Raw layoutSpec remains available for compatibility. directSelectByOptions advertises supported same-table cursor links. columnSelectByOptions advertises a stricter non-summary Ref/RefList subset using reusable sourceWidgetId/sourceColumnId/targetColumnId values. Lists are bounded and carry explicit incompleteness/truncation flags; update_page_widget revalidates current metadata before writing."
   },
   {
     name: "create_page",

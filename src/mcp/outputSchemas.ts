@@ -5,6 +5,27 @@ const pageSummarySchema = z.object({
   widgetCount: z.number().int().nonnegative()
 });
 
+const normalizedPageLayoutNodeSchema: z.ZodType<any> = z.lazy(() =>
+  z.union([
+    z.object({
+      kind: z.literal("widget"),
+      widgetId: z.number().int().positive(),
+      size: z.number().nonnegative().optional()
+    }),
+    z.object({
+      kind: z.literal("group"),
+      children: z.array(normalizedPageLayoutNodeSchema),
+      size: z.number().nonnegative().optional()
+    })
+  ])
+);
+
+const normalizedPageLayoutSchema = z.object({
+  root: normalizedPageLayoutNodeSchema.optional(),
+  collapsedWidgetIds: z.array(z.number().int().positive()),
+  unplacedWidgetIds: z.array(z.number().int().positive())
+});
+
 const pageInfoSchema = z.object({
   id: z.number().int().positive(),
   pageRecordId: z.number().int().positive(),
@@ -12,7 +33,9 @@ const pageInfoSchema = z.object({
   type: z.string(),
   indentation: z.number(),
   pagePos: z.number().optional(),
-  layoutSpec: z.unknown().optional()
+  layoutSpec: z.unknown().optional(),
+  layoutNormalized: normalizedPageLayoutSchema.optional(),
+  layoutNormalizationIncomplete: z.literal(true).optional()
 });
 
 const pageListItemSchema = pageInfoSchema.extend({

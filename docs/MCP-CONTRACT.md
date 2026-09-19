@@ -44,7 +44,7 @@ Stable `outputSchema` / `structuredContent` are already used where the bridge ha
 - `rename_page`;
 - `update_page_widget`.
 
-These outputs expose reusable stable IDs without requiring prose parsing. Page/widget inspection now includes bounded normalized sort/select-by information and explicit incompleteness/truncation signals where exact normalization is not possible.
+These outputs expose reusable stable IDs without requiring prose parsing. Page inspection additionally exposes bounded `layoutNormalized` trees whose leaves are verified current widget IDs, plus collapsed/unplaced widget IDs and `layoutNormalizationIncomplete` when raw Grist layout state cannot be represented exactly. Raw `layoutSpec` remains available for v1 compatibility. Widget inspection also includes bounded normalized sort/select-by information and explicit incompleteness/truncation signals where exact normalization is not possible.
 
 ### Discovery/schema projection
 
@@ -79,7 +79,7 @@ Consequently, absence of formal `outputSchema` on a tool does not mean its servi
 - local formula reference diagnostics;
 - bounded one-hop `$Ref.Field` / `$RefList.Field` diagnostics from already-loaded schema metadata;
 - normalized Ref/RefList relationships including verified reverse relationships;
-- normalized page/widget sort/select-by context where exact resolution is possible;
+- normalized page layout plus widget sort/select-by context where exact resolution is possible;
 - explicit incompleteness markers when internal metadata cannot be safely represented.
 
 No Python/formula execution, raw SQL or generic code execution is introduced.
