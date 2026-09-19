@@ -65,7 +65,9 @@ Partial-batch error semantics are unchanged and continue to report completed wor
 
 ### Creation results
 
-Create operations retain functional created identifiers because later bounded calls need them. On current `main`, broader create-result normalization/formal `outputSchema` coverage remains separate work; the contract must not freeze arbitrary upstream implementation fields merely for convenience.
+Create operations retain only the functional created identifiers needed by later bounded calls: stable table IDs, stable column IDs and positive record IDs. Arbitrary upstream/engine extension fields are discarded. For batched record creation, the existing batch result structure is preserved while each batch result is projected to created record IDs.
+
+If Grist reports a successful create response whose shape or item count cannot be normalized exactly, the bridge returns the safely resolved IDs plus `resultNormalizationIncomplete: true` rather than guessing completeness or throwing after the upstream write may already have succeeded. Formal MCP `outputSchema` coverage for these non-UI creation tools remains separate from this service-level semantic projection.
 
 Consequently, absence of formal `outputSchema` on a tool does not mean its service result is still an unrestricted raw upstream response, and a normalized service acknowledgement does not automatically imply a formal public `outputSchema` has already been declared.
 
