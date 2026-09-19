@@ -148,9 +148,16 @@ These scenarios should be automated where possible and mirrored in reviewer inst
 
 - prove Logto final-client `openid`/`email` and verified UserInfo behavior;
 - add per-tool annotation justification metadata or a generated submission artifact;
-- implement a safe configurable domain-challenge endpoint whose token is supplied only at deployment/submission time;
 - formalize the exact 5 positive / 3 negative test fixtures;
 - audit tool outputs for data minimization.
+
+The domain-verification code path is prepared: `OPENAI_APPS_CHALLENGE_TOKEN` is
+optional, the `/.well-known/openai-apps-challenge` route is absent when it is
+unset, and when configured it returns only the exact token as plain text. A
+value with surrounding whitespace or line breaks is rejected rather than
+silently normalized. Do not configure a placeholder or repository value; set
+the exact portal-issued token only at deployment/submission time, then verify
+the production challenge URL before completing the portal step.
 
 ### Before final review
 
@@ -174,7 +181,7 @@ Once the eligibility gate is viable and the product is review-ready:
 2. Create a plugin **With MCP**.
 3. Use the production universal MCP URL.
 4. Select/configure OAuth and provide reviewer demo credentials.
-5. Complete domain verification when the portal issues its challenge token.
+5. Complete domain verification when the portal issues its challenge token: set the exact value through `OPENAI_APPS_CHALLENGE_TOKEN`, deploy, and verify the well-known response before asking the portal to validate it.
 6. Run **Scan Tools** and resolve all blocking findings.
 7. Fill public listing metadata and policy URLs.
 8. Add starter prompts, exact 5 positive tests, exact 3 negative tests, expected outcomes, release notes and demo recording URL.
@@ -221,7 +228,7 @@ invented publisher, authentication or domain-verification fields.
 - Supply reviewer login and instructions securely through the portal; never put credentials in this JSON or the repository.
 - Provision an isolated synthetic Grist fixture, record its document/table identifiers in reviewer instructions, and execute/reset the proposed scenarios.
 - Supply the demo recording URL; attachments and expected-output URLs remain null because none were provided.
-- Complete production/OAuth/UserInfo validation, portal tool scan and the exact portal-issued domain challenge.
+- Complete production/OAuth/UserInfo validation and portal tool scan; for domain verification, set only the exact portal-issued `OPENAI_APPS_CHALLENGE_TOKEN`, deploy it to the production challenge host, verify the response, then complete the portal check.
 
 ### Proposed synthetic fixture (not provisioned)
 

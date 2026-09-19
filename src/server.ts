@@ -50,6 +50,10 @@ import { installOAuthToolAuthChallenges } from "./mcp/oauthToolChallenge.js";
 import { installOAuthToolSecuritySchemes } from "./mcp/oauthToolSecurity.js";
 import { registerSchemaTools } from "./mcp/schemaTools.js";
 import { registerUiTools } from "./mcp/uiTools.js";
+import {
+  parseOpenAiAppsChallengeToken,
+  registerOpenAiAppsChallenge
+} from "./openaiAppsChallenge.js";
 import { operationHelp } from "./operations/registry.js";
 import { VERSION } from "./version.js";
 
@@ -257,6 +261,11 @@ const app = createMcpExpressApp({
   host: config.host,
   allowedHosts: [...config.mcpAllowedHosts]
 });
+
+registerOpenAiAppsChallenge(
+  app,
+  parseOpenAiAppsChallengeToken(process.env.OPENAI_APPS_CHALLENGE_TOKEN)
+);
 
 app.get("/healthz", (_req, res) => {
   res.json({

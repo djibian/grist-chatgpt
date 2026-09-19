@@ -333,12 +333,13 @@ Completed:
 - submission artifact generation;
 - draft `chatgpt-app-submission.json` with 22 tools, five positive and three negative routing scenarios;
 - real ChatGPT CIMD/OIDC connection proving `openid` / `email` compatibility after the corresponding Dynamic app permissions were enabled;
-- document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields.
+- document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields;
+- safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected.
 
 Remaining eligible work:
 
 - prove UserInfo returns `email` with `email_verified: true` on the final reviewer-compatible path;
-- prepare the safe deployment path for `/.well-known/openai-apps-challenge`; activate it only when the OpenAI portal issues the exact token;
+- when the OpenAI portal eventually issues the production domain token, activate the prepared challenge path with that exact value and verify the deployed response before portal validation;
 - formalize exactly five positive and three negative reviewer scenarios with expected outcomes against the eventual synthetic reviewer fixture;
 - continue auditing other tool outputs for unnecessary diagnostic/internal fields.
 
