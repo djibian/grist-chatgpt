@@ -4,6 +4,10 @@ import * as z from "zod/v4";
 import type { PageWidgetUpdateInput } from "../grist/authorizedService.js";
 import { GRIST_CHART_TYPES } from "../grist/chartTypes.js";
 import {
+  MAX_CUSTOM_WIDGET_MAPPED_COLUMNS,
+  MAX_CUSTOM_WIDGET_MAPPING_KEYS
+} from "../grist/customWidgetSettings.js";
+import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
@@ -48,6 +52,30 @@ const widgetSortSchema = z
       .strict()
   )
   .max(MAX_WIDGET_SORT_COLUMNS);
+
+const customWidgetMappingValueSchema = z.union([
+  z.string().trim().min(1),
+  z.array(z.string().trim().min(1)).max(MAX_CUSTOM_WIDGET_MAPPED_COLUMNS),
+  z.null()
+]);
+
+const customWidgetColumnsMappingSchema = z
+  .record(z.string().min(1), customWidgetMappingValueSchema)
+  .refine(
+    (value) => Object.keys(value).length <= MAX_CUSTOM_WIDGET_MAPPING_KEYS,
+    `Custom widget mappings support at most ${MAX_CUSTOM_WIDGET_MAPPING_KEYS} keys.`
+  );
+
+const customWidgetSettingsUpdateSchema = z
+  .object({
+    access: z.enum(["none", "read table", "full"]).optional(),
+    columnsMapping: customWidgetColumnsMappingSchema.nullable().optional()
+  })
+  .strict()
+  .refine(
+    (value) => value.access !== undefined || value.columnsMapping !== undefined,
+    "At least one of access or columnsMapping must be supplied."
+  );
 
 export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
@@ -140,7 +168,8 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           })
           .strict()
           .nullable()
-          .optional()
+          .optional(),
+        customWidgetSettings: customWidgetSettingsUpdateSchema.optional()
       }),
       outputSchema: widgetMutationOutputSchema
     },
@@ -152,7 +181,8 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
       description,
       chartType,
       sort,
-      selectBy
+      selectBy,
+      customWidgetSettings
     }) => {
       try {
         if (
@@ -160,10 +190,11 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           description === undefined &&
           chartType === undefined &&
           sort === undefined &&
-          selectBy === undefined
+          selectBy === undefined &&
+          customWidgetSettings === undefined
         ) {
           throw new Error(
-            "At least one of title, description, chartType, sort or selectBy must be supplied."
+            "At least one of title, description, chartType, sort, selectBy or customWidgetSettings must be supplied."
           );
         }
         const update: PageWidgetUpdateInput = {
@@ -171,7 +202,8 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           ...(description !== undefined ? { description } : {}),
           ...(chartType !== undefined ? { chartType } : {}),
           ...(sort !== undefined ? { sort } : {}),
-          ...(selectBy !== undefined ? { selectBy } : {})
+          ...(selectBy !== undefined ? { selectBy } : {}),
+          ...(customWidgetSettings !== undefined ? { customWidgetSettings } : {})
         };
         const output = widgetMutationOutputSchema.parse(
           await grist.updatePageWidget(documentId, pageId, widgetId, update)
