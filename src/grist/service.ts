@@ -143,7 +143,8 @@ export class GristService {
   async deleteTable(documentIdOrUrl: string, tableId: string): Promise<unknown> {
     const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
     this.assertIdentifier(tableId, "Table ID");
-    return this.client.applyUserActions(documentId, [["RemoveTable", tableId]]);
+    await this.client.applyUserActions(documentId, [["RemoveTable", tableId]]);
+    return { tableId, deleted: true };
   }
 
   async listColumns(
@@ -195,9 +196,10 @@ export class GristService {
     if (oldColumnId === newColumnId) {
       throw new Error("New column ID must differ from the current column ID.");
     }
-    return this.client.applyUserActions(documentId, [
+    await this.client.applyUserActions(documentId, [
       ["RenameColumn", tableId, oldColumnId, newColumnId]
     ]);
+    return { tableId, oldColumnId, newColumnId, renamed: true };
   }
 
   async deleteColumns(
