@@ -15,6 +15,11 @@ import type {
 } from "./client.js";
 import type { GristChartType } from "./chartTypes.js";
 import {
+  resolveCustomWidgetSettingsUpdate,
+  sameJsonValue,
+  type CustomWidgetSettingsUpdateInput
+} from "./customWidgetSettingsUpdate.js";
+import {
   assertDirectSelectByAllowed,
   resolveColumnSelectByAllowed,
   type ColumnSelectByInput
@@ -43,6 +48,7 @@ export interface PageWidgetUpdateInput {
   chartType?: GristChartType;
   sort?: readonly WidgetSortInput[] | null;
   selectBy?: ColumnSelectByInput | null;
+  customWidgetSettings?: CustomWidgetSettingsUpdateInput;
 }
 
 function sameSortSpec(
@@ -283,7 +289,8 @@ export class AuthorizedGristService {
       update.description === undefined &&
       update.chartType === undefined &&
       update.sort === undefined &&
-      update.selectBy === undefined
+      update.selectBy === undefined &&
+      update.customWidgetSettings === undefined
     ) {
       throw new Error("At least one widget UI field must be updated.");
     }
@@ -295,7 +302,10 @@ export class AuthorizedGristService {
         (update.selectBy.sourceColumnId !== undefined ||
           update.selectBy.targetColumnId !== undefined);
       const tableResponse = await this.inner.listTables(id, {
-        expandColumns: usesColumnSelectBy || update.sort !== undefined
+        expandColumns:
+          usesColumnSelectBy ||
+          update.sort !== undefined ||
+          update.customWidgetSettings !== undefined
       });
       const before = await this.loadDocumentUi(id, tableResponse);
       const page = before.pages.find((candidate) => candidate.id === pageId);
@@ -330,6 +340,18 @@ export class AuthorizedGristService {
           : undefined;
       if (expectedSortColRefs !== undefined) {
         adapterUpdate.sortColRefs = expectedSortColRefs;
+      }
+
+      const expectedOptions =
+        update.customWidgetSettings !== undefined
+          ? resolveCustomWidgetSettingsUpdate(
+              target,
+              tableResponse,
+              update.customWidgetSettings
+            )
+          : undefined;
+      if (expectedOptions !== undefined) {
+        adapterUpdate.optionsJson = expectedOptions.optionsJson;
       }
 
       let expectedSourceWidgetId: number | null | undefined;
@@ -373,7 +395,11 @@ export class AuthorizedGristService {
 
       await this.uiActions.updatePageWidget(id, widgetId, adapterUpdate);
       try {
-        const after = await this.loadDocumentUi(id);
+        const afterTableResponse =
+          expectedOptions !== undefined
+            ? await this.inner.listTables(id, { expandColumns: true })
+            : undefined;
+        const after = await this.loadDocumentUi(id, afterTableResponse);
         const updatedPage = after.pages.find((candidate) => candidate.id === pageId);
         const widget = updatedPage?.widgets.find((candidate) => candidate.id === widgetId);
         if (!widget) {
@@ -401,6 +427,14 @@ export class AuthorizedGristService {
           !sameSortSpec(widget.sortColRefs, expectedSortColRefs)
         ) {
           throw new Error(`Updated widget ${widgetId} did not match the requested saved sort on re-read.`);
+        }
+        if (
+          expectedOptions !== undefined &&
+          !sameJsonValue(widget.options, expectedOptions.options)
+        ) {
+          throw new Error(
+            `Updated widget ${widgetId} did not preserve the exact expected options on re-read.`
+          );
         }
         if (expectedSourceWidgetId === null && widget.selectBy !== undefined) {
           throw new Error(`Updated widget ${widgetId} still had a select-by link after clearing it.`);
