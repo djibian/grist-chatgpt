@@ -3,6 +3,11 @@ export interface FormulaColumnMetadata {
   type: string;
 }
 
+export interface FormulaTableMetadata {
+  id: string;
+  columns: readonly FormulaColumnMetadata[];
+}
+
 export interface FormulaColumnHint {
   columnId: string;
   type: string;
@@ -29,13 +34,47 @@ export type FormulaReferenceFinding =
       suggestions: FormulaColumnHint[];
     };
 
+export type FormulaDereferenceFinding =
+  | {
+      path: string;
+      sourceColumnId: string;
+      targetTableId: string;
+      field: string;
+      status: "ok";
+      resolved: FormulaColumnHint;
+    }
+  | {
+      path: string;
+      sourceColumnId: string;
+      targetTableId: string;
+      field: string;
+      status: "case_mismatch";
+      suggestion: FormulaColumnHint;
+    }
+  | {
+      path: string;
+      sourceColumnId: string;
+      targetTableId: string;
+      field: string;
+      status: "missing";
+      suggestions: FormulaColumnHint[];
+    };
+
 export interface FormulaAnalysis {
   references: FormulaReferenceFinding[];
   truncated: boolean;
+  dereferences?: FormulaDereferenceFinding[];
+  dereferencesTruncated?: boolean;
 }
 
 const MAX_REFERENCES = 100;
+const MAX_DEREFERENCES = 100;
 const MAX_SUGGESTIONS = 3;
+
+type ExtractedDereference = {
+  sourceReference: string;
+  member: string;
+};
 
 function columnHint(column: FormulaColumnMetadata): FormulaColumnHint {
   const match = /^(Ref|RefList):(.+)$/.exec(column.type);
@@ -53,6 +92,16 @@ function columnHint(column: FormulaColumnMetadata): FormulaColumnHint {
   };
 }
 
+function referenceTarget(type: string): { kind: "Ref" | "RefList"; tableId: string } | undefined {
+  const match = /^(Ref|RefList):(.+)$/.exec(type);
+  return match
+    ? {
+        kind: match[1] as "Ref" | "RefList",
+        tableId: match[2]!
+      }
+    : undefined;
+}
+
 function isIdentifierStart(character: string | undefined): boolean {
   return character !== undefined && /[A-Za-z_]/.test(character);
 }
@@ -61,9 +110,17 @@ function isIdentifierPart(character: string | undefined): boolean {
   return character !== undefined && /[A-Za-z0-9_]/.test(character);
 }
 
-function extractReferences(formula: string): { references: string[]; truncated: boolean } {
+function extractReferences(formula: string): {
+  references: string[];
+  dereferences: ExtractedDereference[];
+  truncated: boolean;
+  dereferencesTruncated: boolean;
+} {
   const references: string[] = [];
   const seen = new Set<string>();
+  const dereferences: ExtractedDereference[] = [];
+  const seenDereferences = new Set<string>();
+  let dereferencesTruncated = false;
   let index = 0;
 
   while (index < formula.length) {
@@ -107,11 +164,36 @@ function extractReferences(formula: string): { references: string[]; truncated: 
       const reference = formula.slice(index + 1, end);
       if (!seen.has(reference)) {
         if (references.length === MAX_REFERENCES) {
-          return { references, truncated: true };
+          return {
+            references,
+            dereferences,
+            truncated: true,
+            dereferencesTruncated
+          };
         }
         seen.add(reference);
         references.push(reference);
       }
+
+      if (formula[end] === "." && isIdentifierStart(formula[end + 1])) {
+        let memberEnd = end + 2;
+        while (isIdentifierPart(formula[memberEnd])) memberEnd++;
+        const member = formula.slice(end + 1, memberEnd);
+        // A called attribute is method-like rather than a direct Grist field lookup.
+        // Leave arbitrary Python/method semantics to Grist instead of guessing here.
+        if (formula[memberEnd] !== "(") {
+          const key = `${reference}\u0000${member}`;
+          if (!seenDereferences.has(key)) {
+            if (dereferences.length === MAX_DEREFERENCES) {
+              dereferencesTruncated = true;
+            } else {
+              seenDereferences.add(key);
+              dereferences.push({ sourceReference: reference, member });
+            }
+          }
+        }
+      }
+
       index = end;
       continue;
     }
@@ -119,7 +201,12 @@ function extractReferences(formula: string): { references: string[]; truncated: 
     index++;
   }
 
-  return { references, truncated: false };
+  return {
+    references,
+    dereferences,
+    truncated: false,
+    dereferencesTruncated
+  };
 }
 
 function editDistance(left: string, right: string): number {
@@ -169,51 +256,126 @@ function closeSuggestions(
     .map(candidate => columnHint(candidate.column));
 }
 
+function classifyReference(
+  reference: string,
+  columns: readonly FormulaColumnMetadata[]
+): FormulaReferenceFinding {
+  const exact = columns.find(column => column.id === reference);
+  if (exact) {
+    return {
+      reference,
+      status: "ok",
+      resolved: columnHint(exact)
+    };
+  }
+
+  const caseMatches = columns.filter(
+    column => column.id.toLowerCase() === reference.toLowerCase()
+  );
+  if (caseMatches.length === 1) {
+    return {
+      reference,
+      status: "case_mismatch",
+      suggestion: columnHint(caseMatches[0]!)
+    };
+  }
+
+  return {
+    reference,
+    status: "missing",
+    suggestions: closeSuggestions(reference, columns)
+  };
+}
+
+function classifyDereference(
+  sourceColumnId: string,
+  targetTableId: string,
+  field: string,
+  columns: readonly FormulaColumnMetadata[]
+): FormulaDereferenceFinding {
+  const path = `$${sourceColumnId}.${field}`;
+  const exact = columns.find(column => column.id === field);
+  if (exact) {
+    return {
+      path,
+      sourceColumnId,
+      targetTableId,
+      field,
+      status: "ok",
+      resolved: columnHint(exact)
+    };
+  }
+
+  const caseMatches = columns.filter(
+    column => column.id.toLowerCase() === field.toLowerCase()
+  );
+  if (caseMatches.length === 1) {
+    return {
+      path,
+      sourceColumnId,
+      targetTableId,
+      field,
+      status: "case_mismatch",
+      suggestion: columnHint(caseMatches[0]!)
+    };
+  }
+
+  return {
+    path,
+    sourceColumnId,
+    targetTableId,
+    field,
+    status: "missing",
+    suggestions: closeSuggestions(field, columns)
+  };
+}
+
 /**
  * Advisory lexical inspection only. It never executes or rewrites a Grist formula.
  * References inside Python comments and quoted string literals are deliberately ignored.
+ * When document schema metadata is supplied, one-hop `$Ref.Field` / `$RefList.Field`
+ * lookups are checked against the exact referenced table without attempting to interpret
+ * arbitrary Python or deeper chains.
  */
 export class FormulaInspector {
   inspect(
     formula: string,
-    columns: readonly FormulaColumnMetadata[]
+    columns: readonly FormulaColumnMetadata[],
+    tables: readonly FormulaTableMetadata[] = []
   ): FormulaAnalysis {
     const extracted = extractReferences(formula);
-    const exact = new Map(columns.map(column => [column.id, column] as const));
-    const caseInsensitive = new Map<string, FormulaColumnMetadata[]>();
-    for (const column of columns) {
-      const key = column.id.toLowerCase();
-      const matches = caseInsensitive.get(key) ?? [];
-      matches.push(column);
-      caseInsensitive.set(key, matches);
-    }
+    const references = extracted.references.map(reference =>
+      classifyReference(reference, columns)
+    );
 
-    const references = extracted.references.map((reference): FormulaReferenceFinding => {
-      const resolved = exact.get(reference);
-      if (resolved) {
-        return {
-          reference,
-          status: "ok",
-          resolved: columnHint(resolved)
-        };
-      }
+    const currentById = new Map(columns.map(column => [column.id, column] as const));
+    const tableById = new Map(tables.map(table => [table.id, table] as const));
+    const dereferences = extracted.dereferences.flatMap(candidate => {
+      const source = currentById.get(candidate.sourceReference);
+      const target = source ? referenceTarget(source.type) : undefined;
+      if (!source || !target) return [];
 
-      const caseMatches = caseInsensitive.get(reference.toLowerCase()) ?? [];
-      if (caseMatches.length === 1) {
-        return {
-          reference,
-          status: "case_mismatch",
-          suggestion: columnHint(caseMatches[0]!)
-        };
-      }
+      // `id` is an implicit Grist record attribute and may not be present in expanded
+      // table-column metadata. Avoid manufacturing a missing-column warning for it.
+      if (candidate.member === "id") return [];
 
-      return {
-        reference,
-        status: "missing",
-        suggestions: closeSuggestions(reference, columns)
-      };
+      const targetTable = tableById.get(target.tableId);
+      if (!targetTable) return [];
+      return [
+        classifyDereference(
+          source.id,
+          target.tableId,
+          candidate.member,
+          targetTable.columns
+        )
+      ];
     });
 
-    return { references, truncated: extracted.truncated };
+    return {
+      references,
+      truncated: extracted.truncated,
+      ...(dereferences.length > 0 ? { dereferences } : {}),
+      ...(extracted.dereferencesTruncated ? { dereferencesTruncated: true } : {})
+    };
   }
 }
