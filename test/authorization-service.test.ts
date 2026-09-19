@@ -11,17 +11,39 @@ import type {
 } from "../src/grist/client.js";
 
 function fakeClient(): GristClient {
-  const orgs: GristOrgSummary[] = [{ id: 1, name: "Org" }];
+  const orgs: GristOrgSummary[] = [
+    { id: 1, name: "Org", domain: "org", internalSecret: "secret-org" }
+  ];
   const workspaces: GristWorkspaceSummary[] = [
     {
       id: 10,
       name: "Workspace A",
-      docs: [{ id: 100, urlId: "doc-a", name: "A" }]
+      access: "editors",
+      internalSecret: "secret-workspace-a",
+      docs: [
+        {
+          id: 100,
+          urlId: "doc-a",
+          name: "A",
+          access: "owners",
+          internalSecret: "secret-document-a"
+        }
+      ]
     },
     {
       id: 20,
       name: "Workspace B",
-      docs: [{ id: 200, urlId: "doc-b", name: "B" }]
+      access: "viewers",
+      internalSecret: "secret-workspace-b",
+      docs: [
+        {
+          id: 200,
+          urlId: "doc-b",
+          name: "B",
+          access: "editors",
+          internalSecret: "secret-document-b"
+        }
+      ]
     }
   ];
   return {
@@ -60,6 +82,12 @@ test("combines deployment scope with per-principal resource capabilities", async
     readable.map(({ document }) => document.urlId),
     ["doc-a", "doc-b"]
   );
+  assert.deepEqual(readable[0], {
+    org: { id: 1, name: "Org", domain: "org" },
+    workspace: { id: 10, name: "Workspace A", access: "editors" },
+    document: { id: 100, urlId: "doc-a", name: "A", access: "owners" }
+  });
+  assert.doesNotMatch(JSON.stringify(readable), /secret-/);
 
   const writable = await authorization.listDocuments(principal, "doc:write");
   assert.deepEqual(
