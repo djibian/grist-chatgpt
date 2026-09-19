@@ -97,6 +97,16 @@ test("UI OpenAPI exposes bounded consequential create and update actions", () =>
       .requestBody.content["application/json"].schema.additionalProperties,
     false
   );
+  assert.equal(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}"].patch
+      .requestBody.content["application/json"].schema.properties.description.type,
+    "string"
+  );
+  assert.match(
+    paths["/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}"].patch
+      .requestBody.content["application/json"].schema.properties.description.description,
+    /clears the description/
+  );
 
   const renameParameters = paths["/api/v1/documents/{documentId}/pages/{pageId}"].patch.parameters;
   assert.match(renameParameters[0].description, /Never invent/);
@@ -169,6 +179,7 @@ test("UI REST routes forward semantic page and widget create/update requests", a
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: "Fiche personne",
+          description: "Résumé affiché",
           selectBy: { sourceWidgetId: 11 }
         })
       }
@@ -202,6 +213,7 @@ test("UI REST routes forward semantic page and widget create/update requests", a
         widgetId: 12,
         update: {
           title: "Fiche personne",
+          description: "Résumé affiché",
           selectBy: { sourceWidgetId: 11 }
         }
       }
