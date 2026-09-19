@@ -66,7 +66,11 @@ const updateWidgetBodySchema = z
     description: z.string().optional(),
     chartType: z.enum(GRIST_CHART_TYPES).optional(),
     selectBy: z
-      .object({ sourceWidgetId: z.number().int().positive() })
+      .object({
+        sourceWidgetId: z.number().int().positive(),
+        sourceColumnId: z.string().min(1).optional(),
+        targetColumnId: z.string().min(1).optional()
+      })
       .strict()
       .nullable()
       .optional()
@@ -214,9 +218,9 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
       patch: {
         operationId: "updateGristPageWidget",
         summary:
-          "Update one Grist widget title, description, chart type or safe direct select-by link",
+          "Update bounded metadata or an explicit supported select-by link on one Grist widget",
         description:
-          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. selectBy links one widget directly to another widget on the same page backed by the same table; null clears the link. Column-reference select-by is intentionally not exposed in this tranche.",
+          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. selectBy may use a direct sourceWidgetId from directSelectByOptions, or an exact sourceWidgetId/sourceColumnId/targetColumnId combination returned by columnSelectByOptions; null clears the link. Ref/RefList column links are limited to the bridge's non-summary, non-attachment, non-custom safe subset and are revalidated against current metadata before write.",
         "x-openai-isConsequential": true,
         parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
         requestBody: {
@@ -252,6 +256,18 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
                             minimum: 1,
                             description:
                               "Exact source widget ID returned by getGristPageWidgets for the same page. Never invent or guess it."
+                          },
+                          sourceColumnId: {
+                            type: "string",
+                            minLength: 1,
+                            description:
+                              "Optional exact Ref/RefList source column ID from columnSelectByOptions. Omit for the source widget's own table."
+                          },
+                          targetColumnId: {
+                            type: "string",
+                            minLength: 1,
+                            description:
+                              "Optional exact Ref/RefList target column ID from columnSelectByOptions. Omit for the target widget's own table."
                           }
                         }
                       },
