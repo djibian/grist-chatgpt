@@ -235,13 +235,13 @@ The factory deliberately retains no user context cache. Clients, discovered-reso
 
 ### Document UI layer
 
-v0.6 adds bounded document UI support while preserving the no-escape-hatch invariant:
+The bounded document UI layer now includes:
 
 - normalized page/widget inspection;
 - bounded page creation;
 - bounded native widget creation;
 - page rename;
-- widget title update;
+- widget title and description update, including explicit description clearing;
 - conservative direct `select-by` linking;
 - post-write normalized re-read verification.
 
@@ -366,7 +366,7 @@ Identity/security and independently useful bounded product work proceed on paral
 3. **DONE:** principal-isolated Grist clients, discovery caches and service contexts (C3);
 4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto OSS / ProConnect OAuth path and dynamic principals with repeatable operating evidence;
 5. **BLOCKED by C4 and human persistence/encryption decisions:** secure per-user Grist credential onboarding/storage/disconnect (C5);
-6. production observability, rate limits and release controls;
+6. **PREPARATION DONE; finalization blocked by C4/C5:** production observability, rate limits and release controls (C6);
 7. synthetic reviewer fixture and plugin submission package.
 
 Bounded non-destructive P1 UI work is independently eligible. New destructive page/widget surfaces remain human-gated.
