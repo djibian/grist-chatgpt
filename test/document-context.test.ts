@@ -33,8 +33,24 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
   };
 
   const context = new DocumentContextService().build("doc-1", tableResponse) as {
-    summary: { tableCount: number; columnCount: number; relationCount: number };
-    tables: Array<{ id: string; columns: Array<{ id: string; formula?: string }> }>;
+    summary: {
+      tableCount: number;
+      columnCount: number;
+      relationCount: number;
+      formulaReferenceCount: number;
+      formulaWarningCount: number;
+    };
+    tables: Array<{
+      id: string;
+      columns: Array<{
+        id: string;
+        formula?: string;
+        formulaAnalysis?: {
+          references: Array<{ reference: string; status: string }>;
+          truncated: boolean;
+        };
+      }>;
+    }>;
     relations: Array<{
       sourceTable: string;
       sourceColumn: string;
@@ -46,9 +62,21 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
   assert.deepEqual(context.summary, {
     tableCount: 2,
     columnCount: 4,
-    relationCount: 1
+    relationCount: 1,
+    formulaReferenceCount: 1,
+    formulaWarningCount: 0
   });
   assert.equal(context.tables[0]?.columns[2]?.formula, "$Nom.upper()");
+  assert.deepEqual(context.tables[0]?.columns[2]?.formulaAnalysis, {
+    references: [
+      {
+        reference: "Nom",
+        status: "ok",
+        resolved: { columnId: "Nom", type: "Text" }
+      }
+    ],
+    truncated: false
+  });
   assert.deepEqual(context.relations, [
     {
       sourceTable: "Eleves",
@@ -57,4 +85,49 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
       targetTable: "Enseignants"
     }
   ]);
+});
+
+test("surfaces advisory formula warnings in compact document context", () => {
+  const tableResponse = {
+    tables: [
+      {
+        id: "Eleves",
+        columns: [
+          { id: "Nom", fields: { type: "Text" } },
+          { id: "Age", fields: { type: "Numeric" } },
+          {
+            id: "Diagnostic",
+            fields: {
+              type: "Text",
+              isFormula: true,
+              formula: "$nom + $Ag"
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  const context = new DocumentContextService().build("doc-1", tableResponse) as {
+    summary: { formulaReferenceCount: number; formulaWarningCount: number };
+    tables: Array<{ columns: Array<{ formulaAnalysis?: unknown }> }>;
+  };
+
+  assert.equal(context.summary.formulaReferenceCount, 2);
+  assert.equal(context.summary.formulaWarningCount, 2);
+  assert.deepEqual(context.tables[0]?.columns[2]?.formulaAnalysis, {
+    references: [
+      {
+        reference: "nom",
+        status: "case_mismatch",
+        suggestion: { columnId: "Nom", type: "Text" }
+      },
+      {
+        reference: "Ag",
+        status: "missing",
+        suggestions: [{ columnId: "Age", type: "Numeric" }]
+      }
+    ],
+    truncated: false
+  });
 });
