@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
-import { operationHelp, getMcpToolMetadata } from "../operations/registry.js";
+import { getMcpToolMetadata } from "../operations/registry.js";
+import { progressiveOperationHelp } from "../operations/progressiveHelp.js";
 import {
   pageWidgetsOutputSchema,
   pagesOutputSchema
@@ -14,6 +15,19 @@ interface ContextOperations {
   getPageWidgets(documentId: string, pageId: number): Promise<unknown>;
 }
 
+const helpInputSchema = z
+  .object({
+    operations: z.array(z.string().min(1)).max(20).optional(),
+    category: z
+      .enum(["discovery", "data", "schema", "context", "ui", "utility"])
+      .optional(),
+    includeWorkflows: z.boolean().default(false)
+  })
+  .refine(
+    ({ operations, category }) => !(operations && category),
+    "Filter Grist help by operations or category, not both."
+  );
+
 export function registerDiscoveryTools(
   server: McpServer,
   grist: ContextOperations
@@ -22,13 +36,17 @@ export function registerDiscoveryTools(
     "grist_help",
     {
       ...getMcpToolMetadata("grist_help"),
-      inputSchema: z.object({
-        operations: z.array(z.string().min(1)).max(20).optional()
-      })
+      inputSchema: helpInputSchema
     },
-    async ({ operations }) => {
+    async ({ operations, category, includeWorkflows }) => {
       try {
-        return textResult(operationHelp(operations));
+        return textResult(
+          progressiveOperationHelp({
+            ...(operations ? { operations } : {}),
+            ...(category ? { category } : {}),
+            includeWorkflows
+          })
+        );
       } catch (error) {
         return errorResult(error);
       }

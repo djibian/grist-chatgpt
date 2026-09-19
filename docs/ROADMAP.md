@@ -258,14 +258,19 @@ Integrated normalized relation slice:
 - reverse normalization requires the reverse column to belong to the target table, point semantically back to the source table and have a `reverseCol` that points back to the source `colRef`;
 - unresolved or inconsistent declared reverse links expose only `reverseResolutionIncomplete: true`; numeric `colRef` / `reverseCol` values stay internal and no additional upstream read is performed.
 
+Integrated progressive-discovery slice:
+
+- `grist_help` keeps the historical complete-catalog default while adding compact per-category operation counts and an optional category filter that is mutually exclusive with explicit operation-name filtering;
+- opt-in `includeWorkflows` returns common discover/read/create+verify/schema-change+verify/UI-configure+verify sequences, with every step title/capability/destructive flag resolved from the normative registry rather than duplicated;
+- workflows are descriptive only, execute no operation and duplicate no tool input payload schema.
+
 Candidate slices:
 
 - further normalized relation-graph enrichment only where additional semantic value is demonstrated;
 - more compact summaries for large schemas;
 - richer normalized UI/select-by context beyond the saved-sort/select-by slices above;
 - cache/invalidation behavior that remains principal-isolated;
-- optional MCP resource form such as `grist://documents/{id}/context` if it improves clients without duplicating unsafe data;
-- progressively discoverable help/examples derived from the normative registry.
+- optional MCP resource form such as `grist://documents/{id}/context` if it improves clients without duplicating unsafe data.
 
 Do not indiscriminately load user-table rows into document context.
 
