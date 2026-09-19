@@ -110,6 +110,7 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
         pageId: z.number().int().positive(),
         widgetId: z.number().int().positive(),
         title: z.string().optional(),
+        description: z.string().optional(),
         selectBy: z
           .object({ sourceWidgetId: z.number().int().positive() })
           .strict()
@@ -118,13 +119,18 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
       }),
       outputSchema: widgetMutationOutputSchema
     },
-    async ({ documentId, pageId, widgetId, title, selectBy }) => {
+    async ({ documentId, pageId, widgetId, title, description, selectBy }) => {
       try {
-        if (title === undefined && selectBy === undefined) {
-          throw new Error("At least one of title or selectBy must be supplied.");
+        if (
+          title === undefined &&
+          description === undefined &&
+          selectBy === undefined
+        ) {
+          throw new Error("At least one of title, description or selectBy must be supplied.");
         }
         const update: PageWidgetUpdateInput = {
           ...(title !== undefined ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
           ...(selectBy !== undefined ? { selectBy } : {})
         };
         const output = widgetMutationOutputSchema.parse(
