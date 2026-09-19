@@ -14,7 +14,11 @@ import type {
   UpdateGristRecord
 } from "./client.js";
 import type { GristChartType } from "./chartTypes.js";
-import { assertDirectSelectByAllowed } from "./selectBy.js";
+import {
+  assertDirectSelectByAllowed,
+  resolveColumnSelectByAllowed,
+  type ColumnSelectByInput
+} from "./selectBy.js";
 import { DocumentContextService } from "./documentContext.js";
 import { DocumentUiService, type DocumentUiContext, type GristPageWidget } from "./documentUi.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
@@ -28,7 +32,7 @@ export interface PageWidgetUpdateInput {
   title?: string;
   description?: string;
   chartType?: GristChartType;
-  selectBy?: { sourceWidgetId: number } | null;
+  selectBy?: ColumnSelectByInput | null;
 }
 
 export class AuthorizedGristService {
@@ -119,8 +123,9 @@ export class AuthorizedGristService {
       throw new Error("Grist page ID must be a positive integer.");
     }
     return this.execute("get_page_widgets", documentIdOrUrl, undefined, async (id) => {
-      const ui = await this.loadDocumentUi(id);
-      return this.documentUi.getPageWidgets(ui, pageId);
+      const tableResponse = await this.inner.listTables(id, { expandColumns: true });
+      const ui = await this.loadDocumentUi(id, tableResponse);
+      return this.documentUi.getPageWidgets(ui, pageId, tableResponse);
     });
   }
 
@@ -262,7 +267,15 @@ export class AuthorizedGristService {
     }
 
     return this.execute("update_page_widget", documentIdOrUrl, 1, async (id) => {
-      const before = await this.loadDocumentUi(id);
+      const usesColumnSelectBy =
+        update.selectBy !== undefined &&
+        update.selectBy !== null &&
+        (update.selectBy.sourceColumnId !== undefined ||
+          update.selectBy.targetColumnId !== undefined);
+      const tableResponse = await this.inner.listTables(id, {
+        expandColumns: usesColumnSelectBy
+      });
+      const before = await this.loadDocumentUi(id, tableResponse);
       const page = before.pages.find((candidate) => candidate.id === pageId);
       if (!page) {
         throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
@@ -291,6 +304,8 @@ export class AuthorizedGristService {
       }
 
       let expectedSourceWidgetId: number | null | undefined;
+      let expectedSourceColumnRef: number | undefined;
+      let expectedTargetColumnRef: number | undefined;
       if (update.selectBy !== undefined) {
         if (update.selectBy === null) {
           adapterUpdate.selectBy = null;
@@ -307,8 +322,22 @@ export class AuthorizedGristService {
           if (!source) {
             throw new Error(`Select-by source widget ${sourceWidgetId} does not exist on page ${pageId}.`);
           }
-          assertDirectSelectByAllowed(before, source, target);
-          adapterUpdate.selectBy = { sourceSectionId: sourceWidgetId };
+
+          if (usesColumnSelectBy) {
+            const resolved = resolveColumnSelectByAllowed(
+              before,
+              tableResponse,
+              source,
+              target,
+              update.selectBy
+            );
+            adapterUpdate.selectBy = resolved;
+            expectedSourceColumnRef = resolved.sourceColumnRef;
+            expectedTargetColumnRef = resolved.targetColumnRef;
+          } else {
+            assertDirectSelectByAllowed(before, source, target);
+            adapterUpdate.selectBy = { sourceSectionId: sourceWidgetId };
+          }
           expectedSourceWidgetId = sourceWidgetId;
         }
       }
@@ -344,10 +373,10 @@ export class AuthorizedGristService {
         if (
           typeof expectedSourceWidgetId === "number" &&
           (widget.selectBy?.sourceSectionId !== expectedSourceWidgetId ||
-            widget.selectBy.sourceColumnRef !== undefined ||
-            widget.selectBy.targetColumnRef !== undefined)
+            widget.selectBy.sourceColumnRef !== expectedSourceColumnRef ||
+            widget.selectBy.targetColumnRef !== expectedTargetColumnRef)
         ) {
-          throw new Error(`Updated widget ${widgetId} did not match the requested direct select-by link on re-read.`);
+          throw new Error(`Updated widget ${widgetId} did not match the requested select-by link on re-read.`);
         }
         return { documentId: id, pageId, widget };
       } catch (error) {
