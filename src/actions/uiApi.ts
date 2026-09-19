@@ -7,6 +7,10 @@ import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
+import {
+  MAX_WIDGET_SORT_COLUMNS,
+  WIDGET_SORT_DIRECTIONS
+} from "../grist/widgetSort.js";
 
 export interface GristUiOperations {
   createPage(documentId: string, tableId: string, name: string): Promise<unknown>;
@@ -60,11 +64,26 @@ const renamePageBodySchema = z
   })
   .strict();
 
+const widgetSortBodySchema = z
+  .array(
+    z
+      .object({
+        columnId: z.string().trim().min(1),
+        direction: z.enum(WIDGET_SORT_DIRECTIONS),
+        emptyLast: z.boolean().optional(),
+        naturalSort: z.boolean().optional(),
+        orderByChoice: z.boolean().optional()
+      })
+      .strict()
+  )
+  .max(MAX_WIDGET_SORT_COLUMNS);
+
 const updateWidgetBodySchema = z
   .object({
     title: z.string().optional(),
     description: z.string().optional(),
     chartType: z.enum(GRIST_CHART_TYPES).optional(),
+    sort: widgetSortBodySchema.nullable().optional(),
     selectBy: z
       .object({
         sourceWidgetId: z.number().int().positive(),
@@ -81,10 +100,11 @@ const updateWidgetBodySchema = z
       value.title !== undefined ||
       value.description !== undefined ||
       value.chartType !== undefined ||
+      value.sort !== undefined ||
       value.selectBy !== undefined,
     {
       message:
-        "At least one of title, description, chartType or selectBy must be supplied."
+        "At least one of title, description, chartType, sort or selectBy must be supplied."
     }
   );
 
@@ -218,9 +238,9 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
       patch: {
         operationId: "updateGristPageWidget",
         summary:
-          "Update bounded metadata or an explicit supported select-by link on one Grist widget",
+          "Update bounded metadata, saved sort or an explicit supported select-by link on one Grist widget",
         description:
-          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. selectBy may use a direct sourceWidgetId from directSelectByOptions, or an exact sourceWidgetId/sourceColumnId/targetColumnId combination returned by columnSelectByOptions; null clears the link. Ref/RefList column links are limited to the bridge's non-summary, non-attachment, non-custom safe subset and are revalidated against current metadata before write.",
+          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. sort accepts at most 20 stable column IDs with asc/desc and the bounded emptyLast/naturalSort/orderByChoice flags; null or [] clears the saved sort. Column IDs are resolved against current widget-table metadata before write. selectBy may use a direct sourceWidgetId from directSelectByOptions, or an exact sourceWidgetId/sourceColumnId/targetColumnId combination returned by columnSelectByOptions; null clears the link. Ref/RefList column links are limited to the bridge's non-summary, non-attachment, non-custom safe subset and are revalidated against current metadata before write.",
         "x-openai-isConsequential": true,
         parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
         requestBody: {
@@ -243,6 +263,49 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
                     enum: [...GRIST_CHART_TYPES],
                     description:
                       "Native Grist chart type. Accepted only when the explicitly identified target widget is a chart."
+                  },
+                  sort: {
+                    anyOf: [
+                      {
+                        type: "array",
+                        maxItems: MAX_WIDGET_SORT_COLUMNS,
+                        description:
+                          "Saved widget sort in priority order. Use stable column IDs from the widget's table; [] clears the sort.",
+                        items: {
+                          type: "object",
+                          additionalProperties: false,
+                          required: ["columnId", "direction"],
+                          properties: {
+                            columnId: {
+                              type: "string",
+                              minLength: 1,
+                              description:
+                                "Exact existing column ID on the target widget's current table. Never invent a numeric Grist colRef."
+                            },
+                            direction: {
+                              type: "string",
+                              enum: [...WIDGET_SORT_DIRECTIONS]
+                            },
+                            emptyLast: {
+                              type: "boolean",
+                              description:
+                                "When true, place empty values after non-empty values."
+                            },
+                            naturalSort: {
+                              type: "boolean",
+                              description:
+                                "Natural numeric-aware text ordering. Accepted only for Text columns."
+                            },
+                            orderByChoice: {
+                              type: "boolean",
+                              description:
+                                "Use configured choice order. Accepted only for Choice/ChoiceList columns."
+                            }
+                          }
+                        }
+                      },
+                      { type: "null" }
+                    ]
                   },
                   selectBy: {
                     anyOf: [
@@ -342,6 +405,7 @@ export function registerUiActionApi(
             ? { description: parsed.description }
             : {}),
           ...(parsed.chartType !== undefined ? { chartType: parsed.chartType } : {}),
+          ...(parsed.sort !== undefined ? { sort: parsed.sort } : {}),
           ...(parsed.selectBy !== undefined ? { selectBy: parsed.selectBy } : {})
         };
         res.json(
