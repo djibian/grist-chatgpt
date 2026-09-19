@@ -4,6 +4,10 @@ import {
   type ColumnSelectByInput
 } from "./selectBy.js";
 import { GristApiError } from "./client.js";
+import {
+  normalizePageLayout,
+  type NormalizedPageLayout
+} from "./pageLayout.js";
 import { normalizeExistingSelectBy } from "./selectByContext.js";
 import {
   normalizeWidgetSort,
@@ -48,6 +52,8 @@ export interface GristPage {
   indentation: number;
   pagePos?: number;
   layoutSpec?: unknown;
+  layoutNormalized?: NormalizedPageLayout;
+  layoutNormalizationIncomplete?: true;
   widgets: GristPageWidget[];
 }
 
@@ -118,8 +124,12 @@ function tableRefMap(tableResponse: unknown): Map<number, string> {
 
 function hasExpandedColumns(tableResponse: unknown): boolean {
   const root = record(tableResponse);
-  const source = Array.isArray(root?.tables) ? root.tables : [];
+  const source = Array.isArray(root?.tables) ? rawTables(root.tables) : [];
   return source.some((entry) => Array.isArray(record(entry)?.columns));
+}
+
+function rawTables(value: unknown[]): unknown[] {
+  return value;
 }
 
 export class DocumentUiService {
@@ -190,6 +200,10 @@ export class DocumentUiService {
         const pagePos = number(pageRecord.fields.pagePos);
         const layoutSpec = jsonText(view.fields.layoutSpec);
         const widgets = (widgetsByPage.get(pageId) ?? []).sort((a, b) => a.id - b.id);
+        const normalizedLayout = normalizePageLayout(
+          layoutSpec,
+          widgets.map((widget) => widget.id)
+        );
         const page: GristPage = {
           id: pageId,
           pageRecordId: pageRecord.id,
@@ -198,6 +212,7 @@ export class DocumentUiService {
           indentation: number(pageRecord.fields.indentation) ?? 0,
           ...(pagePos !== undefined ? { pagePos } : {}),
           ...(layoutSpec !== undefined ? { layoutSpec } : {}),
+          ...normalizedLayout,
           widgets
         };
         return [page];
