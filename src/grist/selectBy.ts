@@ -31,8 +31,8 @@ interface SelectByNode {
 
 export interface ColumnSelectByInput {
   sourceWidgetId: number;
-  sourceColumnId?: string;
-  targetColumnId?: string;
+  sourceColumnId?: string | undefined;
+  targetColumnId?: string | undefined;
 }
 
 export interface ColumnSelectByOption extends ColumnSelectByInput {}
