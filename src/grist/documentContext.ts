@@ -1,5 +1,9 @@
 import type { DocumentUiContext } from "./documentUi.js";
-import { FormulaInspector, type FormulaColumnMetadata } from "./formulaInspector.js";
+import {
+  FormulaInspector,
+  type FormulaColumnMetadata,
+  type FormulaTableMetadata
+} from "./formulaInspector.js";
 
 type JsonRecord = Record<string, unknown>;
 type RelationKind = "Ref" | "RefList";
@@ -88,6 +92,11 @@ export class DocumentContextService {
       return [{ id: tableId, columns }];
     });
 
+    const formulaTables: FormulaTableMetadata[] = parsedTables.map(table => ({
+      id: table.id,
+      columns: table.columns.map(column => ({ id: column.id, type: column.type }))
+    }));
+
     const columnByRef = new Map<number, ParsedColumn>();
     for (const table of parsedTables) {
       for (const column of table.columns) {
@@ -98,6 +107,8 @@ export class DocumentContextService {
 
     const relations: DocumentRelation[] = [];
     let formulaReferenceCount = 0;
+    let formulaDereferenceCount = 0;
+    let formulaDereferenceWarningCount = 0;
     let formulaWarningCount = 0;
 
     const tables = parsedTables.map((table) => {
@@ -151,13 +162,20 @@ export class DocumentContextService {
         const isFormula = boolean(column.fields.isFormula) ?? false;
         const formula = text(column.fields.formula);
         const formulaAnalysis = isFormula && formula
-          ? this.formulaInspector.inspect(formula, formulaColumns)
+          ? this.formulaInspector.inspect(formula, formulaColumns, formulaTables)
           : undefined;
         if (formulaAnalysis) {
-          formulaReferenceCount += formulaAnalysis.references.length;
-          formulaWarningCount += formulaAnalysis.references.filter(
+          const referenceWarnings = formulaAnalysis.references.filter(
             reference => reference.status !== "ok"
           ).length;
+          const dereferences = formulaAnalysis.dereferences ?? [];
+          const dereferenceWarnings = dereferences.filter(
+            dereference => dereference.status !== "ok"
+          ).length;
+          formulaReferenceCount += formulaAnalysis.references.length;
+          formulaDereferenceCount += dereferences.length;
+          formulaDereferenceWarningCount += dereferenceWarnings;
+          formulaWarningCount += referenceWarnings + dereferenceWarnings;
         }
 
         return {
@@ -179,6 +197,8 @@ export class DocumentContextService {
         columnCount: tables.reduce((count, table) => count + table.columns.length, 0),
         relationCount: relations.length,
         formulaReferenceCount,
+        formulaDereferenceCount,
+        formulaDereferenceWarningCount,
         formulaWarningCount,
         ...(ui
           ? {

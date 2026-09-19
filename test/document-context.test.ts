@@ -38,6 +38,8 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
       columnCount: number;
       relationCount: number;
       formulaReferenceCount: number;
+      formulaDereferenceCount: number;
+      formulaDereferenceWarningCount: number;
       formulaWarningCount: number;
     };
     tables: Array<{
@@ -64,6 +66,8 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
     columnCount: 4,
     relationCount: 1,
     formulaReferenceCount: 1,
+    formulaDereferenceCount: 0,
+    formulaDereferenceWarningCount: 0,
     formulaWarningCount: 0
   });
   assert.equal(context.tables[0]?.columns[2]?.formula, "$Nom.upper()");
@@ -83,6 +87,83 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
       sourceColumn: "Enseignant",
       kind: "Ref",
       targetTable: "Enseignants"
+    }
+  ]);
+});
+
+test("surfaces one-hop reference-field diagnostics without reading rows", () => {
+  const tableResponse = {
+    tables: [
+      {
+        id: "Eleves",
+        columns: [
+          { id: "Enseignant", fields: { type: "Ref:Enseignants" } },
+          { id: "Groupes", fields: { type: "RefList:Groupes" } },
+          {
+            id: "Diagnostic",
+            fields: {
+              type: "Text",
+              isFormula: true,
+              formula: "$Enseignant.Nom + $Enseignant.nom + $Groupes.Libelle"
+            }
+          }
+        ]
+      },
+      {
+        id: "Enseignants",
+        columns: [{ id: "Nom", fields: { type: "Text" } }]
+      },
+      {
+        id: "Groupes",
+        columns: [{ id: "Libelle", fields: { type: "Text" } }]
+      }
+    ]
+  };
+
+  const context = new DocumentContextService().build("doc-1", tableResponse) as {
+    summary: {
+      formulaReferenceCount: number;
+      formulaDereferenceCount: number;
+      formulaDereferenceWarningCount: number;
+      formulaWarningCount: number;
+    };
+    tables: Array<{
+      columns: Array<{
+        formulaAnalysis?: {
+          dereferences?: unknown[];
+        };
+      }>;
+    }>;
+  };
+
+  assert.equal(context.summary.formulaReferenceCount, 2);
+  assert.equal(context.summary.formulaDereferenceCount, 3);
+  assert.equal(context.summary.formulaDereferenceWarningCount, 1);
+  assert.equal(context.summary.formulaWarningCount, 1);
+  assert.deepEqual(context.tables[0]?.columns[2]?.formulaAnalysis?.dereferences, [
+    {
+      path: "$Enseignant.Nom",
+      sourceColumnId: "Enseignant",
+      targetTableId: "Enseignants",
+      field: "Nom",
+      status: "ok",
+      resolved: { columnId: "Nom", type: "Text" }
+    },
+    {
+      path: "$Enseignant.nom",
+      sourceColumnId: "Enseignant",
+      targetTableId: "Enseignants",
+      field: "nom",
+      status: "case_mismatch",
+      suggestion: { columnId: "Nom", type: "Text" }
+    },
+    {
+      path: "$Groupes.Libelle",
+      sourceColumnId: "Groupes",
+      targetTableId: "Groupes",
+      field: "Libelle",
+      status: "ok",
+      resolved: { columnId: "Libelle", type: "Text" }
     }
   ]);
 });
