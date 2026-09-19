@@ -8,6 +8,7 @@
     "tools/oauth-bridge-probe.ts",
     "tools/oauth-negative-probe.ts",
     "tools/mcp-http-oauth-probe.ts",
-    "tools/chatgpt-oauth-readiness-probe.ts"
+    "tools/chatgpt-oauth-readiness-probe.ts",
+    "tools/plugin-submission-annotations.ts"
   ]
 }
