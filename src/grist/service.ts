@@ -137,7 +137,11 @@ export class GristService {
     this.assertSchemaCount(tables.length);
     this.assertUniqueStrings(tables.map((table) => table.id), "Table IDs");
     for (const table of tables) this.assertIdentifier(table.id, "Table ID");
-    return this.client.updateTables(documentId, tables);
+    await this.client.updateTables(documentId, tables);
+    return {
+      targetTableIds: tables.map((table) => table.id),
+      updated: true
+    };
   }
 
   async deleteTable(documentIdOrUrl: string, tableId: string): Promise<unknown> {
@@ -180,7 +184,12 @@ export class GristService {
     this.assertSchemaCount(columns.length);
     this.assertUniqueStrings(columns.map((column) => column.id), "Column IDs");
     for (const column of columns) this.assertIdentifier(column.id, "Column ID");
-    return this.client.updateColumns(documentId, tableId, columns);
+    await this.client.updateColumns(documentId, tableId, columns);
+    return {
+      tableId,
+      targetColumnIds: columns.map((column) => column.id),
+      updated: true
+    };
   }
 
   async renameColumn(
@@ -213,11 +222,12 @@ export class GristService {
     this.assertUniqueStrings(columnIds, "Column IDs");
     for (const columnId of columnIds) this.assertIdentifier(columnId, "Column ID");
 
-    return this.executeBatches(
+    await this.executeBatchesForAcknowledgement(
       "deleteColumns",
       columnIds.map((columnId) => [columnId]),
       async (batch) => this.client.deleteColumn(documentId, tableId, batch[0]!)
     );
+    return { tableId, columnIds, deleted: true };
   }
 
   async queryRecords(
@@ -259,11 +269,16 @@ export class GristService {
   ): Promise<unknown> {
     const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
     this.assertWriteCount(records.length);
-    return this.executeBatches(
+    await this.executeBatchesForAcknowledgement(
       "updateRecords",
       chunk(records, this.options.writeBatchRecords),
       async (batch) => this.client.updateRecords(documentId, tableId, batch)
     );
+    return {
+      tableId,
+      recordIds: records.map((record) => record.id),
+      updated: true
+    };
   }
 
   async deleteRecords(
@@ -274,11 +289,12 @@ export class GristService {
     const documentId = await this.accessPolicy.assertDocumentAllowed(documentIdOrUrl);
     this.assertRecordIds(recordIds);
     this.assertWriteCount(recordIds.length);
-    return this.executeBatches(
+    await this.executeBatchesForAcknowledgement(
       "deleteRecords",
       chunk(recordIds, this.options.writeBatchRecords),
       async (batch) => this.client.deleteRecords(documentId, tableId, batch)
     );
+    return { tableId, recordIds, deleted: true };
   }
 
   private async executeBatches<T>(
@@ -307,6 +323,31 @@ export class GristService {
     }
 
     return batchedResult(results);
+  }
+
+  private async executeBatchesForAcknowledgement<T>(
+    operation: string,
+    batches: T[][],
+    execute: (batch: T[]) => Promise<unknown>
+  ): Promise<void> {
+    let completedItems = 0;
+
+    for (let index = 0; index < batches.length; index += 1) {
+      const batch = batches[index]!;
+      try {
+        await execute(batch);
+        completedItems += batch.length;
+      } catch (error) {
+        if (index === 0) throw error;
+        throw new PartialBatchError(
+          operation,
+          index,
+          completedItems,
+          index + 1,
+          error
+        );
+      }
+    }
   }
 
   private defaultReadLimit(): number {
