@@ -21,6 +21,7 @@ import {
 } from "./selectBy.js";
 import { DocumentContextService } from "./documentContext.js";
 import { DocumentUiService, type DocumentUiContext, type GristPageWidget } from "./documentUi.js";
+import { projectPublicColumns, projectPublicTables } from "./publicMetadata.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
 import {
   GristUiActionsAdapter,
@@ -392,8 +393,8 @@ export class AuthorizedGristService {
     documentIdOrUrl: string,
     options: { expandColumns?: boolean } = {}
   ): Promise<unknown> {
-    return this.execute("list_tables", documentIdOrUrl, undefined, (id) =>
-      this.inner.listTables(id, options)
+    return this.execute("list_tables", documentIdOrUrl, undefined, async (id) =>
+      projectPublicTables(await this.inner.listTables(id, options))
     );
   }
 
@@ -402,8 +403,8 @@ export class AuthorizedGristService {
     tableId: string,
     options: { hidden?: boolean } = {}
   ): Promise<unknown> {
-    return this.execute("list_columns", documentIdOrUrl, undefined, (id) =>
-      this.inner.listColumns(id, tableId, options)
+    return this.execute("list_columns", documentIdOrUrl, undefined, async (id) =>
+      projectPublicColumns(await this.inner.listColumns(id, tableId, options))
     );
   }
 
