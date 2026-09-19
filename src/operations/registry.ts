@@ -242,7 +242,7 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     title: "Inspect page widgets",
     summary: "Inspect normalized page widget metadata and select-by links.",
     description:
-      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, description, native chart type, options, layout metadata, select-by links and directSelectByOptions. These snapshot options contain sourceWidgetId values supported by update_page_widget for this target (same page/table, safe source type, no cycle); an empty untruncated list means no supported source. Discovery budgets 1000 options and 10000 candidate checks per response in widget-ID order; directSelectByOptionsTruncated marks incomplete lists. Updates revalidate current metadata."
+      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, description, native chart type, options, layout metadata and select-by links. directSelectByOptions advertises supported same-table cursor links. columnSelectByOptions advertises a stricter non-summary Ref/RefList subset using reusable sourceWidgetId/sourceColumnId/targetColumnId values. Both lists are bounded and carry explicit truncation flags; update_page_widget revalidates current metadata before writing."
   },
   {
     name: "create_page",
@@ -289,9 +289,9 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     openWorld: false,
     title: "Update a page widget",
     summary:
-      "Update one widget title, description, native chart type and/or its safe direct select-by link.",
+      "Update bounded widget metadata and/or one explicitly advertised select-by link.",
     description:
-      "Update one widget title, description, native chart type and/or a safe direct select-by link. An empty description clears it. chartType accepts only the bounded native Grist chart-type vocabulary and is rejected unless the target widget is a chart. Direct select-by is limited to another widget on the same page backed by the same table; null clears the link. The result is verified by re-reading the page."
+      "Update one widget title, description, native chart type and/or a bounded select-by link. An empty description clears it. chartType is rejected unless the target is a chart. Direct same-table links use sourceWidgetId only; supported Ref/RefList links use the exact sourceWidgetId/sourceColumnId/targetColumnId combination advertised by get_page_widgets. Column links exclude summary tables, attachments, chart/custom sources and cycles. null clears the link. The result is verified by re-reading the page."
   },
   {
     name: "grist_help",

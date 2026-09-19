@@ -41,6 +41,18 @@ const pageWidgetSchema = z.object({
   selectBy: widgetSelectBySchema.optional()
 });
 
+const columnSelectByOptionSchema = z
+  .object({
+    sourceWidgetId: z.number().int().positive(),
+    sourceColumnId: z.string().min(1).optional(),
+    targetColumnId: z.string().min(1).optional()
+  })
+  .refine(
+    (value) =>
+      value.sourceColumnId !== undefined || value.targetColumnId !== undefined,
+    "At least one Ref/RefList column ID is required."
+  );
+
 export const pagesOutputSchema = z.object({
   documentId: z.string().min(1),
   summary: pageSummarySchema,
@@ -50,12 +62,18 @@ export const pagesOutputSchema = z.object({
 export const pageWidgetsOutputSchema = z.object({
   documentId: z.string().min(1),
   page: pageInfoSchema,
-  widgets: z.array(pageWidgetSchema.extend({
-    directSelectByOptions: z.array(z.object({
-      sourceWidgetId: z.number().int().positive()
-    })),
-    directSelectByOptionsTruncated: z.boolean()
-  }))
+  widgets: z.array(
+    pageWidgetSchema.extend({
+      directSelectByOptions: z.array(
+        z.object({
+          sourceWidgetId: z.number().int().positive()
+        })
+      ),
+      directSelectByOptionsTruncated: z.boolean(),
+      columnSelectByOptions: z.array(columnSelectByOptionSchema),
+      columnSelectByOptionsTruncated: z.boolean()
+    })
+  )
 });
 
 export const pageMutationOutputSchema = z.object({

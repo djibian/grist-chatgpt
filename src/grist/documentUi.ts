@@ -1,4 +1,7 @@
-import { directSelectByValidator } from "./selectBy.js";
+import {
+  directSelectByValidator,
+  discoverColumnSelectByOptions
+} from "./selectBy.js";
 import { GristApiError } from "./client.js";
 
 type JsonRecord = Record<string, unknown>;
@@ -209,7 +212,11 @@ export class DocumentUiService {
     };
   }
 
-  getPageWidgets(context: DocumentUiContext, pageId: number): unknown {
+  getPageWidgets(
+    context: DocumentUiContext,
+    pageId: number,
+    expandedTableResponse?: unknown
+  ): unknown {
     const page = context.pages.find((candidate) => candidate.id === pageId);
     if (!page) {
       throw new GristApiError(
@@ -221,10 +228,13 @@ export class DocumentUiService {
     const assertAllowed = directSelectByValidator(context);
     let remainingOptions = 1000;
     let remainingCandidates = 10000;
+    let remainingColumnOptions = 1000;
+    let remainingColumnCandidates = 10000;
+
     return {
       documentId: context.documentId,
       page: pageInfo,
-      widgets: widgets.map((target) => {
+      widgets: widgets.map((target, targetIndex) => {
         const directSelectByOptions: Array<{ sourceWidgetId: number }> = [];
         let examined = 0;
         for (const source of widgets) {
@@ -239,10 +249,52 @@ export class DocumentUiService {
             // Unsupported candidates never become advertised update inputs.
           }
         }
+
+        const remainingTargets = widgets.length - targetIndex;
+        const maxColumnOptions =
+          remainingTargets > 0
+            ? Math.floor(remainingColumnOptions / remainingTargets)
+            : 0;
+        const maxColumnCandidates =
+          remainingTargets > 0
+            ? Math.floor(remainingColumnCandidates / remainingTargets)
+            : 0;
+        let columnSelectByOptions: Array<{
+          sourceWidgetId: number;
+          sourceColumnId?: string | undefined;
+          targetColumnId?: string | undefined;
+        }> = [];
+        let columnSelectByOptionsTruncated = false;
+
+        if (expandedTableResponse !== undefined) {
+          if (maxColumnOptions === 0 || maxColumnCandidates === 0) {
+            columnSelectByOptionsTruncated = true;
+          } else {
+            const discovered = discoverColumnSelectByOptions(
+              context,
+              expandedTableResponse,
+              target,
+              {
+                maxOptions: maxColumnOptions,
+                maxCandidates: maxColumnCandidates
+              }
+            );
+            columnSelectByOptions = discovered.options;
+            columnSelectByOptionsTruncated = discovered.truncated;
+          }
+        }
+        remainingColumnOptions -= columnSelectByOptions.length;
+        remainingColumnCandidates = Math.max(
+          0,
+          remainingColumnCandidates - maxColumnCandidates
+        );
+
         return {
           ...target,
           directSelectByOptions,
-          directSelectByOptionsTruncated: examined < widgets.length
+          directSelectByOptionsTruncated: examined < widgets.length,
+          columnSelectByOptions,
+          columnSelectByOptionsTruncated
         };
       })
     };
