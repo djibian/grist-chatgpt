@@ -8,9 +8,12 @@ const resourceUri = "https://bridge.example.org/mcp";
 const metadataUrl = "https://bridge.example.org/.well-known/oauth-protected-resource";
 
 function response(body: unknown, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
   return new Response(JSON.stringify(body), {
+    ...init,
     status: init.status ?? 200,
-    headers: { "content-type": "application/json", ...(init.headers ?? {}) }
+    headers
   });
 }
 
