@@ -32,6 +32,31 @@ function grantMatches(
   return grant.documentIds.some((id) => candidates.includes(String(id)));
 }
 
+function minimizeAllowedDocument({
+  org,
+  workspace,
+  document
+}: AllowedDocument): AllowedDocument {
+  return {
+    org: {
+      id: org.id,
+      ...(org.name !== undefined ? { name: org.name } : {}),
+      ...(org.domain !== undefined ? { domain: org.domain } : {})
+    },
+    workspace: {
+      id: workspace.id,
+      ...(workspace.name !== undefined ? { name: workspace.name } : {}),
+      ...(workspace.access !== undefined ? { access: workspace.access } : {})
+    },
+    document: {
+      id: document.id,
+      ...(document.name !== undefined ? { name: document.name } : {}),
+      ...(document.urlId !== undefined ? { urlId: document.urlId } : {}),
+      ...(document.access !== undefined ? { access: document.access } : {})
+    }
+  };
+}
+
 export class AuthorizationService {
   constructor(private readonly deploymentPolicy: AccessPolicy) {}
 
@@ -40,9 +65,11 @@ export class AuthorizationService {
     capability: GristCapability = "doc:read"
   ): Promise<AllowedDocument[]> {
     const allowed = await this.deploymentPolicy.listAllowedDocuments();
-    return allowed.filter((document) =>
-      principal.grants.some((grant) => grantMatches(grant, document, capability))
-    );
+    return allowed
+      .filter((document) =>
+        principal.grants.some((grant) => grantMatches(grant, document, capability))
+      )
+      .map(minimizeAllowedDocument);
   }
 
   async assertDocumentAllowed(
