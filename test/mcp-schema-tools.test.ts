@@ -39,7 +39,7 @@ test("MCP schema surface exposes the expected bounded tools and destructive hint
   );
 
   const byName = new Map(registrations.map((entry) => [entry.name, entry]));
-  assert.equal(byName.get("list_columns")?.annotations?.readOnlyHint, true);
+  assert.equal(byName.get("list_columns")?.annotations?.readOnlyHint, false);
   assert.equal(byName.get("delete_table")?.annotations?.destructiveHint, true);
   assert.equal(byName.get("delete_columns")?.annotations?.destructiveHint, true);
   assert.equal(byName.get("create_tables")?.annotations?.destructiveHint, false);

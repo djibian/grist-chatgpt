@@ -204,13 +204,15 @@ Production should additionally provide per-principal rate limiting and explicit 
 
 MCP annotations describe the actual operation:
 
-- reads use `readOnlyHint: true`;
+- audited reads use `readOnlyHint: false` and `destructiveHint: false`; only the unaudited `grist_help` uses `readOnlyHint: true`;
 - destructive record/table/column deletion uses `destructiveHint: true`;
 - operations confined to the configured private Grist environment use `openWorldHint: false`.
 
 These hints do not grant permission. OAuth scopes, principal grants, deployment policy and Grist ACLs remain independent enforcement layers.
 
 GPT Actions' `x-openai-isConsequential` flag is an approval/UX concern for the temporary GPT Actions adapter, not a bridge security boundary. The server-side authorization model must remain correct regardless of that flag.
+
+`list_documents`, `list_tables`, `list_columns`, `query_records`, `inspect_document`, `get_pages` and `get_page_widgets` retain `doc:read` authorization but declare `readOnlyHint: false`, `destructiveHint: false` and `openWorldHint: false`: their execution appends an audit event without changing Grist user data. Only `grist_help` remains `readOnlyHint: true`. Audit remains enabled; hints do not change OAuth scopes or authorization.
 
 ## Prompt injection and returned data
 

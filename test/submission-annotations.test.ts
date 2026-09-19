@@ -24,6 +24,8 @@ const additiveWrites = [
   "create_tables"
 ].sort();
 
+const auditedReads = ["list_documents", "list_tables", "list_columns", "query_records", "inspect_document", "get_pages", "get_page_widgets"].sort();
+
 test("MCP destructive annotations distinguish overwrite/delete from additive writes", () => {
   assert.deepEqual(
     OPERATION_REGISTRY.filter((operation) => !operation.readOnly && operation.destructive)
@@ -36,7 +38,7 @@ test("MCP destructive annotations distinguish overwrite/delete from additive wri
     OPERATION_REGISTRY.filter((operation) => !operation.readOnly && !operation.destructive)
       .map((operation) => operation.name)
       .sort(),
-    additiveWrites
+    [...additiveWrites, ...auditedReads].sort()
   );
 });
 
@@ -50,4 +52,27 @@ test("every public tool has non-empty submission justifications for all three an
     assert.ok(tool.justifications.openWorldHint.trim().length > 0, tool.name);
     assert.equal(tool.annotations.openWorldHint, false, tool.name);
   }
+});
+
+
+test("audited reads retain read capability and report only additive audit side effects", () => {
+  assert.deepEqual(
+    OPERATION_REGISTRY.filter((operation) => operation.auditOnly)
+      .map((operation) => operation.name).sort(),
+    auditedReads
+  );
+  for (const name of auditedReads) {
+    const operation = OPERATION_REGISTRY.find((entry) => entry.name === name)!;
+    assert.equal(operation.capability, "doc:read");
+    const tool = buildSubmissionToolAnnotations().find((entry) => entry.name === name)!;
+    assert.deepEqual(tool.annotations, {
+      readOnlyHint: false, destructiveHint: false, openWorldHint: false
+    });
+    assert.match(tool.justifications.readOnlyHint, /appends an audit event/);
+    assert.match(tool.justifications.destructiveHint, /does not overwrite or delete user data/);
+  }
+  assert.deepEqual(
+    OPERATION_REGISTRY.filter((operation) => operation.readOnly).map((operation) => operation.name),
+    ["grist_help"]
+  );
 });

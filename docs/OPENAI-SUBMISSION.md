@@ -196,3 +196,61 @@ Official references to re-check again immediately before submission:
 - https://developers.openai.com/plugins/deploy/app-review
 - https://developers.openai.com/plugins/deploy/submission-errors
 - https://developers.openai.com/plugins/build/auth
+
+
+## Prepared import draft
+
+`chatgpt-app-submission.json` follows the official skill v1 import format and contains
+22 tools, five positive scenarios and three negative **non-invocation** scenarios.
+The authorization/invalid-link negative scenarios above remain separate runtime
+security checks: they invoke tools and therefore are not the skill's negative
+routing tests. Neither set is evidence of live reviewer-fixture execution.
+
+Remote MCP only, no distributed skills or Apps SDK UI. Enter
+`https://grist-chatgpt.loeildumaitre.fr/mcp` in the portal's MCP URL field: the
+skill's import contract has no endpoint field. Do not extend the JSON with
+invented publisher, authentication or domain-verification fields.
+
+### Manual completion
+
+- Confirm final public display name/copy/category and logo; draft name follows package metadata.
+- Supply verified publisher identity and app-management permission.
+- Supply website, support, privacy and terms HTTPS URLs.
+- Select countries/regions, release notes and up to three starter prompts.
+- Resolve S0 authorization/eligibility before final public submission.
+- Supply reviewer login and instructions securely through the portal; never put credentials in this JSON or the repository.
+- Provision an isolated synthetic Grist fixture, record its document/table identifiers in reviewer instructions, and execute/reset the proposed scenarios.
+- Supply the demo recording URL; attachments and expected-output URLs remain null because none were provided.
+- Complete production/OAuth/UserInfo validation, portal tool scan and the exact portal-issued domain challenge.
+
+### Proposed synthetic fixture (not provisioned)
+
+Before running the import scenarios, supply one authorized synthetic document
+with a `ReviewTasks` table containing text columns `Title` and `Status`, at least
+three rows with `Status = Open`, and no row titled `NoSuchSyntheticTask`.
+Include at least one Ref relationship, an existing page and a widget so the
+structural scenario can verify all advertised metadata. The reviewer needs
+`doc:read`, `doc:write` and `doc.schema:write` on this isolated document.
+Start each run from a clean fixture without `ReviewMetrics`, `Review dashboard`,
+`Review Alpha` or `Review Beta`; use an operator-managed reset between runs.
+These are proposed synthetic names, not claims that a live fixture exists.
+Never replay a partial or ambiguous write merely to reset a scenario.
+
+### Source review and separate non-blocking improvement
+
+No dedicated tool input requests credentials or sensitive personal identifiers.
+Record fields and returned Grist data may contain personal information; complete
+the existing data-minimization/privacy review and use synthetic reviewer data.
+Tool names and descriptions match their bounded Grist actions. There is no Apps
+SDK widget resource or widget CSP to review; Grist page widgets are upstream
+objects, not embedded ChatGPT UI.
+
+Missing `outputSchema` (deferred, not changed in this preparation):
+`list_documents`, `list_tables`, `list_columns`, `query_records`, `create_records`,
+`update_records`, `delete_records`, `create_tables`, `update_tables`, `delete_table`,
+`create_columns`, `update_columns`, `rename_column`, `delete_columns`,
+`inspect_document`, `grist_help`.
+
+Add an outputSchema so models can use this tool's results more reliably.
+See https://modelcontextprotocol.io/specification/draft/server/tools#tool.
+Follow the normalization strategy in `MCP-CONTRACT.md` as separate work.

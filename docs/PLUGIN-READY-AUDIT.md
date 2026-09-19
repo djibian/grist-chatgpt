@@ -37,7 +37,7 @@ Official references:
 | Bounded Grist business surface | PASS | Records, schema, discovery and bounded document-UI operations are integrated. |
 | MCP-first contract | PASS | Registry-driven tools, user-oriented metadata, structured results/errors and stable capabilities are integrated. |
 | Tool risk annotations | PASS for values | Every operation has explicit `readOnlyHint`, `destructiveHint`, `openWorldHint` derived from the operation registry. |
-| Annotation justifications for submission | MISSING | OpenAI final submission requires a justification for each annotation value for each MCP tool; the registry contains values but not submission-ready justifications. |
+| Annotation justifications for submission | PASS for draft | Generated from the normative registry by `npm run submission:annotations` and mapped into `chatgpt-app-submission.json`. |
 | Credential abstraction | PASS | `GristCredentialProvider` / `GristClientFactory` seam integrated. |
 | Principal/cache isolation | PASS | Fresh per-principal Grist contexts and explicit cross-user isolation tests are integrated. |
 | OAuth MCP resource server | PASS for POC/runtime | OAuth mode, JWT/JWKS, issuer/audience/expiry policy, dynamic Principal and scope enforcement are implemented and exercised on actual `/mcp`. |
@@ -78,9 +78,9 @@ The operation registry already supplies explicit values for all three required a
 - `destructiveHint`;
 - `openWorldHint`.
 
-Current operations stay within the configured Grist environment, so `openWorldHint: false` is coherent. Destructive record/table/column deletes are explicitly marked destructive. Read tools are explicitly read-only.
+Current operations stay within the configured Grist environment, so `openWorldHint: false` is coherent. Destructive record/table/column deletes are explicitly marked destructive. `list_documents`, `list_tables`, `list_columns`, `query_records`, `inspect_document`, `get_pages` and `get_page_widgets` retain `doc:read` authorization but declare `readOnlyHint: false`, `destructiveHint: false` and `openWorldHint: false`: their execution appends an audit event without changing Grist user data. Only `grist_help` remains `readOnlyHint: true`. Audit remains enabled; hints do not change OAuth scopes or authorization.
 
-The missing submission artifact is not the values themselves; it is the **per-tool justification text** required by the final submission validator.
+The draft submission artifact includes per-tool justifications; final live tool scan and reviewer validation remain pending.
 
 ### OAuth/MCP interoperability
 
@@ -215,7 +215,7 @@ After S0 is viable:
 In parallel where low risk:
 
 - prove OIDC `openid`/`email` + UserInfo verified email for the final client path;
-- add submission-ready per-tool annotation justifications;
+- revalidate generated annotation justifications against the deployed tool scan;
 - implement configurable one-token domain challenge serving;
 - define the exact 5 positive / 3 negative reviewer scenarios.
 

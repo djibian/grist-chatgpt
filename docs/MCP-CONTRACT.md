@@ -21,7 +21,7 @@ Input schemas remain next to their concrete MCP registrations because they conta
 
 The current contract follows these rules:
 
-- true reads use `readOnlyHint: true`;
+- only operations with no state changes, including no audit writes, use `readOnlyHint: true`;
 - mutations use `readOnlyHint: false`;
 - additive create operations use `destructiveHint: false` because they do not overwrite or remove existing user state;
 - writes that can overwrite, rename, clear or delete existing Grist state use `destructiveHint: true`, including record/schema/UI updates and explicit deletions;
@@ -33,6 +33,8 @@ This follows the MCP annotation semantics and OpenAI plugin guidance: `destructi
 Full-surface tests compare every MCP registration with the registry and pin the destructive/read-only sets.
 
 For OpenAI submission, `src/operations/submissionAnnotations.ts` derives a non-secret justification for each of the three annotation values for every registered operation. `npm run submission:annotations` prints the resulting submission artifact from the same registry so annotation values and justifications can be reviewed without hand-maintained drift.
+
+`list_documents`, `list_tables`, `list_columns`, `query_records`, `inspect_document`, `get_pages` and `get_page_widgets` retain `doc:read` authorization but declare `readOnlyHint: false`, `destructiveHint: false` and `openWorldHint: false`: their execution appends an audit event without changing Grist user data. Only `grist_help` remains `readOnlyHint: true`. Audit remains enabled; hints do not change OAuth scopes or authorization.
 
 ## Structured successful outputs
 

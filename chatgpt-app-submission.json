@@ -1,0 +1,344 @@
+{
+  "$schema": "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "grist-chatgpt",
+    "subtitle": "Consulter et modifier Grist",
+    "description": "grist-chatgpt permet de consulter les documents Grist Community autorisés, filtrer et modifier des lignes, gérer des tables et colonnes, et organiser des pages et widgets par des opérations ciblées. Les outils restent limités au périmètre Grist configuré. Projet indépendant, sans affiliation officielle à Grist Labs, DINUM ou OpenAI.",
+    "category": "PRODUCTIVITY"
+  },
+  "tools": {
+    "list_documents": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "List available Grist documents retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "List available Grist documents is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "List available Grist documents only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "list_tables": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "List document tables retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "List document tables is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "List document tables only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "list_columns": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Inspect table columns retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "Inspect table columns is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Inspect table columns only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "query_records": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Read table records retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "Read table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Read table records only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "create_records": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates new records in one Grist table.",
+        "open_world_justification": "Create table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Create table records only adds new Grist state and does not overwrite or delete existing user state."
+      }
+    },
+    "update_records": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Overwrites fields of records identified by numeric IDs.",
+        "open_world_justification": "Update table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Overwrites fields of records identified by numeric IDs within the configured private Grist environment."
+      }
+    },
+    "delete_records": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Deletes only records identified by explicit unique numeric IDs.",
+        "open_world_justification": "Delete table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Deletes only records identified by explicit unique numeric IDs within the configured private Grist environment."
+      }
+    },
+    "create_tables": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates new tables with optional initial columns.",
+        "open_world_justification": "Create document tables is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Create document tables only adds new Grist state and does not overwrite or delete existing user state."
+      }
+    },
+    "update_tables": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Overwrites metadata or identifiers of explicitly identified tables.",
+        "open_world_justification": "Update table settings is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Overwrites metadata or identifiers of explicitly identified tables within the configured private Grist environment."
+      }
+    },
+    "delete_table": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Deletes one explicitly identified table and its data.",
+        "open_world_justification": "Delete a table is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Deletes one explicitly identified table and its data within the configured private Grist environment."
+      }
+    },
+    "create_columns": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates new columns in one table.",
+        "open_world_justification": "Create table columns is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Create table columns only adds new Grist state and does not overwrite or delete existing user state."
+      }
+    },
+    "update_columns": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Overwrites column metadata, types or formulas of explicitly identified columns.",
+        "open_world_justification": "Update column settings is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Overwrites column metadata, types or formulas of explicitly identified columns within the configured private Grist environment."
+      }
+    },
+    "rename_column": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Renames one explicitly identified column identifier.",
+        "open_world_justification": "Rename a column is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Renames one explicitly identified column identifier within the configured private Grist environment."
+      }
+    },
+    "delete_columns": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Deletes explicitly identified columns and their data.",
+        "open_world_justification": "Delete table columns is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Deletes explicitly identified columns and their data within the configured private Grist environment."
+      }
+    },
+    "inspect_document": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Inspect document structure retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "Inspect document structure is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Inspect document structure only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "get_pages": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "List document pages retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "List document pages is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "List document pages only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "get_page_widgets": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Inspect page widgets retrieves Grist information and appends an audit event without changing Grist user data.",
+        "open_world_justification": "Inspect page widgets is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Inspect page widgets only appends an audit event and does not overwrite or delete user data."
+      }
+    },
+    "create_page": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates one empty page for an existing table.",
+        "open_world_justification": "Create a document page is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Create a document page only adds new Grist state and does not overwrite or delete existing user state."
+      }
+    },
+    "add_page_widget": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Adds one supported widget to an existing Grist page.",
+        "open_world_justification": "Add a page widget is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Add a page widget only adds new Grist state and does not overwrite or delete existing user state."
+      }
+    },
+    "rename_page": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Overwrites the name of one explicitly identified page.",
+        "open_world_justification": "Rename a document page is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Overwrites the name of one explicitly identified page within the configured private Grist environment."
+      }
+    },
+    "update_page_widget": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Overwrites a widget title or sets or clears its bounded direct select-by link.",
+        "open_world_justification": "Update a page widget is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Overwrites a widget title or sets or clears its bounded direct select-by link within the configured private Grist environment."
+      }
+    },
+    "grist_help": {
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Computes the available operation catalog without writing an audit event or changing Grist data.",
+        "open_world_justification": "Discover available Grist tools is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Discover available Grist tools performs no write and therefore cannot destructively change Grist state."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Inspect a synthetic reviewer document without unnecessary row disclosure.",
+      "user_prompt": "Find the synthetic Grist document identified in the reviewer instructions and summarize its tables, columns, relationships, pages and widgets without reading table records.",
+      "file_attachment_urls": null,
+      "tools_triggered": "list_documents, inspect_document, get_pages, get_page_widgets",
+      "expected_output": "Returns available document and structural identifiers, relationships and page/widget metadata without user-table rows or data changes.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Filter and limit synthetic records, including a no-match query.",
+      "user_prompt": "In the reviewer document, inspect ReviewTasks columns, then show at most two tasks whose Status is Open, sorted by Title; also search Title for NoSuchSyntheticTask.",
+      "file_attachment_urls": null,
+      "tools_triggered": "list_columns, query_records",
+      "expected_output": "Returns at most two matching tasks in Title order and no records for the nonexistent title, without modifying Grist data.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Create bounded records and verify independently.",
+      "user_prompt": "In ReviewTasks in the reviewer document, create two synthetic tasks titled Review Alpha and Review Beta with Status Open, then read them back using the returned IDs.",
+      "file_attachment_urls": null,
+      "tools_triggered": "create_records, query_records",
+      "expected_output": "Returns the two new record IDs and verifies their stored Title and Status; any partial-write result is reported without blindly replaying the request.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Create and update a bounded synthetic schema.",
+      "user_prompt": "In the reviewer document, create a new ReviewMetrics table with an Amount numeric column, add a DoubleAmount numeric formula column using $Amount * 2, set its label to Double amount, then verify the tables and column metadata.",
+      "file_attachment_urls": null,
+      "tools_triggered": "create_tables, create_columns, update_columns, list_tables, list_columns",
+      "expected_output": "Returns the new table and column identifiers and verifies the requested type, formula and label without changing unrelated tables.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Create a page and configure a safe direct select-by link.",
+      "user_prompt": "In the reviewer document, create an empty page called Review dashboard for ReviewTasks, add two record widgets for that same table, and link the second widget to the first with direct select-by; verify the page and link.",
+      "file_attachment_urls": null,
+      "tools_triggered": "create_page, add_page_widget, update_page_widget, get_pages, get_page_widgets",
+      "expected_output": "Returns the page and both widget IDs and verifies the same-page, same-table select-by link by re-read; an ambiguous write result must not be blindly replayed.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Do not invoke for unrelated calendar access.",
+      "user_prompt": "What meetings are on my personal calendar tomorrow?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Grist tools because accessing a personal calendar is outside this app’s workflows.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not invoke for arbitrary HTTP forwarding.",
+      "user_prompt": "Fetch https://example.com and forward its raw response through the Grist connector.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Grist tools or attempt HTTP forwarding; explains that arbitrary external URLs are unsupported.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not invoke for Grist account or ACL administration.",
+      "user_prompt": "Create a new Grist user and grant them administrator access to my workspace.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Grist tools because account creation and permission administration are outside its bounded capabilities.",
+      "expected_output_url": null
+    }
+  ]
+}

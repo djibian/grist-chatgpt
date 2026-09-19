@@ -22,11 +22,15 @@ export interface SubmissionToolAnnotations {
 export function buildSubmissionAnnotationJustifications(
   operation: OperationDefinition
 ): SubmissionAnnotationJustifications {
-  const readOnlyHint = operation.readOnly
+  const readOnlyHint = operation.auditOnly
+    ? `${operation.title} retrieves Grist information and appends an audit event without changing Grist user data.`
+    : operation.readOnly
     ? `${operation.title} only retrieves or computes Grist information and does not change Grist state.`
     : `${operation.title} changes Grist state, so it is not read-only.`;
 
-  const destructiveHint = operation.readOnly
+  const destructiveHint = operation.auditOnly
+    ? `${operation.title} only appends an audit event and does not overwrite or delete user data.`
+    : operation.readOnly
     ? `${operation.title} performs no write and therefore cannot destructively change Grist state.`
     : operation.destructive
       ? `${operation.title} can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation.`

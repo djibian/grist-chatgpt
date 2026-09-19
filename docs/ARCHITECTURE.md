@@ -163,7 +163,7 @@ Because each `AccessPolicy` belongs to one fresh principal context, authorizatio
 - operation name;
 - category;
 - required capability;
-- read-only flag;
+- read-only flag accounting for audit writes, with `auditOnly` metadata distinguishing audited reads from Grist mutations;
 - destructive flag;
 - concise purpose.
 
