@@ -252,9 +252,15 @@ Integrated normalized UI slice:
 - existing column select-by links additionally expose stable `sourceColumnId` / `targetColumnId` values when expanded table metadata resolves every numeric reference exactly, while `selectByNormalizationIncomplete` marks unresolved/unsupported raw state and no partial normalized link is guessed;
 - select-by normalization is bounded to 5,000 columns and retains raw v1 numeric `selectBy` metadata for compatibility.
 
+Integrated normalized relation slice:
+
+- `Ref` / `RefList` relationships keep their stable forward table/column IDs and, when Grist declares a two-way `reverseCol`, expose additive stable-ID `reverse: { table, column, kind }` metadata only after exact bidirectional verification;
+- reverse normalization requires the reverse column to belong to the target table, point semantically back to the source table and have a `reverseCol` that points back to the source `colRef`;
+- unresolved or inconsistent declared reverse links expose only `reverseResolutionIncomplete: true`; numeric `colRef` / `reverseCol` values stay internal and no additional upstream read is performed.
+
 Candidate slices:
 
-- richer normalized relation graph;
+- further normalized relation-graph enrichment only where additional semantic value is demonstrated;
 - more compact summaries for large schemas;
 - richer normalized UI/select-by context beyond the saved-sort/select-by slices above;
 - cache/invalidation behavior that remains principal-isolated;
