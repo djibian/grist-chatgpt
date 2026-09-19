@@ -26,6 +26,8 @@ export interface WidgetUiUpdate {
   chartType?: GristChartType;
   sortColRefs?: readonly ResolvedWidgetSortSpec[];
   selectBy?: WidgetSelectByRefs | null;
+  /** Trusted bridge-generated full section options JSON; never a public model input. */
+  optionsJson?: string;
 }
 
 type ApplyUserActionsClient = Pick<GristClient, "applyUserActions">;
@@ -219,6 +221,18 @@ export class GristUiActionsAdapter {
         fields.linkSrcColRef = sourceColumnRef;
         fields.linkTargetColRef = targetColumnRef;
       }
+    }
+    if (update.optionsJson !== undefined) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(update.optionsJson) as unknown;
+      } catch {
+        throw new Error("Trusted widget options payload must be valid JSON.");
+      }
+      if (!record(parsed)) {
+        throw new Error("Trusted widget options payload must encode a JSON object.");
+      }
+      fields.options = update.optionsJson;
     }
 
     if (Object.keys(fields).length === 0) {
