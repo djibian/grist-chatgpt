@@ -261,8 +261,8 @@ export class DocumentUiService {
             : 0;
         let columnSelectByOptions: Array<{
           sourceWidgetId: number;
-          sourceColumnId?: string;
-          targetColumnId?: string;
+          sourceColumnId?: string | undefined;
+          targetColumnId?: string | undefined;
         }> = [];
         let columnSelectByOptionsTruncated = false;
 
