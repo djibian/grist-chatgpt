@@ -1,297 +1,252 @@
 # Plugin-ready audit — Grist Community / DINUM
 
-**Status:** current product-readiness audit  
-**Audit date:** 2026-09-17  
-**Audit baseline:** `main` after C1, C2, C3, ProConnect/MCP compatibility research and the independent C6 timeout preparation.
+**Status:** current submission-readiness audit  
+**Audit date:** 2026-09-19  
+**Audit baseline:** `main` at `6de61601b220b77758a2b0c90035bff7461d2138`  
+**Official requirements rechecked:** OpenAI plugin submission, remote MCP review, authentication, submission errors and plugin guidelines.
 
-This document is an assessment of the current repository and remaining gaps. It does not change runtime behavior, select an OAuth/identity provider, select credential persistence/encryption, add scopes, or create an institutional commitment.
+This document is an assessment. It does not select credential persistence/encryption, add scopes, claim authorization from Grist Labs/DINUM, or create an institutional commitment.
 
-## Executive assessment
+## Executive conclusion
 
-`grist-chatgpt` has moved beyond the original single-client architecture prototype. The bounded Grist business surface, MCP contract, credential abstraction and per-principal context isolation are now integrated.
+The bridge is technically much further along than the 2026-09-17 audit recorded. The repository and live POC now demonstrate OAuth/JWT/JWKS resource-server behavior, dynamic principals, positive and negative `/mcp` authorization paths, RFC 9728 metadata, Logto/ProConnect federation, CIMD, PKCE, resource binding and a public ChatGPT OAuth readiness probe.
 
-The critical path is no longer a Grist feature problem. It is an **identity and production-readiness problem**:
+The first blocker to a **public OpenAI directory submission is now a publication-eligibility / third-party-authorization gate**, not another Grist feature.
 
-```text
-C1 Credential abstraction       DONE
-C2 MCP contract v1              DONE
-C3 User-aware Grist context     DONE
-C4 OAuth MCP identity           BLOCKED by human identity-provider decision
-C5 Secure Grist onboarding      BLOCKED by C4 + human persistence/encryption decisions
-C6 Production hardening         BLOCKED for finalization by C4/C5
-C7 Reviewer fixture             BLOCKED by C4/C5
-C8 Submission package           BLOCKED by C6/C7
-```
+OpenAI's current plugin guidelines state both that third-party API access requires appropriate authorization and that plugins whose primary function is to act as unofficial connectors to third-party services, including intermediary relay layers, cannot be approved. This repository currently describes itself as an independent, non-official Grist Labs / DINUM / OpenAI integration. No durable evidence in the repository establishes authorization from Grist Labs or DINUM for a public OpenAI plugin.
 
-The product target remains a multi-user MCP bridge for **one configured Grist Community DINUM instance**. Each authenticated production user must execute upstream Grist work with that user's own Grist API key; Grist remains authoritative for ACLs and the bridge may only reduce authority.
+Therefore the next highest-value action is to resolve one of these paths before substantial submission-only engineering:
 
-## Current readiness summary
+1. obtain/document the authorization or partnership basis needed for the Grist/DINUM integration; or
+2. obtain written clarification from OpenAI that the proposed product, with its authentication/authorization and bounded semantic workflow layer, is eligible under the current third-party integration rule.
 
-| Domain | Current status | Assessment |
+Until that is resolved, production hardening that is useful independently may continue, but expensive submission-specific work should not be treated as guaranteed to lead to directory publication.
+
+Official references:
+
+- https://developers.openai.com/plugins/app-guidelines
+- https://developers.openai.com/plugins/deploy/submission
+- https://developers.openai.com/plugins/deploy/app-review
+- https://developers.openai.com/plugins/deploy/submission-errors
+- https://developers.openai.com/plugins/build/auth
+
+## Current readiness matrix
+
+| Area | Status | Current evidence / gap |
 | --- | --- | --- |
-| Product positioning | Green | MCP-first bridge for the Grist Community gap; initial target remains one configured DINUM instance |
-| Public remote MCP over HTTPS | Green for prototype | End-to-end public bridge validation already exists; production identity remains unfinished |
-| Grist business layer | Green | Records, schema, discovery and bounded document-UI operations are implemented |
-| Bounded-operation security model | Green | No generic HTTP, raw SQL or arbitrary model-visible `/apply`/UserAction escape hatch |
-| Credential abstraction (C1) | Green | `GristCredentialProvider` / `GristClientFactory` seam integrated; static provider preserves development deployment |
-| Principal context isolation (C3) | Green | Credential-derived clients, discovery caches, access policies and service graphs are fresh per principal context |
-| MCP contract v1 (C2) | Green | Registry-driven metadata, full-surface contract checks, structured stable successes and typed error direction integrated |
-| OAuth ChatGPT/Codex -> bridge (C4) | Red / blocking | Production still uses static bearer principals; provider/architecture selection is human-gated |
-| Per-user Grist credential onboarding (C5) | Red / blocking | Runtime seam exists, but secure collection/storage/disconnect is not implemented and storage/encryption are human-gated |
-| ProConnect direct MCP compatibility | Ruled out for assessed configuration | Assessed ProConnect configuration disables RFC 8707 Resource Indicators required by MCP 2026-07-28 |
-| Production timeouts | Partial green | Grist upstream abort timeout and inbound HTTP receive/header limits are integrated |
-| Rate limiting / observability / release controls | Amber/red | Remaining C6 work; several parts depend on final dynamic-principal and deployment choices |
-| Reviewer fixture | Red | Synthetic reviewer identity/data and reproducible positive/negative scenarios remain blocked by identity/onboarding |
-| Submission package | Red / later | Publisher/domain/privacy/support/reviewer requirements must be revalidated at submission time |
-| Apps SDK UI / skills | Not required initially | MCP-only remains sufficient for first product unless a demonstrated need changes scope |
+| Bounded Grist business surface | PASS | Records, schema, discovery and bounded document-UI operations are integrated. |
+| MCP-first contract | PASS | Registry-driven tools, user-oriented metadata, structured results/errors and stable capabilities are integrated. |
+| Tool risk annotations | PASS for values | Every operation has explicit `readOnlyHint`, `destructiveHint`, `openWorldHint` derived from the operation registry. |
+| Annotation justifications for submission | MISSING | OpenAI final submission requires a justification for each annotation value for each MCP tool; the registry contains values but not submission-ready justifications. |
+| Credential abstraction | PASS | `GristCredentialProvider` / `GristClientFactory` seam integrated. |
+| Principal/cache isolation | PASS | Fresh per-principal Grist contexts and explicit cross-user isolation tests are integrated. |
+| OAuth MCP resource server | PASS for POC/runtime | OAuth mode, JWT/JWKS, issuer/audience/expiry policy, dynamic Principal and scope enforcement are implemented and exercised on actual `/mcp`. |
+| Logto/ProConnect federation | PASS for POC | Stable ProConnect-backed Logto identity demonstrated in non-production. |
+| CIMD / PKCE / resource binding | PASS | Public readiness probe validates Logto CIMD, PKCE S256, auth code, refresh grant, RFC 9728 and stable ChatGPT CIMD compatibility. |
+| ChatGPT developer-mode live session | EXTERNAL GATE | Current personal ChatGPT workspace does not expose Apps/developer mode. This is not evidence of bridge incompatibility and is not required to create a public plugin submission draft. |
+| Per-user Grist credential lifecycle | MISSING / BLOCKING | C5 secure onboarding, encrypted persistence, rotation and disconnect are not implemented. |
+| Production endpoint | PARTIAL | Public HTTPS POC exists, but OpenAI requires a production endpoint, not a local/test/demo endpoint, for final review. |
+| OAuth UserInfo domain restriction support | PARTIAL / VERIFY | Logto publishes OIDC/UserInfo capabilities, but the final CIMD client path must prove `openid` + `email` are enabled and UserInfo returns `email` with `email_verified: true`. |
+| Reviewer authentication | BLOCKING | OpenAI reviewers need ready-to-use demo credentials without MFA, email/SMS confirmation or private-network access. The current ProConnect path is not suitable as the only reviewer login path. |
+| Synthetic reviewer Grist fixture | MISSING | Must avoid real educational/administrative data and provide reproducible full-feature demo data. |
+| Exactly 5 positive + 3 negative tests | PARTIAL | Candidate scenarios exist in docs/tests, but the exact submission set and expected reviewer-visible outcomes are not yet packaged. |
+| Demo recording URL | MISSING | Final remote-MCP submission requires a recording showing principal workflows/tools on supported platforms. |
+| Domain verification challenge | MISSING | Need to serve the exact portal token at `/.well-known/openai-apps-challenge` on the MCP host or accepted parent origin. |
+| Tool scan | PENDING PORTAL | Must run `Scan Tools` against the production MCP endpoint and resolve all current findings. |
+| Public website/support/privacy/terms | MISSING | Final HTTPS URLs must match the verified publisher identity. |
+| Privacy/data-minimization review | PARTIAL | Credentials are excluded from model-visible tools and audit data; a final per-tool response review and public privacy policy remain required. |
+| Developer/business identity verification | HUMAN / UNKNOWN | Must be completed in the OpenAI Platform organization used for submission. |
+| App-management submission permission | HUMAN / UNKNOWN | Submitter needs `api.apps.write` / App Management Write; organization owners have it automatically. |
+| Listing metadata | MISSING | Final display name, short/long descriptions, logo, category, capabilities, up to 3 starter prompts, countries and release notes. |
+| UI / screenshots / CSP | N/A initially | MCP-only product has no custom UI; screenshots should not be supplied unless tool scan reports UI output. |
+| Skills | N/A initially | Initial product remains MCP-only. |
+| Rate limiting / metrics / alerting | MISSING / C6 | Final production hardening still required. |
+| Deployment/rollback/smoke tests | PARTIAL | Deployment procedure exists historically; final controlled release/rollback and synthetic post-deploy smoke tests remain to formalize. |
+| Public-plugin third-party eligibility | BLOCKING HUMAN GATE | Current product is explicitly non-official; OpenAI's current rules prohibit plugins whose primary function is an unofficial third-party connector. Authorization or OpenAI eligibility clarification is required before assuming public approval is possible. |
 
-## Integrated architecture to preserve
+## Submission requirements that are already structurally satisfied
 
-The current architecture is no longer a singleton Grist visibility model.
+### Remote MCP shape
+
+The intended submission type is **MCP-only remote plugin**, using one universal public HTTPS `/mcp` endpoint. No Apps SDK UI or skill is required for the first version.
+
+### Tool contract
+
+The operation registry already supplies explicit values for all three required annotations on every public operation:
+
+- `readOnlyHint`;
+- `destructiveHint`;
+- `openWorldHint`.
+
+Current operations stay within the configured Grist environment, so `openWorldHint: false` is coherent. Destructive record/table/column deletes are explicitly marked destructive. Read tools are explicitly read-only.
+
+The missing submission artifact is not the values themselves; it is the **per-tool justification text** required by the final submission validator.
+
+### OAuth/MCP interoperability
+
+The live POC demonstrates:
+
+- RFC 9728 protected-resource metadata;
+- authorization server discovery;
+- PKCE `S256`;
+- Authorization Code and refresh grants;
+- CIMD;
+- stable ChatGPT CIMD compatibility including `private_key_jwt` support;
+- canonical MCP resource binding;
+- fixed public scopes `doc:read`, `doc:write`, `doc.schema:write`;
+- JWT/JWKS signature and issuer/audience/expiry validation;
+- insufficient-scope and wrong-resource rejection;
+- no OAuth bearer crossing into the Grist credential boundary.
+
+These are strong prerequisites for submission but do not replace reviewer login and final OAuth UserInfo/domain-restriction checks.
+
+## New/clarified OpenAI requirements to carry into implementation
+
+### 1. Third-party integration authorization and originality
+
+This is now the first public-submission gate.
+
+The plugin must not misrepresent itself as official, and OpenAI additionally requires appropriate authorization for third-party API integration. More importantly, the current guidelines say an unofficial connector whose primary function is connecting to a third-party service cannot be approved.
+
+Before public-submission engineering is treated as committed work, record a durable answer to:
+
+- Who authorizes this integration with Grist Community / DINUM for public distribution?
+- Is Grist Labs authorization also needed for the product/brand/API relationship?
+- If relying on open-source/API rights rather than partnership, does OpenAI accept this specific product as more than a prohibited unofficial connector?
+
+If the answer is unclear, create a submission draft to obtain a plugin/submission identifier and ask OpenAI support for a pre-review eligibility clarification without claiming an official relationship.
+
+### 2. OAuth workspace-domain protection
+
+For OAuth plugins OpenAI expects support for enterprise workspace domain restrictions:
+
+- OIDC discovery;
+- `openid` and `email` advertised and enabled for the OAuth client;
+- a UserInfo endpoint returning `email` and `email_verified: true`.
+
+Logto already exposes the relevant OIDC mechanism, but the exact final CIMD/dynamic-app configuration and returned claims must be demonstrated with sanitized live evidence.
+
+### 3. Reviewer credentials without secondary verification
+
+The reviewer must receive a demo username/password or equivalent ready-to-use credentials that do **not** require:
+
+- MFA;
+- SMS code;
+- email confirmation;
+- private network access;
+- additional account creation/configuration.
+
+The production identity source can remain ProConnect, but final review needs a bounded reviewer path compatible with this requirement. That path must not weaken normal user authentication or broaden production privileges.
+
+### 4. Domain verification endpoint
+
+When the portal issues a token, the exact token must be served as the entire response body at:
 
 ```text
-MCP / GPT Actions
-       |
-       v
-Principal + capabilities
-       |
-       v
-GristContextFactory
-       |
-       +--> GristClientFactory
-       |        |
-       |        v
-       |   GristCredentialProvider
-       |
-       +--> credential-derived GristClient
-       +--> private GristResourceDiscovery cache
-       +--> AccessPolicy
-       +--> AuthorizationService
-       +--> AuthorizedGristService
-                    |
-                    v
-                GristService
-                    |
-                    v
-          Grist Community DINUM
+https://<approved-host>/.well-known/openai-apps-challenge
 ```
 
-`DeploymentResourcePolicy` contains only deployment-level document/workspace ceilings and is safe to share. Every `GristContextFactory.create(principal)` call creates fresh credential-derived state for that principal. The factory deliberately does not keep a cross-principal context cache.
+The host must be the MCP host or an accepted parent origin. Do not invent or commit a token before the portal provides it.
 
-The current development deployment still resolves both static principals through one configured `GRIST_API_KEY` via `StaticApiKeyCredentialProvider`. That is a backward-compatible development substitution, not the final multi-user credential model.
+### 5. Exact review package
 
-## Effective authorization model
+Final remote-MCP submission requires at least:
 
-Production authority remains the intersection of:
-
-```text
-current user's Grist permissions
-∩ deployment resource policy
-∩ principal resource grants
-∩ required operation capability / OAuth scope
-```
-
-Current bridge capability vocabulary:
-
-```text
-doc:read
-doc:write
-doc.schema:write
-```
-
-No current work authorizes changing that public scope set.
-
-Important invariants already present:
-
-- destructive operations use named, bounded targets;
-- partial/non-atomic writes are explicit and must not be blindly replayed;
-- ambiguous UI writes are independently re-read and verified;
-- functional document/table/column/record/page/widget IDs may remain model-visible when needed for safe follow-up calls;
-- credentials and session secrets never belong in model-visible inputs/outputs or audit payloads.
-
-## C1 — credential abstraction: integrated
-
-The earlier audit described a future credential-provider seam. That seam now exists.
-
-`StaticApiKeyCredentialProvider` preserves the current development deployment, while `GristClientFactory` accepts a principal-aware credential context. The remaining production work is **not** to redesign Grist business operations; it is to supply a user-aware credential provider after secure onboarding/persistence decisions are made.
-
-The production invariant remains:
-
-> a principal may receive only the Grist credential associated with that same authenticated user.
-
-## C2 — MCP contract v1: integrated
-
-MCP is the normative public product direction. The operation registry now carries product-level metadata used to keep public MCP definitions and authorization intent aligned.
-
-Integrated direction includes:
-
-- user-intent-oriented titles/descriptions;
-- risk annotations checked across the surface;
-- structured success results where stable/useful;
-- typed error categories without secrets/stacks;
-- text-only error envelopes where success `outputSchema` validation would otherwise make recoverable tool errors become protocol failures;
-- preservation of explicit partial/ambiguous write semantics.
-
-Further contract refinement may happen later, but C2 is not the current blocking dependency.
-
-## C3 — user-aware Grist context: integrated
-
-The earlier singleton discovery/cache risk has been removed architecturally.
-
-For each principal context the bridge creates fresh:
-
-- `GristClient`;
-- `GristResourceDiscovery` cache;
-- `AccessPolicy`;
-- `AuthorizationService`;
-- Grist service/UI adapter graph;
-- `AuthorizedGristService` bound to that exact principal.
-
-Cross-user tests demonstrate that resources learned through one synthetic user's credential do not appear in another principal's discovery/cache state.
-
-This means C5 can later provide different per-user credentials without first redesigning cache isolation.
-
-## C4 — OAuth MCP identity: current blocking gate
-
-Production MCP still authenticates with a static bearer principal. The target is an OAuth-authenticated dynamic `Principal` whose token is validated for issuer, resource/audience, expiry and scopes as required by the current MCP authorization contract.
-
-The decision package is maintained in `docs/OAUTH-IDP-DECISION.md`.
-
-### ProConnect compatibility finding
-
-Repository compatibility work established for the assessed public ProConnect configuration:
-
-- PKCE `S256` support is present;
-- RFC 8707 Resource Indicators are explicitly disabled (`resourceIndicators: { enabled: false }`).
-
-MCP `2026-07-28` requires the MCP client to send the target `resource` and requires resource-bound token acquisition. Therefore **direct ProConnect as the MCP-facing authorization server is ruled out for the assessed configuration**.
-
-This finding does not select a replacement architecture and does not decide whether ProConnect remains the upstream identity source.
-
-### Human decision still required
-
-Provider-specific C4 implementation must not start until an authorized human decides at least:
-
-- whether ProConnect is required as the production identity source;
-- whether an MCP-specific authorization server should federate to ProConnect or another identity/provider should be used;
-- who operates a separate authorization server (managed/self-hosted/either);
-- whether only ChatGPT/Codex pre-registration is required or broader MCP client registration interoperability is required;
-- acceptable refresh/reauthentication behavior;
-- ownership of any production OAuth/ProConnect registration or institutional approval.
-
-## C5 — secure Grist onboarding: blocked
-
-The credential seam is ready, but secure per-user credential lifecycle is intentionally not implemented before the human decisions on persistence/encryption.
-
-Required production behavior remains:
-
-1. authenticate the bridge user;
-2. collect the user's Grist API key outside the model conversation/tool surface;
-3. validate it directly against the configured DINUM Grist instance;
-4. associate verified Grist identity with the authenticated principal;
-5. store credential material encrypted at rest;
-6. resolve it only for that principal's upstream requests;
-7. provide disconnect/removal and lifecycle/revalidation handling;
-8. never log, audit, return or prompt the credential through model-visible surfaces.
-
-Persistence technology and encryption/key-management architecture are explicit human gates.
-
-## C6 — production hardening
-
-C6 cannot be finalized before C4/C5, but identity-independent timeout preparation is integrated.
-
-### Integrated
-
-- Grist upstream requests use an explicit 10-second abort timeout;
-- inbound Node HTTP request reception is bounded to 120 seconds;
-- inbound HTTP header reception is bounded to 60 seconds;
-- these receive-side limits do not cap MCP streaming response duration.
-
-### Remaining
-
-- per-principal rate limiting after dynamic principal semantics are final;
-- operational metrics and alerting;
-- structured audit export where required;
-- secret/key rotation procedure;
-- documented deployment and rollback procedure;
-- protected release workflow / `main` protections;
-- post-deploy synthetic smoke tests.
-
-Do not pre-select institutional monitoring, secret-management or deployment products merely to close these bullets.
-
-## C7 — reviewer fixture
-
-The reviewer environment remains blocked by C4/C5 because a realistic reviewer must authenticate without using real educational/administrative identities or data and must receive a safely isolated Grist credential/data fixture.
-
-Planned positive scenarios include:
-
-1. inspect structure, relations, pages and widgets;
-2. query/filter records;
-3. create a table, columns and records;
-4. perform bounded data/schema updates;
-5. create a page, add widgets, configure direct `select-by`, and verify by independent re-read.
-
-Planned negative scenarios include:
-
-1. insufficient scope for write;
-2. resource outside deployment/principal permission;
-3. invalid/nonexistent UI linkage target with no unintended write.
-
-These scenarios should become both automated integration coverage and reviewer instructions once identity/onboarding are available.
-
-## C8 — submission package
-
-Submission-specific requirements change independently of this repository and must be revalidated close to submission.
-
-Expected package areas include:
-
-- stable public HTTPS MCP endpoint;
-- developer/publisher identity and required permissions;
+- exactly 5 positive tests;
+- exactly 3 negative tests;
+- expected behavior for each;
+- release notes;
+- a demo recording URL;
+- current successful tool scan;
+- reviewer credentials when OAuth is used;
+- production MCP URL;
 - domain verification;
-- public metadata and example prompts;
-- support contact/website;
-- privacy policy and terms;
-- reviewer credentials and instructions;
-- availability/country settings;
-- tool/security scan findings;
-- accurate non-misleading relationship statements regarding Grist Labs, DINUM / La Suite numérique and OpenAI.
+- explicit annotation values and justifications.
 
-The repository must not claim an official institutional relationship that has not been explicitly established.
+### 6. Public listing constraints
 
-## Deliberate non-goals and deferred breadth
+Prepare the final values close to submission, including:
 
-The current critical path does not include:
+- package name: <= 64 characters and restricted package-name character set;
+- display name: <= 30 characters;
+- short description: <= 30 characters;
+- long description: <= 4000 characters;
+- developer name: <= 80 characters;
+- at most 20 listed capabilities, each <= 120 characters;
+- at most 3 unique starter prompts, each <= 128 characters and without MCP `@mentions`;
+- HTTPS website/support/privacy/terms URLs;
+- category, availability countries and release notes.
 
-- arbitrary multi-instance Grist routing;
-- generic HTTP forwarding;
-- raw SQL;
-- arbitrary UserActions or generic `/apply` access;
-- user/ACL administration;
-- layout mutation;
-- page/widget deletion;
-- generated executable custom widgets;
-- Apps SDK UI;
-- skills.
+## Privacy and data handling
 
-Additional Grist feature breadth should not displace identity/security readiness unless the authoritative roadmap changes.
+The final privacy policy must describe at least:
 
-## Current critical-path conclusion
+- categories of personal data processed;
+- purposes;
+- categories of recipients;
+- retention periods;
+- user controls/removal.
 
-The repository has the core Grist/MCP service architecture needed to proceed. C1-C3 are integrated and the direct-ProConnect compatibility uncertainty has been materially reduced.
+The plugin must minimize tool inputs and outputs. Internal diagnostic/session/trace/request identifiers should not be returned unless strictly required. Functional Grist document/table/column/record/page/widget identifiers may remain model-visible when they are necessary to target and verify bounded operations; this necessity should be reflected in the privacy/reviewer documentation.
 
-The next blocking transition is now explicitly human:
+API keys, passwords, OAuth tokens, MFA/OTP codes and other authentication secrets must never be collected through model-visible MCP tool arguments or results. The planned separate bridge-owned Grist credential onboarding flow preserves this invariant.
 
-> choose and durably record the production identity-source / MCP authorization-server architecture for C4.
+## Recommended order from this audit
 
-Until that gate is resolved, useful autonomous work should be limited to genuinely independent low-risk preparation already permitted by the roadmap and documentation/consistency fixes. It must not silently commit to a provider, persistence/encryption architecture, new scopes, a changed Grist credential model, new generic/destructive power, or an institutional obligation.
+### S0 — Public-plugin eligibility
 
-## Authoritative companion documents
+**Human/institutional gate; resolve first.**
 
-- `AGENTS.md` — execution contract and human gates;
-- `docs/PRODUCT_VISION.md` — product target and invariants;
-- `docs/ROADMAP.md` — eligibility/dependencies;
-- `docs/ARCHITECTURE.md` — current and target architecture;
-- `docs/SECURITY.md` — security doctrine;
-- `docs/OAUTH-IDP-DECISION.md` — C4 human decision package;
-- `docs/PROCONNECT-MCP-COMPAT-RESULTS.md` — current direct-ProConnect compatibility evidence;
-- `docs/OPENAI-SUBMISSION.md` — submission planning, to be revalidated near submission.
+Obtain either:
+
+- a clear authorization basis for the Grist/DINUM integration suitable for public distribution; and/or
+- written OpenAI clarification that this product is eligible under the current unofficial-connector rule.
+
+### S1 — Complete product identity/credential lifecycle
+
+After S0 is viable:
+
+- finish production C4 identity hardening as needed;
+- decide C5 persistence/encryption/key management;
+- implement secure per-user Grist onboarding, validation, retrieval, rotation and disconnect.
+
+### S2 — Submission protocol gaps
+
+In parallel where low risk:
+
+- prove OIDC `openid`/`email` + UserInfo verified email for the final client path;
+- add submission-ready per-tool annotation justifications;
+- implement configurable one-token domain challenge serving;
+- define the exact 5 positive / 3 negative reviewer scenarios.
+
+### S3 — Reviewer and production environment
+
+- production-not-POC MCP endpoint;
+- bounded reviewer login without MFA/email/SMS/private network;
+- synthetic Grist account/data fixture;
+- per-principal rate limiting, metrics/alerts, release/rollback and smoke tests.
+
+### S4 — Publisher package and portal submission
+
+- verified publisher identity and `api.apps.write`;
+- website/support/privacy/terms;
+- listing metadata and starter prompts;
+- demo recording;
+- domain verification;
+- tool scan;
+- reviewer credentials/instructions;
+- exactly 5 positive + 3 negative tests;
+- submit, remediate review findings, then publish after approval.
+
+## Go / no-go
+
+Do **not** treat public-directory approval as technically inevitable while S0 is unresolved.
+
+Proceed to final public submission only when:
+
+1. publication eligibility / third-party authorization is resolved;
+2. each authenticated user is safely isolated and upstream Grist calls use that user's own credential;
+3. the reviewer can authenticate without prohibited secondary verification and use only synthetic data;
+4. final production OAuth, UserInfo and domain verification requirements pass;
+5. exact OpenAI review artifacts and policy attestations are complete;
+6. public branding, privacy and support responsibilities are accurate and non-misleading.

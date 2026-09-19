@@ -6,296 +6,257 @@ Status vocabulary:
 
 - **DONE** — integrated on `main` and no longer active;
 - **ELIGIBLE** — useful work can start now;
-- **ACTIVE** — an implementation PR exists or work is underway;
+- **ACTIVE** — work is underway or an implementation/evidence tranche remains open;
 - **BLOCKED** — a named dependency or human decision is missing;
 - **DEFERRED** — intentionally not part of the current critical path.
 
-Priority does not imply eligibility. An item may be high priority but blocked.
+Priority does not imply eligibility.
 
 ## Current baseline
 
-### V0.6 — bounded document UI
-
-**Status: DONE**
-
-Integrated capabilities include semantic page/widget inspection, bounded page/widget mutation, conservative direct `select-by`, post-write normalized verification and plugin-ready architecture/security documentation.
-
-Further document-UI breadth is not the current critical path.
-
-## Critical path to plugin-ready v1
-
 ```text
-                     V0.6 DONE
-                         |
-             +-----------+-----------+
-             |                       |
-             v                       v
- C1 Credential abstraction      C2 MCP contract v1
-          DONE                       DONE
-             |
-             v
- C3 User-aware Grist context
-          DONE
-             |
-             v
- C4-P0 Logto/ProConnect MCP POC
-          ACTIVE
-             |
-             v
- C4 OAuth MCP identity
-       BLOCKED by POC
-             |
-             v
- C5 Secure onboarding
-       BLOCKED by C4
-             |
-        +----+----+
-        |         |
-        v         v
- C6 Production   C7 Reviewer
- hardening       fixture
- blocked C4/C5   blocked C4/C5
-        |         |
-        +----+----+
-             |
-             v
- C8 Submission package
-             |
-             v
- Plugin submission
+V0.6 bounded document UI          DONE
+C1 credential abstraction         DONE
+C2 MCP contract v1                DONE
+C3 user-aware Grist context       DONE
+C4-P0 Logto/ProConnect MCP POC    ACTIVE (live-client evidence remains)
 ```
 
-C1, C2 and C3 are integrated. The C4 human identity-provider gate is resolved and recorded in `docs/OAUTH-IDP-DECISION.md`.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam and per-principal Grist context/cache isolation.
 
-Selected architecture:
+The C4 architecture decision is recorded: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
-- ProConnect is the upstream institutional identity source;
-- Logto OSS self-hosted is the reference MCP-facing authorization server;
-- `grist-chatgpt` remains a provider-neutral OAuth resource server;
-- Auth0 EU is the SaaS fallback and Curity Standard the commercial self-hosted fallback;
-- direct ProConnect as MCP-facing authorization server remains ruled out for the currently assessed configuration because RFC 8707 Resource Indicators are disabled.
+Live C4-P0 evidence now includes OAuth-enabled `/mcp`, JWT/JWKS verification, canonical resource binding, fixed scopes, dynamic principals, positive/negative authorization proofs, RFC 9728, Logto/ProConnect federation, CIMD, PKCE, refresh-token capability and stable ChatGPT CIMD metadata compatibility.
 
-C4-P0 has completed the live Logto/ProConnect identity, resource-token, JWT/JWKS, dynamic-Principal and OAuth-enabled `/mcp` positive/negative resource-server proofs. ChatGPT-facing RFC 9728 metadata, tool `securitySchemes`, runtime OAuth challenges, and a non-destructive public readiness probe are integrated. The remaining blocking evidence is now the real non-production ChatGPT MCP OAuth flow, including reconnect/refresh and revocation behavior. Full C4 implementation remains blocked until those mandatory checks pass.
+## New highest-priority gate — S0 public-plugin eligibility
 
-## C1 — Credential abstraction
+**Status: BLOCKED / HUMAN-INSTITUTIONAL GATE**  
+**Priority: highest for the stated goal of public OpenAI plugin publication**
 
-**Status: DONE**  
-**Priority: blocking / highest**
+OpenAI's current public-plugin guidelines state that:
 
-Integrated result:
+- third-party API integration requires appropriate authorization and compliance with the third party's terms; and
+- plugins whose primary function is acting as unofficial connectors to third-party services, including intermediary relay layers, cannot be approved.
 
-- `GristCredentialProvider` seam;
-- credential-aware client/context construction;
-- static API-key provider preserving existing deployment behavior;
-- no storage or multi-user persistence decision embedded in the abstraction.
+This repository explicitly describes itself as an independent, non-official Grist Labs / DINUM / OpenAI integration. No repository evidence currently establishes authorization from Grist Labs or DINUM for public directory distribution.
 
-## C2 — MCP contract v1
+Before substantial **submission-only** engineering is treated as committed work, resolve at least one durable path:
 
-**Status: DONE**  
-**Priority: high / independent**
+1. obtain/document the authorization or partnership basis needed for public Grist/DINUM integration; or
+2. obtain written OpenAI clarification that this product, including its authentication/authorization and bounded semantic workflow layer, is eligible under the current unofficial-connector rule.
 
-Integrated result includes full-surface contract metadata/testing direction, user-intent-oriented tool metadata and stable structured-output/error conventions without weakening authorization or broadening Grist escape hatches.
+A plugin submission draft may be created to obtain a submission/plugin identifier for an OpenAI support clarification. Do not claim an official relationship that has not been explicitly established.
 
-## C3 — User-aware Grist context
+Authoritative audit:
 
-**Status: DONE**  
-**Priority: blocking**
+```text
+docs/PLUGIN-READY-AUDIT.md
+docs/OPENAI-SUBMISSION.md
+```
 
-Integrated result:
+## Critical path to public plugin
 
-- deployment policy separated from credential-derived discovery;
-- principal-bound Grist clients/service graphs;
-- per-principal discovery/cache isolation;
-- explicit cross-user isolation tests;
-- current static single-key development deployment retained.
+```text
+                 S0 publication eligibility
+                        BLOCKED
+                           |
+          +----------------+----------------+
+          |                                 |
+          v                                 v
+ C4-P0 live-client proof            low-risk submission prep
+       ACTIVE                       ELIGIBLE in parallel
+          |
+          v
+ C4 production OAuth identity
+ BLOCKED by S0 + C4-P0 completion
+          |
+          v
+ C5 secure Grist onboarding
+ BLOCKED by C4 + persistence/encryption decision
+          |
+     +----+----+
+     |         |
+     v         v
+ C6 production   C7 reviewer fixture
+ hardening       and review auth
+     |         |
+     +----+----+
+          |
+          v
+ C8 submission package
+          |
+          v
+ OpenAI review / publication
+```
 
 ## C4-P0 — Logto / ProConnect / MCP interoperability POC
 
 **Status: ACTIVE**  
-**Priority: blocking / highest**  
-**POC branch used for repository harness:** `poc/logto-proconnect-mcp`
+**Priority: blocking for final C4 proof**
 
-### Goal
+Integrated/live PASS evidence includes:
 
-Prove the human-selected C4 architecture before production-quality OAuth integration.
+- Logto OSS + PostgreSQL non-production deployment;
+- ProConnect federation and stable identity mapping;
+- Authorization Code + PKCE `S256`;
+- RFC 8707 canonical resource binding;
+- JWT/JWKS, issuer, resource/audience and expiry validation;
+- fixed scopes `doc:read`, `doc:write`, `doc.schema:write`;
+- dynamic principal and principal-bound Grist context construction;
+- wrong-resource rejection;
+- insufficient-scope rejection before mutation;
+- OAuth-enabled actual `/mcp` positive and negative request paths;
+- prevention of static-bearer override in OAuth mode;
+- OAuth bearer excluded from the Grist credential path;
+- RFC 9728 protected-resource metadata and OAuth challenges;
+- root MCP tool `securitySchemes` and runtime insufficient-scope challenge;
+- Logto Dynamic app / CIMD;
+- stable ChatGPT CIMD compatibility including `private_key_jwt` metadata support;
+- public readiness probe returning PASS.
 
-Authoritative POC contract:
+Durable evidence:
 
 ```text
 docs/LOGTO-PROCONNECT-MCP-POC.md
-```
-
-### Integrated repository harness and proven live seams
-
-The repository and live POC evidence now cover:
-
-- provider-neutral OAuth identity -> dynamic `Principal` mapping;
-- OAuth scope reduction to the existing Grist capability vocabulary;
-- standard JWT/JWKS verification plus issuer, audience/resource and expiry policy checks;
-- bearer -> verifier -> bounded principal/context construction;
-- principal-bound C3 `GristContextFactory` behavior without forwarding the OAuth bearer as a Grist credential;
-- wrong-resource rejection before Grist access;
-- insufficient-scope write rejection before mutation;
-- OAuth-enabled Express `/mcp` positive and negative request paths;
-- prevention of static-bearer override in OAuth mode;
-- Logto OSS + PostgreSQL non-production deployment;
-- ProConnect federation with stable identity mapping;
-- Authorization Code + PKCE `S256` with RFC 8707 canonical resource binding;
-- local refresh-token issuance with `offline_access` plus consent;
-- RFC 9728 protected-resource metadata and OAuth resource challenges;
-- root MCP tool `securitySchemes` with compatibility mirror;
-- runtime `_meta["mcp/www_authenticate"]` insufficient-scope challenges;
-- a safe public ChatGPT OAuth readiness probe.
-
-Durable evidence and the exact live handoff are in:
-
-```text
 docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md
 docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md
 docs/CHATGPT-OAUTH-READINESS.md
 docs/LOGTO-PROCONNECT-MCP-POC-NEXT.md
 ```
 
-### Current live dependency
+Remaining C4-P0 evidence is real ChatGPT client behavior: end-to-end authorization callback, subsequent bearer calls, reconnect/refresh and logout/revocation. The current personal ChatGPT workspace does not expose custom Apps/developer mode; this is an external availability gate, not evidence of bridge incompatibility. Public plugin submission itself is a separate OpenAI Platform route.
 
-The next mandatory POC work is an operator/live-client gate:
+Do not weaken OAuth/MCP behavior merely to bypass the external client-availability gate.
 
-1. deploy the current integrated `main` to the public non-production MCP endpoint;
-2. enable Logto 1.43 Dynamic app / CIMD with only the fixed `doc:read`, `doc:write`, `doc.schema:write` permissions;
-3. run `probe:chatgpt-oauth-readiness` against the public endpoint;
-4. connect the real ChatGPT developer/draft MCP client and record sanitized end-to-end OAuth evidence;
-5. demonstrate reconnect/refresh behavior and logout/revocation enforcement.
+## C4 — production OAuth MCP identity
 
-The exact ChatGPT callback/client metadata observed during the live connection is authoritative; do not hard-code guessed client/callback values into bridge core.
-
-No production ProConnect/DataPass commitment is implied or authorized by this POC step.
-
-### Required proof
-
-The POC must demonstrate:
-
-- Logto OSS non-production deployment with PostgreSQL/HTTPS and secrets outside Git;
-- ProConnect integration login through Logto's generic OIDC federation path;
-- stable identity mapping across repeated login;
-- MCP Authorization Code + PKCE `S256`;
-- RFC 8707 `resource` handling;
-- access token audience/resource binding to the canonical MCP resource;
-- representation/enforcement of `doc:read`, `doc:write`, `doc.schema:write`;
-- rejection of wrong-resource and insufficient-scope tokens;
-- standard JWT/JWKS resource-server validation without proprietary Logto SDK coupling;
-- mapping to dynamic `Principal` and the existing C3 `GristContextFactory` isolation boundary;
-- durable refresh/offline connectivity with a draft ChatGPT MCP app;
-- proof that OAuth/ProConnect tokens never become Grist credentials.
-
-### Constraints
-
-- non-production only unless separately approved;
-- no production ProConnect/DataPass commitment;
-- no model-visible or committed secrets/tokens;
-- no C5 credential persistence/encryption decision;
-- do not broaden public scopes;
-- do not make Logto-specific SDK behavior part of bridge core.
-
-### Exit criteria
-
-All mandatory POC checks are PASS with sanitized durable evidence in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
-
-If a mandatory MCP requirement fails because of Logto, reopen only the authorization-server product choice and evaluate the documented fallbacks. Do not silently weaken MCP conformance.
-
-## C4 — OAuth MCP identity
-
-**Status: BLOCKED by C4-P0 POC**  
-**Priority: blocking**  
-**Suggested branch after POC:** `feat/oauth-mcp`
+**Status: BLOCKED by S0 and C4-P0 completion**  
+**Priority: blocking after S0 is viable**
 
 ### Goal
 
-Replace the production MCP static bearer principal with OAuth-authenticated dynamic principals and explicit scopes.
+Finalize production-quality OAuth identity on the already integrated provider-neutral seams.
 
-### Fixed architecture after human decision
+Fixed architecture:
 
-- identity source: ProConnect;
-- reference authorization server: Logto OSS self-hosted;
-- bridge: standards-based OAuth resource server;
-- preferred token validation: JWT + JWKS;
-- canonical resource URI is deployment-configurable;
-- scopes remain `doc:read`, `doc:write`, `doc.schema:write`;
-- static bearer may remain only as an explicit development/backward-compatibility path if still useful.
+- ProConnect upstream identity;
+- Logto OSS reference authorization server;
+- standards-based JWT/JWKS resource server;
+- deployment-configurable canonical resource URI;
+- public scopes remain exactly `doc:read`, `doc:write`, `doc.schema:write`;
+- provider-specific behavior stays at the edge;
+- static bearer may exist only as explicit development/backward-compatible mode.
 
-### Core implementation after POC
+The POC already implements most core resource-server mechanics. C4 should productionize rather than redesign them.
 
-- publish protected-resource metadata and standards-compatible authentication challenges;
-- validate signature, issuer, audience/resource, expiry and scopes;
-- construct dynamic `Principal` objects;
-- create principal-bound Grist contexts through `GristContextFactory`;
-- enforce scopes through existing `AuthorizationService`;
-- keep provider-specific configuration at the edge, not in Grist business logic.
-
-## C5 — Secure Grist onboarding and credential lifecycle
+## C5 — secure Grist onboarding and credential lifecycle
 
 **Status: BLOCKED by C4 and human persistence/encryption decisions**  
-**Priority: blocking**  
-**Suggested branch:** `feat/grist-onboarding`
+**Priority: submission-critical**
 
 ### Goal
 
-Allow an authenticated user to securely connect their own Grist Community API key outside model-visible MCP tool data.
+Allow an authenticated user to securely connect that user's own Grist Community API key outside model-visible MCP data.
 
-### Required behavior
+Required behavior:
 
 - bridge-owned secure onboarding flow;
-- validate supplied key against configured DINUM Grist;
-- associate verified Grist identity with authenticated principal;
+- validate the supplied key against the configured Grist Community instance;
+- associate the verified Grist identity with the authenticated principal;
 - encrypted-at-rest credential storage;
 - per-principal retrieval only;
-- disconnect/removal and revalidation/rotation lifecycle;
-- never log/return/prompt the credential.
+- disconnect/removal;
+- rotation/revalidation lifecycle;
+- never log, return or prompt the credential through MCP/model-visible surfaces.
 
-### Remaining human gates
+Human decisions still required:
 
 - persistence technology;
 - encryption/key-management design;
 - production institutional ownership where required.
 
-## C6 — Production hardening
+## S1 — low-risk OpenAI submission protocol preparation
+
+**Status: ELIGIBLE**  
+**Priority: useful while S0 is unresolved**
+
+These tasks do not require committing to production credential storage or claiming publication eligibility:
+
+- prove the final Logto/CIMD client path enables OIDC `openid` and `email` and that UserInfo returns `email` with `email_verified: true`;
+- add/generate explicit submission justification text for each tool's `readOnlyHint`, `openWorldHint` and `destructiveHint`;
+- implement a safe configurable `/.well-known/openai-apps-challenge` response path whose token is supplied only when the OpenAI portal issues it;
+- formalize exactly five positive and three negative reviewer scenarios with expected outcomes;
+- audit tool outputs for data minimization and unnecessary diagnostic/internal fields.
+
+Do not invent a domain-verification token or reviewer credential before the relevant live portal/environment exists.
+
+## C6 — production hardening
 
 **Status: BLOCKED by C4/C5 for finalization**  
 **Priority: high**
 
-### Integrated independent preparation
+Already integrated:
 
-- Grist upstream requests have an explicit 10-second abort timeout;
-- Node HTTP request reception is explicitly bounded to 120 seconds and header reception to 60 seconds without limiting MCP streaming response duration;
-- `main` is protected by the repository ruleset and required CI gate.
+- explicit Grist upstream abort timeout;
+- bounded HTTP request/header reception;
+- repository CI/ruleset protection.
 
-### Remaining/finalization work
+Remaining:
 
 - per-principal rate limiting;
 - operational metrics and alerting;
-- structured audit export as needed;
+- structured audit export if required;
 - secret/key rotation procedure;
-- deployment and rollback procedure;
+- controlled deployment and rollback procedure;
 - post-deploy synthetic smoke tests.
 
-Independent low-risk preparation may continue only when it does not assume unfinished C4/C5 behavior.
+Independent preparation may proceed only when it does not assume unfinished C4/C5 decisions.
 
-## C7 — Reviewer fixture
+## C7 — reviewer environment
 
-**Status: BLOCKED by C4/C5**  
+**Status: BLOCKED by C4/C5 and S0 viability**  
 **Priority: submission-critical**
 
-Provide reproducible synthetic reviewer access without real educational/administrative data, including positive record/schema/UI scenarios and negative insufficient-scope/resource/linkage scenarios.
+OpenAI's current remote-MCP review requirements require:
 
-## C8 — Publisher/submission package
+- ready-to-use demo credentials;
+- no MFA, SMS confirmation, email confirmation or private-network dependency;
+- synthetic data rather than real educational/administrative data;
+- a functioning reviewer Grist identity/credential;
+- exactly 5 positive and 3 negative tests;
+- explicit expected outcomes.
 
-**Status: BLOCKED by C6/C7**  
+The production ProConnect path may remain unchanged, but the reviewer path must satisfy these constraints without weakening normal production authentication.
+
+Candidate scenarios are maintained in `docs/OPENAI-SUBMISSION.md`.
+
+## C8 — publisher/submission package
+
+**Status: BLOCKED by S0, C6 and C7**  
 **Priority: final**
 
-Prepare/revalidate at submission time stable HTTPS MCP, publisher identity, domain verification, public metadata, privacy/terms/support, reviewer instructions, availability and tool-scan findings.
+Final package must be revalidated against current OpenAI requirements and includes at least:
+
+- verified developer/business publisher identity;
+- `api.apps.write` / App Management Write permission;
+- stable production public HTTPS MCP URL;
+- successful current Tool Scan;
+- domain verification challenge;
+- exact annotations plus per-annotation justifications;
+- website, support, privacy and terms HTTPS URLs;
+- listing metadata, category, availability, capabilities and release notes;
+- up to 3 starter prompts;
+- exactly 5 positive + 3 negative review tests;
+- reviewer credentials/instructions;
+- demo recording URL;
+- OAuth OIDC/UserInfo domain-restriction compatibility;
+- accurate, non-misleading Grist/DINUM/OpenAI relationship statements.
+
+Initial submission remains MCP-only. Custom UI and skills are not required.
 
 ## Deferred feature breadth
 
-The following are intentionally not on the current critical path:
+Not on the critical path:
 
 - layout mutation;
 - page/widget deletion;
@@ -303,7 +264,10 @@ The following are intentionally not on the current critical path:
 - generated executable custom widgets;
 - Apps SDK UI;
 - skills;
-- arbitrary multi-instance Grist routing.
+- arbitrary multi-instance Grist routing;
+- generic HTTP forwarding;
+- raw SQL;
+- arbitrary Grist UserActions.
 
 ## Parallelism policy
 
@@ -315,14 +279,15 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-The C4 human gate is resolved and the repository-side C4-P0 harness is integrated. C4-P0 remains ACTIVE until the mandatory live ChatGPT POC evidence is PASS. Full C4 OAuth integration must not start before those exit criteria are met.
+While S0 is unresolved, prefer documentation, policy clarification and the bounded S1 preparation above over opening costly C4/C5/C6 implementation branches whose value depends on public-plugin eligibility.
 
 ## Controller integration order
 
 When multiple PRs are open, prefer:
 
 1. safe completion/merge of an existing eligible dependency;
-2. independent reviewable work already underway;
-3. opening new work only when it does not create avoidable dependency stacking.
+2. work that resolves S0 or provides bounded evidence for S1;
+3. independent reviewable preparation already underway;
+4. new production implementation only when its dependencies and human gates are satisfied.
 
-After every merge, resolve the new exact `main` SHA and re-evaluate this roadmap against current code/GitHub state.
+After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current OpenAI policy.
