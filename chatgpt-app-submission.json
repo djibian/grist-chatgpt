@@ -63,7 +63,7 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Creates new records in one Grist table.",
+        "read_only_justification": "Create table records changes Grist state, so it is not read-only.",
         "open_world_justification": "Create table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
         "destructive_justification": "Create table records only adds new Grist state and does not overwrite or delete existing user state."
       }
@@ -75,9 +75,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Overwrites fields of records identified by numeric IDs.",
+        "read_only_justification": "Update table records changes Grist state, so it is not read-only.",
         "open_world_justification": "Update table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Overwrites fields of records identified by numeric IDs within the configured private Grist environment."
+        "destructive_justification": "Update table records can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "delete_records": {
@@ -87,9 +87,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Deletes only records identified by explicit unique numeric IDs.",
+        "read_only_justification": "Delete table records changes Grist state, so it is not read-only.",
         "open_world_justification": "Delete table records is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Deletes only records identified by explicit unique numeric IDs within the configured private Grist environment."
+        "destructive_justification": "Delete table records can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "create_tables": {
@@ -99,7 +99,7 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Creates new tables with optional initial columns.",
+        "read_only_justification": "Create document tables changes Grist state, so it is not read-only.",
         "open_world_justification": "Create document tables is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
         "destructive_justification": "Create document tables only adds new Grist state and does not overwrite or delete existing user state."
       }
@@ -111,9 +111,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Overwrites metadata or identifiers of explicitly identified tables.",
+        "read_only_justification": "Update table settings changes Grist state, so it is not read-only.",
         "open_world_justification": "Update table settings is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Overwrites metadata or identifiers of explicitly identified tables within the configured private Grist environment."
+        "destructive_justification": "Update table settings can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "delete_table": {
@@ -123,9 +123,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Deletes one explicitly identified table and its data.",
+        "read_only_justification": "Delete a table changes Grist state, so it is not read-only.",
         "open_world_justification": "Delete a table is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Deletes one explicitly identified table and its data within the configured private Grist environment."
+        "destructive_justification": "Delete a table can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "create_columns": {
@@ -135,7 +135,7 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Creates new columns in one table.",
+        "read_only_justification": "Create table columns changes Grist state, so it is not read-only.",
         "open_world_justification": "Create table columns is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
         "destructive_justification": "Create table columns only adds new Grist state and does not overwrite or delete existing user state."
       }
@@ -147,9 +147,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Overwrites column metadata, types or formulas of explicitly identified columns.",
+        "read_only_justification": "Update column settings changes Grist state, so it is not read-only.",
         "open_world_justification": "Update column settings is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Overwrites column metadata, types or formulas of explicitly identified columns within the configured private Grist environment."
+        "destructive_justification": "Update column settings can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "rename_column": {
@@ -159,9 +159,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Renames one explicitly identified column identifier.",
+        "read_only_justification": "Rename a column changes Grist state, so it is not read-only.",
         "open_world_justification": "Rename a column is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Renames one explicitly identified column identifier within the configured private Grist environment."
+        "destructive_justification": "Rename a column can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "delete_columns": {
@@ -171,9 +171,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Deletes explicitly identified columns and their data.",
+        "read_only_justification": "Delete table columns changes Grist state, so it is not read-only.",
         "open_world_justification": "Delete table columns is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Deletes explicitly identified columns and their data within the configured private Grist environment."
+        "destructive_justification": "Delete table columns can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "inspect_document": {
@@ -219,7 +219,7 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Creates one empty page for an existing table.",
+        "read_only_justification": "Create a document page changes Grist state, so it is not read-only.",
         "open_world_justification": "Create a document page is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
         "destructive_justification": "Create a document page only adds new Grist state and does not overwrite or delete existing user state."
       }
@@ -231,7 +231,7 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Adds one supported widget to an existing Grist page.",
+        "read_only_justification": "Add a page widget changes Grist state, so it is not read-only.",
         "open_world_justification": "Add a page widget is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
         "destructive_justification": "Add a page widget only adds new Grist state and does not overwrite or delete existing user state."
       }
@@ -243,9 +243,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Overwrites the name of one explicitly identified page.",
+        "read_only_justification": "Rename a document page changes Grist state, so it is not read-only.",
         "open_world_justification": "Rename a document page is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Overwrites the name of one explicitly identified page within the configured private Grist environment."
+        "destructive_justification": "Rename a document page can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "update_page_widget": {
@@ -255,9 +255,9 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Overwrites a widget title or sets or clears its bounded direct select-by link.",
+        "read_only_justification": "Update a page widget changes Grist state, so it is not read-only.",
         "open_world_justification": "Update a page widget is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
-        "destructive_justification": "Overwrites a widget title or sets or clears its bounded direct select-by link within the configured private Grist environment."
+        "destructive_justification": "Update a page widget can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
     "grist_help": {
@@ -267,7 +267,7 @@
         "openWorldHint": false
       },
       "justifications": {
-        "read_only_justification": "Computes the available operation catalog without writing an audit event or changing Grist data.",
+        "read_only_justification": "Discover available Grist tools only retrieves or computes Grist information and does not change Grist state.",
         "open_world_justification": "Discover available Grist tools is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
         "destructive_justification": "Discover available Grist tools performs no write and therefore cannot destructively change Grist state."
       }
