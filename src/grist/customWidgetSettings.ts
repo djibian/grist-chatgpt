@@ -70,8 +70,9 @@ function findWidgetTable(
 
   for (const value of tables) {
     const table = record(value);
-    const id = nonEmptyText(table?.id);
-    const fields = record(table?.fields);
+    if (!table) continue;
+    const id = nonEmptyText(table.id);
+    const fields = record(table.fields);
     const ref = positiveInteger(fields?.tableRef);
     if (!id || !ref) continue;
     if (
