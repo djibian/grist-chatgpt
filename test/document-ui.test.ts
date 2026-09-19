@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { assertDirectSelectByAllowed } from "../src/grist/selectBy.js";
+import { pageWidgetsOutputSchema } from "../src/mcp/outputSchemas.js";
 import { GristApiError } from "../src/grist/client.js";
 import { DocumentUiService } from "../src/grist/documentUi.js";
 
@@ -119,4 +121,63 @@ test("lists pages compactly and returns widgets for an explicit page", () => {
       error.status === 404 &&
       /Grist page 999 does not exist/.test(error.message)
   );
+});
+
+test("discovers only direct select-by sources accepted for each target", () => {
+  const service = new DocumentUiService();
+  const widget = (id: number, tableRef = 1, type = "record", source = 0) => ({
+    id, fields: { parentId: 101, tableRef, parentKey: type, linkSrcSectionRef: source }
+  });
+  const context = service.build("doc-1", tables, pages, views, { records: [
+    widget(1), widget(2), widget(3, 2), widget(4, 1, "chart"),
+    widget(5, 1, "custom"), widget(6, 1, "record", 1),
+    widget(7, 1, "record", 8), widget(8, 1, "record", 7),
+    { id: 9, fields: { parentId: 102, tableRef: 1, parentKey: "record" } }
+  ] });
+  const result = service.getPageWidgets(context, 101) as {
+    widgets: Array<{ id: number; directSelectByOptions: Array<{ sourceWidgetId: number }> }>;
+  };
+  for (const target of result.widgets) {
+    for (const option of target.directSelectByOptions) {
+      const widgets = context.pages[0]!.widgets;
+      assert.doesNotThrow(() => assertDirectSelectByAllowed(context,
+        widgets.find(w => w.id === option.sourceWidgetId)!, widgets.find(w => w.id === target.id)!));
+    }
+  }
+  assert.equal(pageWidgetsOutputSchema.safeParse(result).success, true);
+  // Excludes self, other table/page, chart/custom and existing/new cycles.
+  assert.deepEqual(result.widgets.find(w => w.id === 1)?.directSelectByOptions,
+    [{ sourceWidgetId: 2 }]);
+  assert.deepEqual(result.widgets.find(w => w.id === 3)?.directSelectByOptions, []);
+  assert.deepEqual(result.widgets.find(w => w.id === 2)?.directSelectByOptions,
+    [{ sourceWidgetId: 1 }, { sourceWidgetId: 6 }]);
+});
+
+test("bounds discovery output and marks incomplete lists deterministically", () => {
+  const service = new DocumentUiService();
+  const context = service.build("doc-1", tables, pages, views, { records:
+    Array.from({ length: 40 }, (_, i) => ({ id: 40 - i,
+      fields: { parentId: 101, tableRef: 1, parentKey: "record" } }))
+  });
+  const result = pageWidgetsOutputSchema.parse(service.getPageWidgets(context, 101));
+  assert.equal(result.widgets.reduce((n, w) => n + w.directSelectByOptions.length, 0), 1000);
+  assert.deepEqual(result.widgets[0]?.directSelectByOptions[0], { sourceWidgetId: 2 });
+  assert.equal(result.widgets[0]?.directSelectByOptionsTruncated, false);
+  assert.equal(result.widgets[25]?.directSelectByOptions.length, 25);
+  assert.equal(result.widgets[25]?.directSelectByOptionsTruncated, true);
+  assert.equal(result.widgets[39]?.directSelectByOptionsTruncated, true);
+  assert.deepEqual(result.widgets[39]?.directSelectByOptions, []);
+});
+
+test("bounds rejected candidate work even when no options are produced", () => {
+  const service = new DocumentUiService();
+  const context = service.build("doc-1", tables, pages, views, { records:
+    Array.from({ length: 101 }, (_, i) => ({ id: i + 1,
+      fields: { parentId: 101, tableRef: 1, parentKey: "chart" } }))
+  });
+  const result = pageWidgetsOutputSchema.parse(service.getPageWidgets(context, 101));
+  assert.equal(result.widgets.every(w => w.directSelectByOptions.length === 0), true);
+  assert.equal(result.widgets[98]?.directSelectByOptionsTruncated, false);
+  assert.equal(result.widgets[99]?.directSelectByOptionsTruncated, true);
+  assert.equal(result.widgets[100]?.directSelectByOptionsTruncated, true);
 });

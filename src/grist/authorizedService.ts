@@ -13,6 +13,7 @@ import type {
   NewGristRecord,
   UpdateGristRecord
 } from "./client.js";
+import { assertDirectSelectByAllowed } from "./selectBy.js";
 import { DocumentContextService } from "./documentContext.js";
 import { DocumentUiService, type DocumentUiContext, type GristPageWidget } from "./documentUi.js";
 import type { GristService, QueryRecordsOptions } from "./service.js";
@@ -286,7 +287,7 @@ export class AuthorizedGristService {
           if (!source) {
             throw new Error(`Select-by source widget ${sourceWidgetId} does not exist on page ${pageId}.`);
           }
-          this.assertDirectSelectByAllowed(before, source, target);
+          assertDirectSelectByAllowed(before, source, target);
           adapterUpdate.selectBy = { sourceSectionId: sourceWidgetId };
           expectedSourceWidgetId = sourceWidgetId;
         }
@@ -455,43 +456,6 @@ export class AuthorizedGristService {
     return this.execute("delete_columns", documentIdOrUrl, columnIds.length, (id) =>
       this.inner.deleteColumns(id, tableId, columnIds)
     );
-  }
-
-  private assertDirectSelectByAllowed(
-    context: DocumentUiContext,
-    source: GristPageWidget,
-    target: GristPageWidget
-  ): void {
-    if (source.pageId !== target.pageId) {
-      throw new Error("Direct select-by is limited to widgets on the same Grist page.");
-    }
-    if (source.tableRef !== target.tableRef || source.tableId !== target.tableId) {
-      throw new Error(
-        "This tranche only allows direct select-by between widgets backed by the same Grist table."
-      );
-    }
-    if (source.type === "chart" || source.type === "custom") {
-      throw new Error(
-        `Widget type "${source.type}" is not allowed as a direct select-by source in this safe subset.`
-      );
-    }
-
-    const widgets = new Map<number, GristPageWidget>();
-    for (const page of context.pages) {
-      for (const widget of page.widgets) widgets.set(widget.id, widget);
-    }
-    const visited = new Set<number>();
-    let current: GristPageWidget | undefined = source;
-    while (current?.selectBy?.sourceSectionId) {
-      if (visited.has(current.id)) {
-        throw new Error("The existing select-by graph already contains a cycle; refusing to modify it.");
-      }
-      visited.add(current.id);
-      if (current.selectBy.sourceSectionId === target.id) {
-        throw new Error("The requested select-by link would create a cycle; refusing the update.");
-      }
-      current = widgets.get(current.selectBy.sourceSectionId);
-    }
   }
 
   private async resolveTableRef(documentId: string, tableId: string): Promise<number> {

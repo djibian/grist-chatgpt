@@ -1,3 +1,4 @@
+import { directSelectByValidator } from "./selectBy.js";
 import { GristApiError } from "./client.js";
 
 type JsonRecord = Record<string, unknown>;
@@ -217,10 +218,33 @@ export class DocumentUiService {
       );
     }
     const { widgets, ...pageInfo } = page;
+    const assertAllowed = directSelectByValidator(context);
+    let remainingOptions = 1000;
+    let remainingCandidates = 10000;
     return {
       documentId: context.documentId,
       page: pageInfo,
-      widgets
+      widgets: widgets.map((target) => {
+        const directSelectByOptions: Array<{ sourceWidgetId: number }> = [];
+        let examined = 0;
+        for (const source of widgets) {
+          if (remainingOptions === 0 || remainingCandidates === 0) break;
+          examined++;
+          remainingCandidates--;
+          try {
+            assertAllowed(source, target);
+            directSelectByOptions.push({ sourceWidgetId: source.id });
+            remainingOptions--;
+          } catch {
+            // Unsupported candidates never become advertised update inputs.
+          }
+        }
+        return {
+          ...target,
+          directSelectByOptions,
+          directSelectByOptionsTruncated: examined < widgets.length
+        };
+      })
     };
   }
 }
