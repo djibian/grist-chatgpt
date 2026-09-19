@@ -2,6 +2,7 @@ import type { Express, Response } from "express";
 import * as z from "zod/v4";
 
 import type { PageWidgetUpdateInput } from "../grist/authorizedService.js";
+import { GRIST_CHART_TYPES } from "../grist/chartTypes.js";
 import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
@@ -63,6 +64,7 @@ const updateWidgetBodySchema = z
   .object({
     title: z.string().optional(),
     description: z.string().optional(),
+    chartType: z.enum(GRIST_CHART_TYPES).optional(),
     selectBy: z
       .object({ sourceWidgetId: z.number().int().positive() })
       .strict()
@@ -74,9 +76,11 @@ const updateWidgetBodySchema = z
     (value) =>
       value.title !== undefined ||
       value.description !== undefined ||
+      value.chartType !== undefined ||
       value.selectBy !== undefined,
     {
-      message: "At least one of title, description or selectBy must be supplied."
+      message:
+        "At least one of title, description, chartType or selectBy must be supplied."
     }
   );
 
@@ -209,9 +213,10 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
     "/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}": {
       patch: {
         operationId: "updateGristPageWidget",
-        summary: "Update one Grist widget title, description or safe direct select-by link",
+        summary:
+          "Update one Grist widget title, description, chart type or safe direct select-by link",
         description:
-          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. selectBy links one widget directly to another widget on the same page backed by the same table; null clears the link. Column-reference select-by is intentionally not exposed in this tranche.",
+          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. selectBy links one widget directly to another widget on the same page backed by the same table; null clears the link. Column-reference select-by is intentionally not exposed in this tranche.",
         "x-openai-isConsequential": true,
         parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
         requestBody: {
@@ -228,6 +233,12 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
                     type: "string",
                     description:
                       "Widget description. Surrounding whitespace is trimmed; an empty string clears the description."
+                  },
+                  chartType: {
+                    type: "string",
+                    enum: [...GRIST_CHART_TYPES],
+                    description:
+                      "Native Grist chart type. Accepted only when the explicitly identified target widget is a chart."
                   },
                   selectBy: {
                     anyOf: [
@@ -314,6 +325,7 @@ export function registerUiActionApi(
           ...(parsed.description !== undefined
             ? { description: parsed.description }
             : {}),
+          ...(parsed.chartType !== undefined ? { chartType: parsed.chartType } : {}),
           ...(parsed.selectBy !== undefined ? { selectBy: parsed.selectBy } : {})
         };
         res.json(
