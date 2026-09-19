@@ -198,7 +198,7 @@ Raw Grist `/apply` is never model-accessible. Where low-level actions are requir
 | rename page | `renameGristPage` | `rename_page` |
 | update bounded widget configuration | `updateGristPageWidget` | `update_page_widget` |
 
-`update_page_widget` currently supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, and a conservative Ref/RefList column select-by subset. Writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
+`update_page_widget` supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, a conservative Ref/RefList column select-by subset, and bounded access/column-mapping updates for an explicitly identified existing custom widget. Custom-widget mappings use only stable current column IDs; URLs, plugin/widget identity and arbitrary widget-owned options are not writable model inputs. The bridge preserves every untargeted existing widget option and verifies the complete expected options object after write. All UI writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
 
 ## Operation registry and audit
 
