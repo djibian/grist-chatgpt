@@ -242,7 +242,7 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     title: "Inspect page widgets",
     summary: "Inspect normalized page widget metadata and select-by links.",
     description:
-      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, options, layout metadata and select-by links."
+      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, options, layout metadata, select-by links and directSelectByOptions. These snapshot options contain sourceWidgetId values supported by update_page_widget for this target (same page/table, safe source type, no cycle); an empty untruncated list means no supported source. Discovery budgets 1000 options and 10000 candidate checks per response in widget-ID order; directSelectByOptionsTruncated marks incomplete lists. Updates revalidate current metadata."
   },
   {
     name: "create_page",

@@ -245,6 +245,8 @@ v0.6 adds bounded document UI support while preserving the no-escape-hatch invar
 - conservative direct `select-by` linking;
 - post-write normalized re-read verification.
 
+`get_page_widgets` includes `directSelectByOptions` for each target widget. Each option is a `{ sourceWidgetId }` value suitable for `update_page_widget.selectBy`. Discovery shares the mutation validator: same page/table, no self-link, no chart/custom source and no introduced or reachable existing cycle. This is a snapshot of the bridge-supported direct-link subset, not all links offered by Grist. Discovery uses ascending target/source widget IDs and a total response budget of 1000 options and 10000 candidate checks. `directSelectByOptionsTruncated` marks every list that was not fully examined; an empty truncated list does not mean that no link exists. An empty untruncated list means no supported source; `selectBy: null` remains the explicit way to clear a link. The write path revalidates fresh metadata. Discovery reads no user-table rows and retains the existing `doc:read` authorization and additive audit event.
+
 Raw Grist metadata tables and arbitrary UserActions remain hidden from the model.
 
 ### GristClient and low-level actions

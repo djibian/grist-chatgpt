@@ -50,7 +50,12 @@ export const pagesOutputSchema = z.object({
 export const pageWidgetsOutputSchema = z.object({
   documentId: z.string().min(1),
   page: pageInfoSchema,
-  widgets: z.array(pageWidgetSchema)
+  widgets: z.array(pageWidgetSchema.extend({
+    directSelectByOptions: z.array(z.object({
+      sourceWidgetId: z.number().int().positive()
+    })),
+    directSelectByOptionsTruncated: z.boolean()
+  }))
 });
 
 export const pageMutationOutputSchema = z.object({
