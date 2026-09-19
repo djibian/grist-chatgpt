@@ -20,6 +20,7 @@ C1 credential abstraction         DONE
 C2 MCP contract v1                DONE
 C3 user-aware Grist context       DONE
 C4-P0 Logto/ProConnect MCP POC    ACTIVE (live-client evidence remains)
+S1 annotation semantics/package   DONE
 ```
 
 The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam and per-principal Grist context/cache isolation.
@@ -46,6 +47,8 @@ Before substantial **submission-only** engineering is treated as committed work,
 2. obtain written OpenAI clarification that this product, including its authentication/authorization and bounded semantic workflow layer, is eligible under the current unofficial-connector rule.
 
 A plugin submission draft may be created to obtain a submission/plugin identifier for an OpenAI support clarification. Do not claim an official relationship that has not been explicitly established.
+
+The decision package and exact clarification questions are tracked in GitHub issue #58.
 
 Authoritative audit:
 
@@ -177,15 +180,21 @@ Human decisions still required:
 
 ## S1 — low-risk OpenAI submission protocol preparation
 
-**Status: ELIGIBLE**  
+**Status: ELIGIBLE (partially completed)**  
 **Priority: useful while S0 is unresolved**
 
-These tasks do not require committing to production credential storage or claiming publication eligibility:
+Completed:
+
+- MCP annotation semantics rechecked against current OpenAI/MCP definitions;
+- overwrite/rename/clear/delete operations now use `destructiveHint: true`, while additive create operations remain `false`;
+- explicit per-tool justifications for `readOnlyHint`, `openWorldHint` and `destructiveHint` are generated from the normative registry;
+- `npm run submission:annotations` produces the review artifact and tests pin the destructive/additive sets.
+
+Remaining eligible work:
 
 - prove the final Logto/CIMD client path enables OIDC `openid` and `email` and that UserInfo returns `email` with `email_verified: true`;
-- add/generate explicit submission justification text for each tool's `readOnlyHint`, `openWorldHint` and `destructiveHint`;
-- implement a safe configurable `/.well-known/openai-apps-challenge` response path whose token is supplied only when the OpenAI portal issues it;
-- formalize exactly five positive and three negative reviewer scenarios with expected outcomes;
+- prepare the safe deployment path for `/.well-known/openai-apps-challenge`; activate it only when the OpenAI portal issues the exact token;
+- formalize exactly five positive and three negative reviewer scenarios with expected outcomes against the eventual synthetic reviewer fixture;
 - audit tool outputs for data minimization and unnecessary diagnostic/internal fields.
 
 Do not invent a domain-verification token or reviewer credential before the relevant live portal/environment exists.
