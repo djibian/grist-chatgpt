@@ -26,6 +26,12 @@ const widgetSelectBySchema = z.object({
   targetColumnRef: z.number().int().positive().optional()
 });
 
+const normalizedSelectBySchema = z.object({
+  sourceWidgetId: z.number().int().positive(),
+  sourceColumnId: z.string().min(1).optional(),
+  targetColumnId: z.string().min(1).optional()
+});
+
 const widgetSortEntrySchema = z.object({
   columnId: z.string().min(1),
   direction: z.enum(["asc", "desc"]),
@@ -48,20 +54,16 @@ const pageWidgetSchema = z.object({
   sortColRefs: z.unknown().optional(),
   sort: z.array(widgetSortEntrySchema).optional(),
   sortNormalizationIncomplete: z.boolean().optional(),
-  selectBy: widgetSelectBySchema.optional()
+  selectBy: widgetSelectBySchema.optional(),
+  selectByNormalized: normalizedSelectBySchema.optional(),
+  selectByNormalizationIncomplete: z.boolean().optional()
 });
 
-const columnSelectByOptionSchema = z
-  .object({
-    sourceWidgetId: z.number().int().positive(),
-    sourceColumnId: z.string().min(1).optional(),
-    targetColumnId: z.string().min(1).optional()
-  })
-  .refine(
-    (value) =>
-      value.sourceColumnId !== undefined || value.targetColumnId !== undefined,
-    "At least one Ref/RefList column ID is required."
-  );
+const columnSelectByOptionSchema = normalizedSelectBySchema.refine(
+  (value) =>
+    value.sourceColumnId !== undefined || value.targetColumnId !== undefined,
+  "At least one Ref/RefList column ID is required."
+);
 
 export const pagesOutputSchema = z.object({
   documentId: z.string().min(1),
