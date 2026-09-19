@@ -87,6 +87,118 @@ test("summarizes tables, formulas and Ref relationships without records", () => 
   ]);
 });
 
+test("normalizes verified two-way Ref and RefList columns to stable IDs", () => {
+  const tableResponse = {
+    tables: [
+      {
+        id: "Authors",
+        columns: [
+          {
+            id: "Books",
+            fields: {
+              type: "RefList:Books",
+              colRef: 11,
+              reverseCol: 22
+            }
+          }
+        ]
+      },
+      {
+        id: "Books",
+        columns: [
+          {
+            id: "Author",
+            fields: {
+              type: "Ref:Authors",
+              colRef: 22,
+              reverseCol: 11
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  const context = new DocumentContextService().build("doc-1", tableResponse) as {
+    relations: unknown[];
+  };
+
+  assert.deepEqual(context.relations, [
+    {
+      sourceTable: "Authors",
+      sourceColumn: "Books",
+      kind: "RefList",
+      targetTable: "Books",
+      reverse: {
+        table: "Books",
+        column: "Author",
+        kind: "Ref"
+      }
+    },
+    {
+      sourceTable: "Books",
+      sourceColumn: "Author",
+      kind: "Ref",
+      targetTable: "Authors",
+      reverse: {
+        table: "Authors",
+        column: "Books",
+        kind: "RefList"
+      }
+    }
+  ]);
+
+  const serialized = JSON.stringify(context.relations);
+  assert.equal(serialized.includes("colRef"), false);
+  assert.equal(serialized.includes("reverseCol"), false);
+});
+
+test("marks a declared reverse relation incomplete instead of guessing", () => {
+  const tableResponse = {
+    tables: [
+      {
+        id: "Authors",
+        columns: [
+          {
+            id: "Books",
+            fields: {
+              type: "RefList:Books",
+              colRef: 11,
+              reverseCol: 22
+            }
+          }
+        ]
+      },
+      {
+        id: "Books",
+        columns: [
+          {
+            id: "WrongBacklink",
+            fields: {
+              type: "Ref:OtherTable",
+              colRef: 22,
+              reverseCol: 11
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  const context = new DocumentContextService().build("doc-1", tableResponse) as {
+    relations: Array<Record<string, unknown>>;
+  };
+
+  assert.deepEqual(context.relations[0], {
+    sourceTable: "Authors",
+    sourceColumn: "Books",
+    kind: "RefList",
+    targetTable: "Books",
+    reverseResolutionIncomplete: true
+  });
+  assert.equal("reverse" in (context.relations[0] ?? {}), false);
+});
+
 test("surfaces advisory formula warnings in compact document context", () => {
   const tableResponse = {
     tables: [
