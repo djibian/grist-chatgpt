@@ -24,7 +24,7 @@ S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection through stable widget IDs, bounded advisory formula-reference and one-hop reference-field inspection, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection through stable column IDs, bounded advisory formula-reference and one-hop reference-field inspection, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -201,14 +201,17 @@ Current baseline:
 - bounded `directSelectByOptions` discovery for supported same-page/same-table sources, with cycle checks and explicit truncation semantics;
 - bounded `columnSelectByOptions` discovery/configuration for explicit non-summary `Ref`/`RefList` links, using reusable column IDs rather than invented numeric refs, excluding Attachments, chart/custom sources and cycles, with a 5,000-column schema ceiling plus response/candidate truncation semantics;
 - read-only page layout normalization preserves the Grist BoxSpec grouping/order and finite non-negative sizes while replacing verified leaves with stable current widget IDs; collapsed/currently unplaced widget IDs are exposed separately, raw `layoutSpec` is retained for compatibility, and stale/duplicate/malformed state produces `layoutNormalizationIncomplete` rather than guessed output;
-- layout normalization is capped at 1,000 tree nodes, depth 50 and 1,000 collapsed/unplaced IDs and performs no additional upstream read.
+- layout normalization is capped at 1,000 tree nodes, depth 50 and 1,000 collapsed/unplaced IDs and performs no additional upstream read;
+- existing `type === "custom"` widgets expose additive `customWidgetSettings` with normalized access, optional stable gallery/bundled `widgetId`, and single/list/null column mappings translated from Grist numeric refs to current stable column IDs; URLs, plugin identifiers and arbitrary widget-owned options are deliberately excluded from that normalized view;
+- custom-widget mapping normalization is capped at 100 mapping keys, 1,000 mapped columns and 5,000 schema columns, excludes the legacy native-calendar alias `custom.calendar`, and uses `customWidgetSettingsNormalizationIncomplete` instead of guessing malformed/stale mapping state.
 
 Eligible non-generic work, in small slices:
 
 - richer safe widget configuration;
 - further explicit `select-by` configuration only where semantics remain bounded and verifiable;
 - bounded layout mutation where semantics can be verified and post-state can be re-read exactly;
-- configuration of known existing custom widgets/mappings where the upstream contract can be kept bounded.
+- bounded mutation of access/column mappings for known existing custom widgets only after inputs can use stable IDs and the exact encoded post-state can be re-read;
+- widget-owned custom options only after a separate bounded JSON size/depth/value contract is defined; do not proxy arbitrary option payloads by default.
 
 Human gate before exposing any new destructive surface:
 
@@ -250,6 +253,7 @@ Do not introduce a Python interpreter, raw SQL or a generic code-execution surfa
 Integrated normalized UI slice:
 
 - page context exposes additive bounded `layoutNormalized` trees whose leaves are verified stable widget IDs, plus collapsed/unplaced widget IDs and `layoutNormalizationIncomplete` when raw Grist BoxSpec state cannot be represented exactly; raw `layoutSpec` remains for v1 compatibility;
+- existing custom-widget context exposes data-minimized access/widget identity and stable-ID column mappings with explicit normalization incompleteness; custom URLs/plugin internals/widget-owned arbitrary options are not duplicated into the normalized semantic view;
 - when expanded table metadata is available, widget context exposes additive stable-ID `sort` entries derived from native `sortColRefs`, plus `sortNormalizationIncomplete` when malformed, unsupported or unresolved raw entries prevent exact normalization;
 - normalization uses the same 20-key and 5,000-column bounds as saved-sort configuration, never guesses unsupported semantics, and retains raw `sortColRefs` for v1 compatibility;
 - non-expanded internal UI reads do not claim normalized saved-sort state;
@@ -273,7 +277,7 @@ Candidate slices:
 
 - further normalized relation-graph enrichment only where additional semantic value is demonstrated;
 - more compact summaries for large schemas;
-- richer normalized UI/select-by context beyond the layout/saved-sort/select-by slices above;
+- richer normalized UI/select-by context beyond the layout/custom-settings/saved-sort/select-by slices above;
 - cache/invalidation behavior that remains principal-isolated;
 - optional MCP resource form such as `grist://documents/{id}/context` if it improves clients without duplicating unsafe data.
 

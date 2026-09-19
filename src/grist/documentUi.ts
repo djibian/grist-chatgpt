@@ -1,4 +1,8 @@
 import {
+  normalizeCustomWidgetSettings,
+  type NormalizedCustomWidgetSettings
+} from "./customWidgetSettings.js";
+import {
   directSelectByValidator,
   discoverColumnSelectByOptions,
   type ColumnSelectByInput
@@ -42,6 +46,8 @@ export interface GristPageWidget {
   };
   selectByNormalized?: ColumnSelectByInput;
   selectByNormalizationIncomplete?: boolean;
+  customWidgetSettings?: NormalizedCustomWidgetSettings;
+  customWidgetSettingsNormalizationIncomplete?: true;
 }
 
 export interface GristPage {
@@ -124,12 +130,8 @@ function tableRefMap(tableResponse: unknown): Map<number, string> {
 
 function hasExpandedColumns(tableResponse: unknown): boolean {
   const root = record(tableResponse);
-  const source = Array.isArray(root?.tables) ? rawTables(root.tables) : [];
+  const source = Array.isArray(root?.tables) ? root.tables : [];
   return source.some((entry) => Array.isArray(record(entry)?.columns));
-}
-
-function rawTables(value: unknown[]): unknown[] {
-  return value;
 }
 
 export class DocumentUiService {
@@ -184,6 +186,13 @@ export class DocumentUiService {
       };
       const normalizedSort = normalizeWidgetSort(widget, tableResponse);
       if (normalizedSort) Object.assign(widget, normalizedSort);
+      const normalizedCustomWidgetSettings = normalizeCustomWidgetSettings(
+        widget,
+        tableResponse
+      );
+      if (normalizedCustomWidgetSettings) {
+        Object.assign(widget, normalizedCustomWidgetSettings);
+      }
 
       const widgets = widgetsByPage.get(pageId) ?? [];
       widgets.push(widget);
