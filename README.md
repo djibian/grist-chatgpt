@@ -17,87 +17,87 @@ Initial deployment target : DINUM instance
 Tenancy model             : multi-user, one configured Grist instance
 ```
 
-The bridge is intended for Grist Community deployments where the official Grist MCP/OAuth integration is not available or sufficient. It is not intended to replace the official Grist MCP server where that integration already fits the deployment.
+The bridge targets Grist Community deployments where the official Grist MCP/OAuth integration is unavailable or insufficient. It is not intended to replace the official Grist MCP server where that integration already fits the deployment.
 
-For the production multi-user target, each authenticated bridge user executes upstream Grist operations with **that user's own Grist API key**. Grist remains authoritative for the user's real ACLs; the bridge may only reduce authority through deployment policy, principal grants, scopes/capabilities and bounded semantic operations.
+For the production multi-user target, every authenticated bridge user executes upstream Grist operations with **that user's own Grist API key**. Grist remains authoritative for real ACLs; the bridge may only reduce authority through deployment policy, principal grants, OAuth scopes/capabilities and bounded semantic operations.
 
 See:
 
 - [Product vision](docs/PRODUCT_VISION.md)
 - [Authoritative roadmap](docs/ROADMAP.md)
-- [Plugin-ready audit](docs/PLUGIN-READY-AUDIT.md)
 - [Current architecture](docs/ARCHITECTURE.md)
 - [Security model](docs/SECURITY.md)
-- [C4 OAuth / identity-provider decision package](docs/OAUTH-IDP-DECISION.md)
-- [ProConnect/MCP compatibility results](docs/PROCONNECT-MCP-COMPAT-RESULTS.md)
+- [Plugin-ready audit](docs/PLUGIN-READY-AUDIT.md)
+- [C4 OAuth / identity-provider decision](docs/OAUTH-IDP-DECISION.md)
+- [OAuth operating model](docs/OAUTH-OPERATIONS.md)
 - [OpenAI submission planning](docs/OPENAI-SUBMISSION.md)
 
 ## Current status
 
-Integrated milestones:
+Integrated milestones include:
 
 - **M1 validated 2026-09-06:** Grist Community DINUM read/create/update proof of concept.
 - **Public MCP validated 2026-09-10:** HTTPS -> Caddy -> MCP -> Grist DINUM.
 - **GPT Actions validated 2026-09-10:** a custom GPT can read and write Grist through the public bridge without receiving the Grist API key.
-- **v0.4:** realistic data/schema operations, explicit deletion, batching and hardened partial-failure reporting.
-- **v0.5:** principals, Grist-aligned capabilities, policy-aware authorization, structured audit, operation registry and semantic document inspection.
-- **v0.6 DONE:** bounded document-UI inspection and mutation: pages, native widgets, page rename, widget title updates, conservative direct `select-by` links and post-write verification.
+- **v0.4 release:** realistic data/schema operations, explicit deletion, batching and hardened partial-failure reporting.
+- **v0.5 release:** principals, Grist-aligned capabilities, policy-aware authorization, structured audit, operation registry and semantic document inspection.
+- **V0.6 roadmap milestone DONE:** bounded document-UI inspection and mutation. This milestone has been integrated after the v0.5.0 release; the package/release version remains `0.5.0` until a separate release decision.
 - **C1 DONE:** credential abstraction with `GristCredentialProvider`, `StaticApiKeyCredentialProvider` and `GristClientFactory`.
-- **C2 DONE:** MCP contract v1 with registry-driven product metadata, full-surface annotation checks, structured stable successes and typed error direction.
+- **C2 DONE:** MCP contract v1 with registry-driven product metadata, annotation checks, structured UI successes and typed error direction.
 - **C3 DONE:** principal-aware Grist contexts with isolated client/discovery/cache/access-policy/service state.
-- **ProConnect compatibility research integrated:** PKCE `S256` is present in the assessed implementation, but RFC 8707 Resource Indicators are disabled; direct ProConnect is therefore ruled out as the MCP-facing authorization server for the assessed configuration.
-- **C6 independent preparation:** Grist upstream requests have a 10-second abort timeout; inbound HTTP request/header reception is explicitly bounded without limiting MCP streaming response duration.
+- **C4-P0 DONE:** real ChatGPT Developer Mode interoperability through Logto OSS federated with ProConnect, including PKCE, RFC 8707 resource binding, JWT/JWKS validation, dynamic principals, scope enforcement, positive/negative MCP authorization paths, refresh/grant-revocation behavior and real bounded Grist reads/writes.
+- **C4 ELIGIBLE:** productionize the already-proven OAuth design; the identity-provider decision is no longer a blocker.
+- **C5 BLOCKED:** secure per-user Grist credential onboarding still requires C4 productionization plus explicit persistence/encryption decisions.
+- **C6 preparation integrated:** timeouts, release/rollback documentation, OAuth deployment preflight/smoke design, metrics vocabulary and audit contract review are present; finalization still depends on C4/C5.
+- **S1 partially completed:** submission annotations/artifact, the canonical 5-positive/3-negative reviewer specification, the optional domain-challenge endpoint and several output-minimization slices are integrated.
 
-The current critical-path blocker is **C4 — OAuth MCP identity**. Provider-specific implementation is not eligible until the human identity-provider / authorization-server decision documented in `docs/OAUTH-IDP-DECISION.md` is made durable.
-
-Historical milestone documents under `docs/M1-*`, `docs/M2-*` and `docs/M3-*` describe the implementation that existed at the time of each validation.
+Historical milestone/evidence documents under `docs/M1-*`, `docs/M2-*`, `docs/M3-*` and the Logto/ProConnect POC files describe the implementation/evidence at the time they were recorded. `docs/ROADMAP.md` is authoritative for current tranche status.
 
 ## Goal
 
 Allow ChatGPT/Codex or another MCP client to perform realistic Grist work on explicitly selected resources while keeping credentials, authorization and business rules server-side.
 
-The bridge is intentionally not a generic Grist API proxy. Every model-visible capability must correspond to a named, bounded operation.
+The bridge is intentionally not a generic Grist API proxy. Every model-visible capability corresponds to a named, bounded operation.
 
 ## Current architecture
 
 ```text
-                GPT Actions             MCP client
-                     |                      |
-                     +----------+-----------+
-                                |
-                                v
-                       transport adapters
-                                |
-                                v
-                    Principal + capabilities
-                                |
-                                v
-                       GristContextFactory
-                    /           |            \
-                   /            |             \
-                  v             v              v
-       GristClientFactory  GristResourceDiscovery  AccessPolicy
-              |               private cache           |
-              v                                       v
-   GristCredentialProvider                    AuthorizationService
-              |                                       |
-              v                                       v
-   credential-derived GristClient            AuthorizedGristService
-              |                                       |
-              +-------------------+-------------------+
-                                  |
-                                  v
-                              GristService
-                                  |
-                   REST + bounded internal actions
-                                  |
-                                  v
-                         Grist Community DINUM
+GPT Actions compatibility                 MCP client
+        |                                     |
+        +------------------+------------------+
+                           |
+                           v
+                   transport adapters
+                           |
+                           v
+               Principal + capabilities
+                           |
+                           v
+                  GristContextFactory
+                 /          |          \
+                v           v           v
+       GristClientFactory  discovery   AccessPolicy
+                |          private cache    |
+                v                         v
+     GristCredentialProvider      AuthorizationService
+                |                         |
+                v                         v
+             GristClient        AuthorizedGristService
+                |                         |
+                +------------+------------+
+                             |
+                             v
+                         GristService
+                             |
+                REST + bounded internal actions
+                             |
+                             v
+                    Grist Community DINUM
 ```
 
-`DeploymentResourcePolicy` is the shareable deployment-level maximum boundary. Each `GristContextFactory.create(principal)` call creates fresh credential-derived client, discovery/cache, access-policy and service state for that principal.
+`DeploymentResourcePolicy` is the shareable deployment-level ceiling. Each `GristContextFactory.create(principal)` call creates fresh credential-derived client, discovery/cache, access-policy and service state for that principal.
 
-The current development deployment still uses one configured server-side `GRIST_API_KEY` through `StaticApiKeyCredentialProvider` and two static bearer principals. Those are compatibility/development substitutions, not the final production identity model.
+The validated MCP POC supports **OAuth dynamic principals through Logto OSS + ProConnect**. Static MCP bearer remains a development/backward-compatibility mode; GPT Actions continues to use its static compatibility bearer. Both paths still use one configured server-side `GRIST_API_KEY` through `StaticApiKeyCredentialProvider` in the current personal/development deployment. That shared upstream Grist credential is the remaining prototype substitution and must not be confused with production multi-user isolation.
 
 ## Production identity target
 
@@ -138,13 +138,11 @@ current user's Grist permissions
 ∩ required operation capability / OAuth scope
 ```
 
-Current capability vocabulary:
+Fixed public capability vocabulary:
 
-- `doc:read` — discovery, schema/UI inspection and row reads;
+- `doc:read` — discovery, schema/UI/context inspection and row reads;
 - `doc:write` — record create/update/delete;
 - `doc.schema:write` — table/column/document-UI structural mutations.
-
-No current work authorizes changing that scope vocabulary.
 
 ## Main capabilities
 
@@ -160,7 +158,9 @@ No current work authorizes changing that scope vocabulary.
 | inspect page widgets | `getGristPageWidgets` | `get_page_widgets` |
 | operation/capability help | `getGristHelp` | `grist_help` |
 
-`inspect_document` / `inspectGristDocument` reads structure without reading user-table rows. It returns tables, columns, formulas, `Ref` / `RefList` relationships and normalized page/widget context.
+`inspect_document` reads structure without reading user-table rows. Current context includes formulas, bounded local and one-hop Ref/RefList field diagnostics, normalized relationships including verified reverse references, and normalized page/widget sort/select-by context where exact resolution is possible.
+
+`grist_help` can return the full operation catalog, filter by category, report compact category counts and optionally expose registry-derived non-executing workflow descriptions.
 
 ### Data
 
@@ -172,6 +172,8 @@ No current work authorizes changing that scope vocabulary.
 | delete explicit record IDs | `deleteGristRecords` | `delete_records` |
 
 Large create/update/delete requests may be split into sequential internal batches. Those batches are **not atomic as a group**. Partial failure is reported explicitly and the complete operation must not be blindly replayed.
+
+Successful update/delete responses are minimized to bounded semantic acknowledgements rather than forwarding upstream engine response bodies. Creation responses retain the functional created identifiers needed for follow-up work.
 
 ### Schema
 
@@ -185,7 +187,7 @@ Large create/update/delete requests may be split into sequential internal batche
 | rename column ID | `renameGristColumn` | `rename_column` |
 | delete explicit columns | `deleteGristColumns` | `delete_columns` |
 
-Raw Grist `/apply` is never model-accessible. Where low-level actions are required internally, the bridge constructs only fixed bounded operations.
+Raw Grist `/apply` is never model-accessible. Where low-level actions are required internally, the bridge constructs only fixed bounded operations. Success-only schema mutation results are projected to stable requested targets; functional creation IDs remain available.
 
 ### Document UI
 
@@ -194,13 +196,13 @@ Raw Grist `/apply` is never model-accessible. Where low-level actions are requir
 | create empty page | `createGristPage` | `create_page` |
 | add native page widget | `addGristPageWidget` | `add_page_widget` |
 | rename page | `renameGristPage` | `rename_page` |
-| update widget title/direct select-by | `updateGristPageWidget` | `update_page_widget` |
+| update bounded widget configuration | `updateGristPageWidget` | `update_page_widget` |
 
-Document-UI operations are semantic and bounded. The model does not receive arbitrary metadata-table write access or arbitrary UserActions. Writes are re-read and verified; ambiguous post-write results are treated as non-retryable at whole-operation level.
+`update_page_widget` currently supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, and a conservative Ref/RefList column select-by subset. Writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
 
 ## Operation registry and audit
 
-`src/operations/registry.ts` centralizes required capability, product metadata and risk annotations used by authorization/help/MCP contract checks.
+`src/operations/registry.ts` centralizes required capability, product metadata and risk annotations used by authorization, help, MCP contract checks and submission preparation.
 
 Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, target document, item count where meaningful, status and duration. Audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
 
@@ -208,36 +210,38 @@ Every operation passing through `AuthorizedGristService` emits a structured JSON
 
 A Grist API key is a high-value credential and must never become a tool argument or conversation value.
 
-The credential seam is already integrated:
-
 ```text
 Principal -> GristCredentialProvider -> credential -> GristClientFactory -> GristClient
 ```
 
-The current static provider preserves development deployment behavior. Production onboarding remains future C5 work and is blocked on explicit persistence/encryption decisions. Any user-aware provider must guarantee that one principal can never retrieve another principal's credential.
+The current static provider preserves personal/development deployment behavior. Production onboarding is C5 work and remains blocked on explicit persistence/encryption decisions. Any user-aware provider must guarantee that one principal can never retrieve another principal's credential.
 
 ## OAuth / ProConnect boundary
 
-The repository contains a bounded compatibility assessment for ProConnect against MCP `2026-07-28`.
+The C4 architecture decision is durable:
 
-For the assessed ProConnect public implementation:
+- **ProConnect** is the upstream institutional identity source;
+- **Logto OSS self-hosted** is the reference MCP-facing authorization server;
+- `grist-chatgpt` remains a provider-neutral JWT/JWKS OAuth resource server;
+- direct ProConnect is ruled out for the assessed configuration because RFC 8707 Resource Indicators are disabled there;
+- Auth0 EU and Curity Standard remain documented fallbacks.
 
-- PKCE `S256` is supported;
-- RFC 8707 Resource Indicators are disabled.
-
-Because MCP requires resource-bound token acquisition, **direct ProConnect cannot be the MCP-facing authorization server in that assessed configuration**.
-
-This does not decide whether ProConnect should remain the upstream identity source. A dedicated MCP authorization server federated to ProConnect, another identity/authorization provider, or another explicitly approved architecture remain behind the C4 human gate.
+C4-P0 proved this path with real ChatGPT Developer Mode. C4 now concerns productionization and operating evidence, not provider selection.
 
 ## Production-hardening status
 
-Already integrated independently of final identity:
+Already integrated independently of final C5 identity/credential lifecycle:
 
-- 10-second Grist upstream request timeout;
-- 120-second inbound request receive timeout;
-- 60-second inbound header receive timeout.
+- 10-second Grist upstream abort timeout;
+- bounded inbound HTTP request/header reception;
+- protected `main` integration gate;
+- deployment/rollback operating documentation;
+- offline OAuth deployment preflight;
+- non-secret public OAuth deployment smoke checks;
+- bounded production metrics vocabulary;
+- structured audit contract/privacy review.
 
-Still pending C6 finalization includes per-principal rate limiting, metrics/alerting, audit export where required, secret rotation, deployment/rollback procedure, protected releases and post-deploy smoke tests.
+Remaining C6 finalization includes per-principal rate limiting, operational metrics/alerting, audit export if required, secret/key rotation, controlled production deployment/rollback evidence and authenticated post-deploy synthetic smoke evidence.
 
 ## Configuration
 
@@ -260,52 +264,48 @@ Important development/prototype variables include:
 - `GRIST_MAX_WRITE_RECORDS`
 - `GRIST_WRITE_BATCH_RECORDS`
 - `GRIST_MAX_SCHEMA_ITEMS`
-- `MCP_BEARER_TOKEN`
+- `MCP_AUTH_MODE` (`static` or `oauth`)
+- `MCP_BEARER_TOKEN` for static MCP development mode only
+- `OAUTH_ISSUER`, `OAUTH_JWKS_URI`, `MCP_RESOURCE_URI` in OAuth mode
 - `GPT_ACTION_TOKEN`
-
-The MCP and GPT Actions bearer tokens must each be at least 32 characters and must differ.
+- `MCP_ALLOWED_HOSTS`
+- optional `OPENAI_APPS_CHALLENGE_TOKEN` only when the submission portal issues the exact value
 
 Endpoints:
 
 ```text
-/mcp          MCP
-/api/v1       GPT Actions REST
-/openapi.json GPT Actions OpenAPI 3.1 schema
-/healthz      health check
+/mcp                                      MCP
+/api/v1                                   GPT Actions REST
+/openapi.json                             GPT Actions OpenAPI 3.1 schema
+/healthz                                  health check
+/.well-known/oauth-protected-resource     RFC 9728 metadata
+/.well-known/openai-apps-challenge        optional portal challenge route
 ```
 
 The Node service intentionally binds to localhost. Use a reverse proxy for public HTTPS deployment and configure `MCP_ALLOWED_HOSTS` for the public MCP hostname.
 
 ## Deliberate exclusions
 
-The bridge does **not** expose:
-
-- arbitrary HTTP forwarding;
-- raw SQL;
-- arbitrary Grist `/apply` / UserActions;
-- unrestricted Grist instance administration;
-- user/ACL administration;
-- model-visible Grist API keys;
-- bridge-managed recreation of Grist ACLs;
-- arbitrary routing across unrelated Grist instances.
-
-These are architectural boundaries, not missing generic convenience features.
+The bridge does **not** expose arbitrary HTTP forwarding, raw SQL, arbitrary Grist `/apply`/UserActions, unrestricted instance administration, user/ACL administration, model-visible credentials, bridge-managed recreation of Grist ACLs, or arbitrary routing across unrelated Grist instances.
 
 ## Critical path to plugin-ready v1
 
 ```text
-V0.6 bounded document UI       DONE
+V0.6 bounded document UI       DONE roadmap milestone
 C1 Credential abstraction      DONE
 C2 MCP contract v1             DONE
 C3 User-aware Grist context    DONE
-C4 OAuth MCP identity          BLOCKED by human identity-provider decision
-C5 Secure Grist onboarding     BLOCKED by C4 + persistence/encryption decisions
+C4-P0 OAuth interoperability   DONE
+C4 Production OAuth            ELIGIBLE
+C5 Secure Grist onboarding     BLOCKED by C4 + human persistence/encryption decisions
 C6 Production hardening        BLOCKED for finalization by C4/C5
-C7 Reviewer fixture            BLOCKED by C4/C5
-C8 Submission package          BLOCKED by C6/C7
+S0 Public-plugin eligibility   BLOCKED / human-institutional gate
+S1 Submission preparation      ELIGIBLE / partially completed
+C7 Reviewer environment        BLOCKED by identity/credential readiness + S0
+C8 Final submission            BLOCKED by C6/C7/S0
 ```
 
-The next critical-path transition is the human C4 decision recorded in `docs/OAUTH-IDP-DECISION.md`. Further Grist feature breadth is intentionally lower priority.
+The exact dependency map and currently eligible work live in `docs/ROADMAP.md`.
 
 ## Development and validation
 
@@ -324,7 +324,7 @@ CI also runs the production dependency audit. `package-lock.json` is committed a
 2. **MCP-first business logic** — product behavior is transport-neutral, with GPT Actions treated as a compatibility adapter.
 3. **Capabilities are explicit** — resource access and `read/write/schema` authority are separate concerns.
 4. **Powerful but bounded operations** — destructive targets are exact identifiers.
-5. **Understand before modifying** — semantic document context is available without reading row data.
+5. **Understand before modifying** — semantic document context is available without indiscriminate row disclosure.
 6. **Partial writes are explicit** — no blind replay after partial or ambiguous success.
 7. **No generic escape hatches** — no arbitrary HTTP, SQL or raw `/apply` tool.
 8. **Secrets remain outside the model** — Grist credentials and OAuth/session secrets never enter model-visible inputs or outputs.
