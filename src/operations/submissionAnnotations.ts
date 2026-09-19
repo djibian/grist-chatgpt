@@ -19,6 +19,15 @@ export interface SubmissionToolAnnotations {
   justifications: SubmissionAnnotationJustifications;
 }
 
+export interface SubmissionArtifactTool {
+  annotations: SubmissionToolAnnotations["annotations"];
+  justifications: {
+    read_only_justification: string;
+    open_world_justification: string;
+    destructive_justification: string;
+  };
+}
+
 export function buildSubmissionAnnotationJustifications(
   operation: OperationDefinition
 ): SubmissionAnnotationJustifications {
@@ -57,4 +66,20 @@ export function buildSubmissionToolAnnotations(): SubmissionToolAnnotations[] {
     },
     justifications: buildSubmissionAnnotationJustifications(operation)
   }));
+}
+
+export function buildSubmissionArtifactTools(): Record<string, SubmissionArtifactTool> {
+  return Object.fromEntries(
+    buildSubmissionToolAnnotations().map((tool) => [
+      tool.name,
+      {
+        annotations: tool.annotations,
+        justifications: {
+          read_only_justification: tool.justifications.readOnlyHint,
+          open_world_justification: tool.justifications.openWorldHint,
+          destructive_justification: tool.justifications.destructiveHint
+        }
+      }
+    ])
+  );
 }
