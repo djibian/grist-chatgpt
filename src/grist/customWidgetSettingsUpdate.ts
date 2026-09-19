@@ -7,8 +7,8 @@ import {
 } from "./customWidgetSettings.js";
 
 export interface CustomWidgetSettingsUpdateInput {
-  access?: CustomWidgetAccessLevel;
-  columnsMapping?: CustomWidgetColumnMapping | null;
+  access?: CustomWidgetAccessLevel | undefined;
+  columnsMapping?: CustomWidgetColumnMapping | null | undefined;
 }
 
 export interface ResolvedCustomWidgetSettingsUpdate {
