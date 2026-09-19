@@ -6,25 +6,25 @@
 
 It keeps authentication, authorization, guardrails and Grist credentials server-side while exposing named bounded operations. It is not intended to reproduce the whole Grist API or become a generic model-driven remote-control proxy.
 
-The long-term product contract is MCP-first. GPT Actions/OpenAPI remain a useful development and compatibility surface during the prototype phase.
+The long-term product contract is MCP-first. GPT Actions/OpenAPI remain a development and compatibility adapter.
 
-See [Plugin-ready audit — Grist Community / DINUM](PLUGIN-READY-AUDIT.md) for the product-readiness assessment and [User-aware Grist contexts](USER-CONTEXT.md) for the C3 context-isolation boundary.
+See [Plugin-ready audit](PLUGIN-READY-AUDIT.md), [User-aware Grist contexts](USER-CONTEXT.md), [OAuth operating model](OAUTH-OPERATIONS.md) and the [authoritative roadmap](ROADMAP.md).
 
 ## Current architecture
 
 ```text
-ChatGPT GPT Actions                 MCP client
-        |                               |
-        +---------------+---------------+
-                        |
-                        v
-                transport adapters
-                        |
-                        v
-              Principal / capabilities
-                        |
-                        v
-                GristContextFactory
+GPT Actions compatibility                 MCP client
+        |                                     |
+        +------------------+------------------+
+                           |
+                           v
+                   transport adapters
+                           |
+                           v
+                 Principal / capabilities
+                           |
+                           v
+                  GristContextFactory
                   |               |
                   |               +--> GristClientFactory
                   |                       |
@@ -58,13 +58,11 @@ ChatGPT GPT Actions                 MCP client
                                    Grist Community
 ```
 
-`DeploymentResourcePolicy` is shared because it contains only configured document/workspace ceilings. Every `GristContextFactory.create(principal)` call creates a fresh credential-derived client, discovery cache, access policy and service graph for that principal.
+`DeploymentResourcePolicy` contains only configured document/workspace ceilings and is safe to share. Every `GristContextFactory.create(principal)` call creates fresh credential-derived client, discovery/cache, access policy and service state for that principal.
 
-The completed C4-P0 deployment authenticates MCP users through Logto OSS federated with ProConnect and constructs dynamic OAuth principals. Static bearer remains a development/compatibility mode. Both modes currently use one configured `GRIST_API_KEY` through `StaticApiKeyCredentialProvider`; this is a POC substitution, not the final multi-user credential model. See [OAuth operating model](OAUTH-OPERATIONS.md) for repeatable configuration checks and the remaining C4/C5 boundaries.
+The completed C4-P0 deployment authenticates MCP users through Logto OSS federated with ProConnect and constructs dynamic OAuth principals. Static MCP bearer remains an explicit development/backward-compatibility mode; GPT Actions remains a static-bearer compatibility adapter. All current paths still resolve the same configured `GRIST_API_KEY` through `StaticApiKeyCredentialProvider` in the personal/development deployment. That shared upstream Grist credential is the remaining prototype substitution, not the final multi-user model.
 
 ## Product architecture target
-
-The selected production model for Grist Community DINUM is:
 
 ```text
                  ChatGPT / Codex
@@ -96,30 +94,21 @@ The selected production model for Grist Community DINUM is:
               Grist Community DINUM
 ```
 
-This product specifically targets the Community-edition gap where the official Grist MCP/OAuth integration is not available. Where an official Grist MCP integration is available and sufficient, equivalent bridge functionality should not be duplicated without a clear additional product need.
+The product targets the Community-edition gap where the official Grist MCP/OAuth integration is unavailable or insufficient. Where an official integration is available and sufficient, equivalent bridge functionality should not be duplicated without a clear additional product need.
 
 ## Responsibility boundaries
 
 ### Transport adapters
 
-GPT Actions and MCP translate protocol-specific calls into the same service methods. No Grist authorization rule should depend on the transport implementation itself.
+GPT Actions and MCP translate protocol-specific calls into the same service methods. No Grist authorization rule depends on the transport itself. MCP is the primary product contract; GPT Actions is compatibility/development surface.
 
-MCP is the intended primary public product contract. GPT Actions should remain an adapter rather than a source of core business rules.
+### Principal and capabilities
 
-### Principal
+Each authenticated bridge client is represented as a `Principal` with stable internal identity, transport, resource grants and Grist-aligned capabilities.
 
-Each authenticated bridge client is represented as a `Principal` with:
+MCP OAuth mode constructs dynamic principals from validated issuer/subject and scopes. Static MCP mode and GPT Actions use static principals only for development/compatibility.
 
-- a stable internal ID;
-- a transport;
-- one or more resource grants;
-- Grist-aligned capabilities.
-
-MCP OAuth mode constructs dynamic principals from validated issuer/subject and scopes. Static MCP mode and the GPT Actions compatibility adapter use static bearer principals.
-
-### Capabilities
-
-The initial vocabulary is:
+Fixed public capability vocabulary:
 
 ```text
 doc:read
@@ -127,66 +116,38 @@ doc:write
 doc.schema:write
 ```
 
-Semantics:
-
-- `doc:read`: document discovery, tables/columns, semantic context, page/widget inspection and record reads;
+- `doc:read`: discovery, tables/columns, semantic context, page/widget inspection and record reads;
 - `doc:write`: record creation/update/deletion;
 - `doc.schema:write`: table/column/document-UI structural mutations.
 
-These capabilities are the fixed public OAuth scopes. They deliberately express bridge authority, not the raw power of a user's Grist API key.
+### Deployment resource policy and authorization
 
-### Deployment resource policy
+`DeploymentResourcePolicy` defines the maximum documents/workspaces the bridge may expose. Within one principal context, `GristResourceDiscovery` learns only resources visible through that context's Grist credential, and `AccessPolicy` intersects those discoveries with the deployment ceiling.
 
-`DeploymentResourcePolicy` defines which configured documents and/or workspaces this bridge may expose at all. It contains no Grist client, credential-derived visibility or cache and is therefore safe to share between principals.
+Effective authority is the intersection of:
 
-Within one principal context, `GristResourceDiscovery` learns only the resources visible through that context's Grist credential, and `AccessPolicy` intersects those discoveries with the deployment ceiling. Explicit configured document IDs retain the existing direct-target behavior, while the actual upstream Grist call still uses the current principal's credential and remains subject to Grist ACLs.
-
-The authorization model is the intersection of:
-
-1. deployment policy for the DINUM bridge;
-2. resources/operations permitted by the current user's Grist API key;
+1. deployment resource policy;
+2. permissions of the current user's Grist API key;
 3. principal resource grants;
-4. the operation's required capability/scope.
+4. operation capability/OAuth scope.
 
-Authorization must fail closed if any layer denies access.
-
-### AuthorizationService
-
-`AuthorizationService` intersects the context-bound `AccessPolicy`, principal grants and the operation capability.
-
-Because each `AccessPolicy` belongs to one fresh principal context, authorization cannot reuse discovered Grist visibility from another principal. Grist itself remains the final authority on the upstream operation executed with the current context's credential.
+Authorization fails closed if any layer denies access. Grist itself remains authoritative on the final upstream operation.
 
 ### Operation registry
 
-`src/operations/registry.ts` is authoritative for operation policy metadata:
+`src/operations/registry.ts` is authoritative for operation policy metadata: name, category, capability, audit-aware read-only status, destructive status, open-world status, title, summary and description.
 
-- operation name;
-- category;
-- required capability;
-- read-only flag accounting for audit writes, with `auditOnly` metadata distinguishing audited reads from Grist mutations;
-- destructive flag;
-- concise purpose.
-
-`AuthorizedGristService` obtains capability requirements from this registry, and `grist_help` exposes the same metadata.
-
-The plugin-ready direction is to extend this shared contract so that OAuth scope mapping and MCP annotations/descriptions cannot drift independently.
+The same registry drives authorization/help/MCP metadata and submission annotation generation so those surfaces do not drift independently.
 
 ### AuthorizedGristService
 
-This facade preserves Grist business behavior while adding:
+This facade adds capability enforcement, resource authorization, principal identity, structured audit and public result projection around the transport-neutral Grist business layer.
 
-- capability enforcement;
-- resource authorization;
-- principal identity;
-- structured audit.
-
-This remains the correct place for transport-neutral model authorization.
+Recent data-minimization work ensures model-facing discovery metadata and success-only mutation results do not forward arbitrary upstream/internal engine fields. Functional stable identifiers required for follow-up work remain available.
 
 ### GristCredentialProvider
 
-C1 introduced the server-side credential boundary used for upstream Grist access.
-
-Each authenticated production user must execute upstream Grist operations with **that user's own Grist API key**. The current abstraction is:
+C1 introduced the server-side credential boundary:
 
 ```text
 Principal
@@ -204,129 +165,121 @@ GristClientFactory
 GristClient / principal context
 ```
 
-`StaticApiKeyCredentialProvider` preserves today's single-user `GRIST_API_KEY` development deployment. A future user-aware provider can resolve a different credential per authenticated principal without changing the Grist business layer.
-
-Any user-aware provider must never return another principal's credential and must never expose the secret to the model.
+`StaticApiKeyCredentialProvider` preserves the current single-upstream-key development deployment. C5 will provide secure per-user credential onboarding/storage/retrieval/disconnect after the human persistence/encryption decisions are made.
 
 ### GristContextFactory and user isolation
 
-C3 introduces `GristContextFactory` as the lifecycle boundary for credential-derived Grist state.
+Every `create(principal)` call constructs a fresh credential-derived `GristClient`, `GristResourceDiscovery` cache, `AccessPolicy`, `AuthorizationService`, `GristService`, UI adapter and `AuthorizedGristService` bound to that principal.
 
-For every `create(principal)` call it constructs a fresh:
-
-- credential-derived `GristClient`;
-- `GristResourceDiscovery` and private discovery cache;
-- `AccessPolicy` bound to the shared static deployment ceiling;
-- `AuthorizationService`;
-- `GristService` and `GristUiActionsAdapter`;
-- `AuthorizedGristService` bound to the exact principal.
-
-The factory deliberately retains no user context cache. Clients, discovered-resource sets, caches and authorization facts learned under one credential therefore cannot become visibility state for another principal. Explicit two-principal tests cover this boundary.
+The factory deliberately retains no shared user context cache. Credential-derived clients, discoveries and authorization facts therefore cannot cross principal boundaries.
 
 ### GristService
 
-`GristService` remains the transport-neutral business layer for validated data/schema behavior:
+`GristService` owns validated data/schema behavior including read/write/schema guardrails, exact-target deletion, write batching, partial-success errors, validation of identifiers/counts and semantic result projection.
 
-- read/write/schema guardrails;
-- exact-target deletion;
-- write batching;
-- explicit partial-success errors;
-- validation of identifiers and counts.
+Large record operations may use sequential non-atomic batches. Partial failure reports completed work and forbids blind replay of the complete operation.
 
 ### Document UI layer
 
-The bounded document UI layer now includes:
+The bounded UI layer now includes:
 
 - normalized page/widget inspection;
-- bounded page creation;
-- bounded native widget creation;
+- empty page creation;
+- supported native widget creation;
 - page rename;
 - widget title and description update, including explicit description clearing;
-- conservative direct `select-by` linking;
+- native chart-type configuration for chart widgets;
+- saved sort configuration using stable current column IDs and bounded sort flags;
+- conservative direct same-table select-by linking;
+- bounded Ref/RefList column select-by linking through advertised stable widget/column IDs;
+- normalized saved-sort and select-by inspection;
 - post-write normalized re-read verification.
 
-`get_page_widgets` includes `directSelectByOptions` for each target widget. Each option is a `{ sourceWidgetId }` value suitable for `update_page_widget.selectBy`. Discovery shares the mutation validator: same page/table, no self-link, no chart/custom source and no introduced or reachable existing cycle. This is a snapshot of the bridge-supported direct-link subset, not all links offered by Grist. Discovery uses ascending target/source widget IDs and a total response budget of 1000 options and 10000 candidate checks. `directSelectByOptionsTruncated` marks every list that was not fully examined; an empty truncated list does not mean that no link exists. An empty untruncated list means no supported source; `selectBy: null` remains the explicit way to clear a link. The write path revalidates fresh metadata. Discovery reads no user-table rows and retains the existing `doc:read` authorization and additive audit event.
+Discovery/mutation enforce bounded option/candidate/schema limits, reject unsupported/ambiguous links and cycles, and never expose arbitrary metadata-table writes or arbitrary UserActions.
 
-Raw Grist metadata tables and arbitrary UserActions remain hidden from the model.
+### Semantic document context
+
+`DocumentContextService` builds compact structural context without reading user-table rows. Current context includes:
+
+- tables/columns/formulas;
+- local `$Column` diagnostics;
+- bounded one-hop `$Ref.Field` / `$RefList.Field` diagnostics using already-loaded schema metadata;
+- forward Ref/RefList relationships plus verified reverse relationships when exact bidirectional metadata is available;
+- normalized page/widget context including sort and select-by stable IDs where exact resolution is possible;
+- explicit incompleteness markers when raw metadata cannot be normalized safely.
+
+No formula execution, Python interpreter, raw SQL or indiscriminate row loading is introduced.
 
 ### GristClient and low-level actions
 
-`GristClient` owns explicit REST calls.
+`GristClient` owns explicit REST calls. Raw `/apply` is inaccessible to models. It may be used internally only behind fixed named bounded operations with known action shapes, such as `RenameColumn`, `RemoveTable` and specific UI actions.
 
-Raw `/apply` remains inaccessible to models. It may be used internally only behind fixed named operations with known action shapes, such as `RenameColumn` or `RemoveTable`, and future bounded UI operations must preserve the same principle.
+Raw `/apply` engine response bodies are not propagated through the corresponding model-facing semantic operations.
 
 ## MCP tool contract
 
-The MCP surface is the normative public API direction of the product.
+Each public MCP tool should have a stable user-intent contract covering:
 
-Each product tool should define a stable contract including:
-
-- name;
-- user-intent-oriented title and description;
+- name/title/description;
 - input schema;
-- output schema where useful;
-- structured result form;
+- output schema where a stable normalized shape is ready;
+- structured result form where applicable;
 - required capability/OAuth scope;
 - read-only/destructive/open-world annotations;
 - typed error behavior.
 
-Descriptions should explain what the user can accomplish and relevant constraints, not internal `UserAction` mechanics.
+The UI tool family already exposes stable structured successful results. Record/schema update/delete service results are now minimized semantic acknowledgements, while creation operations retain functional created identifiers; broader `outputSchema` coverage remains separate contract work.
+
+## OAuth architecture
+
+The C4 identity-provider gate is resolved:
+
+- ProConnect is the upstream institutional identity source;
+- Logto OSS self-hosted is the reference MCP-facing authorization server;
+- `grist-chatgpt` remains a provider-neutral OAuth resource server using standard JWT/JWKS validation;
+- direct ProConnect is ruled out for the assessed configuration because RFC 8707 Resource Indicators are disabled there;
+- Auth0 EU and Curity Standard remain documented fallbacks.
+
+C4-P0 has passed with real ChatGPT Developer Mode. C4 is now productionization/operating-evidence work, not provider selection.
 
 ## Secure Grist credential onboarding
 
-The user's Grist API key must never be a model-visible input.
-
-The target onboarding path is a separate bridge-owned web flow:
+The production C5 target is a separate bridge-owned flow:
 
 ```text
-OAuth-authenticated plugin user
+OAuth-authenticated user
         |
         v
-secure "Connect Grist" page
+secure Connect Grist page
         |
         v
-user submits API key directly to bridge
+API key submitted directly to bridge
         |
         v
-bridge validates it against configured Grist Community DINUM
+validate against configured Grist Community instance
         |
         v
-verified Grist identity associated with principal
+associate verified Grist identity with principal
         |
         v
 encrypted credential storage
 ```
 
-The credential must never enter prompts, MCP inputs/outputs, audit events, general logs or error payloads.
+The credential must never enter prompts, MCP/GPT inputs/outputs, audit events, general logs or error payloads. Persistence technology and encryption/key management remain human-gated.
 
-A product-level disconnect operation must delete the stored bridge credential association; Grist-level API-key revocation/regeneration remains independently available to the user.
+## Audit and observability
 
-Persistence technology and encryption/key-management architecture remain human-gated decisions under the roadmap.
+Every operation routed through `AuthorizedGristService` emits a bounded JSON audit event containing operational metadata such as request ID, principal, transport, operation, capability, document ID, item count, status, duration and error type. Cell values and secrets are excluded.
 
-## Semantic document context
-
-`DocumentContextService` provides a compact structural representation intended for reasoning before complex modifications.
-
-It reports tables, columns, formulas, `Ref`/`RefList` relationships and, in v0.6, normalized page/widget context without reading user-table rows.
-
-This separation remains useful for both privacy and tool selection.
-
-## Audit model
-
-Every operation routed through `AuthorizedGristService` emits one structured JSON event containing operational metadata such as request ID, principal, transport, operation, capability, document ID, item count, status, duration and error type.
-
-Cell values, bearer tokens and Grist API keys must never be intentionally logged by the audit layer.
-
-The institutional deployment may route the same event shape to centralized audit infrastructure.
+C6 preparation also documents low-cardinality metrics vocabulary, release/rollback procedure and non-secret OAuth smoke checks. Per-principal rate limiting, operational alerting/export, key rotation and controlled production evidence remain later C6 work.
 
 ## Current personal/development deployment
 
-The validated prototype remains intentionally simple:
-
 ```text
-ChatGPT / MCP client
+ChatGPT MCP client
    |
-   | OAuth via Logto / ProConnect (static bearer optional in development)
+   | OAuth via Logto / ProConnect
+   | (static bearer optional for development)
    v
 personal VPS bridge
    |
@@ -336,40 +289,22 @@ personal VPS bridge
 Grist Community DINUM
 ```
 
-This is appropriate for one trusted developer validating the bridge. Its internal contexts are now principal-isolated, but the shared static credential is still only a development/backward-compatible identity substitute and must not be confused with the final multi-user production identity model.
-
-## Institutional/product target
-
-The initial production target is **multi-user for one configured DINUM Grist Community instance**, not a general multi-tenant router for arbitrary Grist installations.
-
-This keeps one stable MCP service boundary while allowing each authenticated user to operate through their own Grist identity and ACLs.
+This is suitable for one trusted developer validating the product. OAuth identity and internal contexts are real/principal-aware; the shared upstream Grist credential still prevents treating this deployment as production multi-user isolation.
 
 ## Deliberate exclusions
 
-The bridge continues to exclude:
-
-- generic HTTP forwarding;
-- raw SQL;
-- arbitrary `/apply` / UserActions;
-- unrestricted instance administration;
-- user/ACL administration;
-- model-visible Grist API keys;
-- bridge-managed recreation of Grist ACLs;
-- arbitrary multi-tenant routing across unrelated Grist instances.
+The bridge excludes generic HTTP forwarding, raw SQL, arbitrary `/apply`/UserActions, unrestricted instance administration, user/ACL administration, model-visible credentials, bridge-managed recreation of Grist ACLs, and arbitrary routing across unrelated Grist instances.
 
 ## Near-term architecture roadmap
 
-Identity/security and independently useful bounded product work proceed on parallel axes under `ROADMAP.md`:
-
-1. **DONE:** credential abstraction and credential-aware client construction (C1);
-2. **DONE:** MCP contract-v1 metadata/structured-result hardening (C2);
-3. **DONE:** principal-isolated Grist clients, discovery caches and service contexts (C3);
-4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto OSS / ProConnect OAuth path and dynamic principals with repeatable operating evidence;
-5. **BLOCKED by C4 and human persistence/encryption decisions:** secure per-user Grist credential onboarding/storage/disconnect (C5);
-6. **PREPARATION DONE; finalization blocked by C4/C5:** production observability, rate limits and release controls (C6);
-7. synthetic reviewer fixture and plugin submission package.
-
-Bounded non-destructive P1 UI work is independently eligible. New destructive page/widget surfaces remain human-gated.
+1. **C1 DONE:** credential abstraction and credential-aware client construction.
+2. **C2 DONE:** MCP contract-v1 metadata/structured-result hardening.
+3. **C3 DONE:** principal-isolated clients, discoveries, caches and service contexts.
+4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto/ProConnect OAuth path with repeatable deployment/rotation/outage evidence.
+5. **C5 BLOCKED by C4 + human persistence/encryption decisions:** secure per-user Grist credential lifecycle.
+6. **C6 preparation integrated; finalization blocked by C4/C5:** rate limits, operational metrics/alerts, rotation and controlled release evidence.
+7. P1/P2/P3 bounded product work remains independently eligible where it preserves the architecture.
+8. S0 public-directory eligibility remains a separate human/institutional distribution gate.
 
 ## Architectural invariant
 

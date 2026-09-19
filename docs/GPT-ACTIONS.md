@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Provide a ChatGPT Plus-compatible path to Grist Community through a custom GPT while keeping the Grist API key, authorization and guardrails server-side.
+GPT Actions/OpenAPI is the compatibility/development adapter for using Grist Community through a custom GPT while keeping Grist credentials, authorization and guardrails server-side.
 
-The GPT authenticates only to the bridge with `GPT_ACTION_TOKEN`.
+It is **not** the long-term primary product contract; MCP is.
 
 ```text
 ChatGPT custom GPT
@@ -25,7 +25,7 @@ GristService -> GristClient -> Grist Community
 
 ## Authentication and capability scope
 
-Configure a random `GPT_ACTION_TOKEN` of at least 32 characters, distinct from `MCP_BEARER_TOKEN`.
+Configure a random `GPT_ACTION_TOKEN` of at least 32 characters. It identifies the static `chatgpt-actions` compatibility principal and is independent from MCP OAuth authentication.
 
 ```bash
 openssl rand -hex 32
@@ -37,15 +37,13 @@ In the custom GPT Action editor:
 - Auth type: Bearer
 - Secret: `GPT_ACTION_TOKEN`
 
-The bearer identifies the static `chatgpt-actions` principal in the current personal deployment.
-
-Its capabilities are controlled by `GPT_ACTION_CAPABILITIES`. When omitted, compatibility defaults are:
+Capabilities are controlled by `GPT_ACTION_CAPABILITIES`; compatibility defaults are:
 
 ```text
 doc:read,doc:write,doc.schema:write
 ```
 
-Removing a capability denies the corresponding operations server-side even if the Grist API key itself could perform them.
+Removing a capability denies the corresponding operations server-side even if the configured upstream Grist API key could perform them.
 
 ## OpenAPI schema
 
@@ -55,52 +53,53 @@ The bridge serves OpenAPI 3.1 at:
 GET /openapi.json
 ```
 
-Re-import or refresh the schema in the custom GPT after bridge upgrades that add operations. The advertised version is shared with MCP and `/healthz`.
+Re-import/refresh the schema after bridge upgrades that alter the compatibility surface. Advertised version is shared with MCP and `/healthz`.
 
 ## Resource scope
 
-ChatGPT does not inherit every document accessible to the Grist API key.
+GPT Actions does not inherit every document accessible to the Grist API key.
 
-`AccessPolicy` defines the deployment resource boundary with:
+`AccessPolicy` intersects:
 
-- `GRIST_ALLOWED_DOCUMENT_IDS`;
-- `GRIST_ALLOWED_WORKSPACE_IDS`.
+- deployment ceiling from `GRIST_ALLOWED_DOCUMENT_IDS` / `GRIST_ALLOWED_WORKSPACE_IDS`;
+- static GPT Actions principal grants;
+- the capability required by the operation;
+- final upstream Grist ACL enforcement through the configured credential.
 
-`AuthorizationService` then intersects that boundary with the `chatgpt-actions` principal and the capability required by each operation.
-
-`listGristDocuments` therefore returns only documents visible to this principal.
+`listGristDocuments` therefore returns only documents exposed to this compatibility principal.
 
 ## Discovery and semantic context
 
-v0.5 adds two read-only actions:
+Current compatibility actions include:
 
-- `getGristHelp` — returns the operation catalog with category, required capability and risk metadata;
-- `inspectGristDocument` — returns a compact semantic context containing tables, columns, formulas and `Ref` / `RefList` relationships without reading user-table rows.
+- `getGristHelp` — registry-derived operation discovery, optional category filtering/counts and opt-in non-executing workflow descriptions;
+- `inspectGristDocument` — compact structural context without user-table rows;
+- `listGristDocuments`, `listGristTables`, `listGristColumns`;
+- `getGristPages`, `getGristPageWidgets`.
 
-For complex document work, `inspectGristDocument` should normally be preferred over repeatedly discovering table structure one endpoint at a time.
+`inspectGristDocument` currently exposes bounded formula/schema diagnostics, including local `$Column` references and exact one-hop `$Ref.Field` / `$RefList.Field` checks against already-loaded schema metadata, plus normalized relationships and page/widget context. Formulas are never executed.
+
+For complex document work, inspect semantic context before broad discovery/mutation when that avoids unnecessary row disclosure.
 
 ## Data operations
 
-- `listGristDocuments` — discover allowed documents/workspaces.
-- `listGristTables` — list tables, optionally expanding column metadata.
-- `queryGristRecords` — read/filter/sort records; supports `hidden` and `cellFormat`.
-- `createGristRecords` — create records.
-- `updateGristRecords` — update records by numeric ID.
+- `queryGristRecords` — read/filter/sort records; supports the bridge's bounded Grist query contract;
+- `createGristRecords` — create records;
+- `updateGristRecords` — update records by explicit numeric ID;
 - `deleteGristRecords` — delete exact unique numeric IDs only.
 
 Read operations require `doc:read`; record writes require `doc:write`.
 
-Read size is controlled by `GRIST_MAX_READ_RECORDS`. Write size is controlled by `GRIST_MAX_WRITE_RECORDS`; large writes are internally split according to `GRIST_WRITE_BATCH_RECORDS`.
+Read/write bounds are controlled by `GRIST_MAX_READ_RECORDS`, `GRIST_MAX_WRITE_RECORDS` and `GRIST_WRITE_BATCH_RECORDS`.
 
-Internal batches are **not atomic as a group**. If a later batch fails after previous batches succeeded, the API reports the already-applied batches/items. A client must reconcile those items and must not retry the complete operation blindly.
+Internal batches are **not atomic as a group**. Partial failure reports completed work and the complete operation must not be blindly replayed.
 
-There is intentionally no pagination abstraction over Grist. Reads use Grist's native filter/sort/limit model.
+Successful update/delete results are minimized to bounded semantic acknowledgements containing the exact stable targets rather than arbitrary upstream engine response bodies. Creation results retain functional created record IDs for safe follow-up work.
 
 ## Schema operations
 
-The following require `doc.schema:write`:
+`listGristColumns` is read-only under `doc:read`. Schema mutations require `doc.schema:write`:
 
-- `listGristColumns` itself is read-only and requires only `doc:read`;
 - `createGristTables`;
 - `updateGristTables`;
 - `deleteGristTable`;
@@ -109,53 +108,74 @@ The following require `doc.schema:write`:
 - `renameGristColumn`;
 - `deleteGristColumns`.
 
-Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`, a total per-operation guardrail. For `createGristTables`, each table and nested initial column counts toward the same maximum.
+Schema operation size is controlled by `GRIST_MAX_SCHEMA_ITEMS`. For table creation, each table and nested initial column counts toward the same operation maximum.
 
-Column deletion is sequential and may therefore also report partial success.
+Success-only update/delete/apply-backed results are projected to semantic acknowledgements rather than raw upstream response bodies. Create operations preserve functional created table/column identifiers.
 
-`widgetOptions` must be supplied in the JSON-string representation expected by Grist.
+Raw Grist `/apply` is never exposed to the GPT. Fixed internal actions such as `RenameColumn` and `RemoveTable` remain hidden behind named bounded operations.
+
+## Document UI operations
+
+The compatibility adapter exposes the same bounded document-UI business layer as MCP:
+
+- `getGristPages`;
+- `getGristPageWidgets`;
+- `createGristPage`;
+- `addGristPageWidget`;
+- `renameGristPage`;
+- `updateGristPageWidget`.
+
+`updateGristPageWidget` currently supports bounded:
+
+- title updates;
+- description updates and explicit clearing;
+- native chart type on chart widgets only;
+- saved sort using stable current column IDs and supported bounded flags;
+- direct same-table select-by;
+- conservative Ref/RefList column select-by using the exact stable IDs advertised by page-widget inspection.
+
+The adapter resolves required internal numeric Grist references server-side, revalidates current metadata before writes and re-reads the page after writes. Ambiguous post-write verification failures must not trigger blind replay.
+
+Page deletion, widget deletion and broader destructive UI state are not exposed.
 
 ## Consequential actions
 
-Read operations, including help and document context, are marked `x-openai-isConsequential: false`.
+GPT Actions `x-openai-isConsequential` metadata is an approval/UX hint for this compatibility adapter, not an authorization boundary.
 
-Existing create/update/delete data and schema mutations remain marked consequential. This OpenAI metadata is independent of bridge authorization: it neither grants nor removes a server-side capability.
-
-## Low-level Grist boundary
-
-The bridge never exposes raw `/api/docs/{docId}/apply` to ChatGPT.
-
-Two current high-level actions use it internally:
-
-- `renameGristColumn` → fixed `RenameColumn`;
-- `deleteGristTable` → fixed `RemoveTable`.
-
-The model never supplies arbitrary User Action names or arrays.
+Server-side capability/resource checks remain authoritative regardless of client approval metadata.
 
 ## Audit
 
-Every GPT operation routed through the policy-aware service emits structured operational metadata to the server log: request ID, principal, operation, capability, target document, status and duration. Cell values and credentials are not intentionally included.
+Every GPT operation routed through `AuthorizedGristService` emits bounded operational metadata: request ID, principal, operation, capability, target document, status, duration and related low-cardinality fields. Cell contents and credentials are not intentionally logged.
+
+Because audited reads append an audit event, MCP's `readOnlyHint` semantics are intentionally stricter than the GPT Actions consequential UX flag; these are different contracts.
 
 ## Deliberately unsupported generic capabilities
 
-The GPT Actions interface does not expose:
+The adapter does not expose:
 
 - arbitrary HTTP requests;
 - raw SQL;
-- raw Grist `/apply` actions;
+- arbitrary Grist `/apply`/UserActions;
 - unrestricted instance administration;
-- user/ACL administration.
+- user/ACL administration;
+- model-visible Grist API keys.
+
+## Current identity limitation
+
+GPT Actions remains a **static-bearer compatibility path**. The production product uses MCP OAuth dynamic principals. In the current personal/development deployment, both transports still ultimately use the configured server-side `GRIST_API_KEY`; C5 will replace that shared upstream credential with per-user Grist credentials for production multi-user use.
 
 ## Validation approach
 
-Use a synthetic allowed document when validating destructive/schema changes. A useful sequence is:
+Use a synthetic allowed document for destructive/schema/UI validation. A representative sequence is:
 
 1. `getGristHelp`;
 2. `listGristDocuments`;
 3. `inspectGristDocument`;
-4. create a temporary table;
-5. add typed/formula columns;
-6. create/update/delete synthetic records;
-7. delete temporary schema objects.
+4. create temporary schema;
+5. create/update/delete synthetic records;
+6. inspect/create/configure page/widgets;
+7. re-read exact targets after each bounded mutation;
+8. remove only explicitly identified temporary schema objects.
 
 This exercises the same authorized business layer used by MCP without exposing production data unnecessarily.

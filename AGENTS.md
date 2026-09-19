@@ -6,7 +6,7 @@ This file is the operational contract for autonomous work on `djibian/grist-chat
 
 - `main` is the only durable source of truth for integrated project state.
 - At the start of every execution, resolve the exact SHA of `main` and read this file, `docs/PRODUCT_VISION.md` and `docs/ROADMAP.md` from that exact SHA.
-- Reconstruct mutable GitHub facts instead of trusting remembered state: open PRs, exact PR heads, Draft/Ready state, CI, reviews, issues, dependencies and current `main`.
+- Reconstruct mutable GitHub facts instead of trusting remembered state: open PRs, exact PR heads, Draft/Ready state, CI, reviews, issues, dependencies, all remote branches and current `main`.
 - The state of one agent/chat/controller execution is never project state.
 
 ## Single-entry controller mode
@@ -75,6 +75,67 @@ Current baseline checks include:
 
 A stale green run on an older SHA is not evidence for the current head.
 
+## Startup repository coherence gate
+
+Every Controller execution begins with one global repository-coherence pass **before selecting or spawning new roadmap work**. This startup gate is the recovery mechanism for interrupted or prematurely ended previous executions; correctness must not depend on a previous Controller reaching a clean shutdown step.
+
+The Controller must first reconstruct the current integrated and mutable state, then verify that the repository tells one materially consistent story.
+
+### Mutable-state reconstruction
+
+Inventory every remote branch, not only open PR heads. Classify each non-`main` branch as far as the available evidence permits, for example:
+
+- head of an open PR;
+- work ahead of `main` with no open PR;
+- branch associated with a closed/unmerged PR;
+- stale pointer whose work is already integrated;
+- ambiguous residue requiring inspection.
+
+A branch ahead of `main` without an open PR is potential unfinished work. Do not overwrite it, duplicate it or assume it is abandoned. Inspect its delta and provenance before choosing overlapping work; promote, preserve, close or clean it only when the evidence supports that action.
+
+### Coherence chain
+
+Check material consistency in this direction:
+
+```text
+code / tests / runtime configuration
+        -> operation registry and public contracts
+        -> docs/ROADMAP.md
+        -> docs/ARCHITECTURE.md + docs/SECURITY.md
+        -> current-state specialized docs
+        -> README.md
+```
+
+The checks are semantic, not merely textual. Examples of material drift include:
+
+- a capability implemented on `main` but still documented as future or unavailable;
+- a resolved human gate still presented as blocking;
+- a current security/identity description that contradicts the runtime path;
+- a current-state audit whose conclusions depend on an obsolete baseline;
+- a public README that materially understates or misstates the integrated product;
+- stale branch/PR state that could cause duplicate autonomous work.
+
+Historical milestone/evidence documents may retain the state that was true when they were produced. Do not rewrite history merely to make old evidence look current. Instead, distinguish clearly between historical evidence and documents that claim to describe current state.
+
+### Repair before expansion
+
+If the startup pass finds a material inconsistency that can affect autonomous selection, user understanding, security interpretation or public product description, repair it in one bounded coherence PR before starting new feature work. Re-run the normal CI and integration gates on that PR.
+
+Do not manufacture documentation churn for harmless wording differences. The objective is material coherence, not identical phrasing across files.
+
+### Documentation during the execution
+
+A normal feature PR should update documentation in that same PR only when the feature itself changes facts that must be durable immediately, especially:
+
+- a public tool/API contract or required configuration;
+- a security or architecture invariant;
+- a human gate or product decision;
+- a roadmap tranche status, dependency or eligibility fact that the Controller may use later in the same execution.
+
+Do **not** perform a global README/architecture/security/audit synchronization after every integrated PR merely because some descriptive detail could be refreshed. The next Controller startup pass is responsible for global semantic reconciliation.
+
+An end-of-execution coherence check is optional and useful when cheap, but it is never the sole mechanism that guarantees repository coherence.
+
 ## Eligibility, priority and dependencies
 
 Treat these as separate concepts:
@@ -85,15 +146,16 @@ Treat these as separate concepts:
 
 A high-priority blocked item does not prevent useful independent work. Conversely, an item being possible does not make it useful.
 
-`docs/ROADMAP.md` is the authoritative dependency map. When code reality and roadmap text diverge, do not silently guess; make the mismatch durable through an appropriate PR or human decision.
+`docs/ROADMAP.md` is the authoritative dependency map. When code reality and roadmap text diverge, do not silently guess; the startup coherence gate must repair the mismatch before stale roadmap text drives new work.
 
 When several items are eligible, the Controller should choose without asking the user unless a human gate applies. Prefer, in order:
 
 1. finishing or integrating already-open eligible work;
-2. work that unlocks another blocked tranche;
-3. the highest-priority independent work from different roadmap axes so useful parallelism is preserved;
-4. smaller bounded slices over speculative broad rewrites;
-5. low-risk preparation while a higher-priority item is externally blocked.
+2. finishing or recovering valid unintegrated work already present on a branch before duplicating it;
+3. work that unlocks another blocked tranche;
+4. the highest-priority independent work from different roadmap axes so useful parallelism is preserved;
+5. smaller bounded slices over speculative broad rewrites;
+6. low-risk preparation while a higher-priority item is externally blocked.
 
 Do not select a lower-value task merely because it is easier to automate.
 
@@ -168,12 +230,12 @@ A Worker should:
 4. verify the chantier is eligible and its dependencies are satisfied;
 5. run the bounded external-reference protocol above when relevant and capture its decision for the PR;
 6. create/use one short branch;
-7. implement the smallest coherent slice with tests and docs where needed;
+7. implement the smallest coherent slice with tests and documentation required by that slice's contract/configuration/security/roadmap-state changes;
 8. run/observe CI on the exact head;
 9. open or update a PR with scope, evidence, dependencies, reference provenance when relevant and deferred work;
 10. stop at a human gate or when no useful eligible action remains.
 
-Workers must not silently expand scope merely because adjacent improvements are visible.
+Workers must not silently expand scope merely because adjacent improvements are visible. Workers are not responsible for a repository-wide documentation sweep after their bounded PR; global reconciliation belongs to the next Controller startup pass.
 
 A Controller-generated Worker mandate should normally contain only what is not already durable in the repository: the assigned tranche/slice, expected branch purpose, relevant dependency/head facts, and explicit stop conditions. It should not duplicate the full product vision, roadmap or security doctrine.
 
@@ -182,19 +244,18 @@ A Controller-generated Worker mandate should normally contain only what is not a
 The Controller should:
 
 1. resolve exact `main` SHA and reload the three normative documents;
-2. reconstruct all relevant mutable GitHub state;
-3. identify ready-to-integrate PRs, blocked work and independent eligible work;
-4. choose and assign the best eligible work itself using the roadmap and selection rules above;
-5. prefer finishing eligible existing work before spawning unnecessary new branches;
-6. keep normally at most two independent Worker slots active, selecting different roadmap axes when that improves throughput and does not create races;
-7. use CI wait time to review or progress genuinely independent work;
-8. after every durable transition, resolve `main` again and rebuild the relevant state;
-9. after every integrated PR, reconcile `docs/ROADMAP.md` and relevant evidence docs against the new `main` before allowing stale roadmap text to drive the next tranche; if the PR changed durable tranche state, capability baseline, completed/remaining work or a dependency, update those docs in the same PR when practical or in an immediate follow-up documentation PR;
-10. never leave already-integrated work described as merely candidate/remaining work when that mismatch could affect autonomous selection;
-11. continue while a useful eligible action exists;
-12. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful.
-
-A documentation-only reconciliation PR is useful when needed to restore authoritative state, but should not become a ritual after every merge when the roadmap/evidence already remains accurate.
+2. reconstruct all relevant mutable GitHub state, including every remote branch and its relationship to `main`/PRs where determinable;
+3. execute the startup repository coherence gate and integrate any required coherence repair before selecting new roadmap work;
+4. identify ready-to-integrate PRs, recoverable unintegrated branch work, blocked work and independent eligible work;
+5. choose and assign the best eligible work itself using the roadmap and selection rules above;
+6. prefer finishing eligible existing/recoverable work before spawning unnecessary new branches;
+7. keep normally at most two independent Worker slots active, selecting different roadmap axes when that improves throughput and does not create races;
+8. use CI wait time to review or progress genuinely independent work;
+9. after every durable transition, resolve `main` again and rebuild the relevant mutable state;
+10. require a PR itself to update any public contract/configuration, security/architecture invariant, human gate or roadmap status/dependency that changes because of that PR, but do not require a global documentation reconciliation after every merge;
+11. never let a known stale roadmap status/dependency drive subsequent work in the same execution;
+12. continue while a useful eligible action exists;
+13. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful.
 
 The Controller must never infer project state from another chat's narrative when GitHub can provide the current fact.
 
@@ -204,7 +265,9 @@ The Controller must not ask the user to supply task-specific Worker prompts when
 
 - `docs/PRODUCT_VISION.md`: durable product purpose, target architecture and non-goals.
 - `docs/ROADMAP.md`: current dependency graph, tranche status and eligible next work.
-- `docs/PLUGIN-READY-AUDIT.md`: detailed plugin-readiness analysis and submission gaps.
-- `docs/ARCHITECTURE.md` and `docs/SECURITY.md`: implementation architecture and security doctrine.
+- `docs/ARCHITECTURE.md` and `docs/SECURITY.md`: current implementation architecture and security doctrine.
+- current-state specialized docs such as `docs/MCP-CONTRACT.md`, `docs/GPT-ACTIONS.md`, `docs/PLUGIN-READY-AUDIT.md` and `docs/OPENAI-SUBMISSION.md`: detailed current contracts/readiness where they explicitly claim current status.
+- `README.md`: public high-level projection of current integrated product state, not the authority for hidden implementation decisions.
+- milestone/POC/result documents: historical evidence unless they explicitly declare themselves current operating documents.
 
-If these documents conflict, `AGENTS.md` governs execution, while product/security contradictions must be resolved explicitly rather than chosen opportunistically.
+If current-state documents conflict, `AGENTS.md` governs execution, while product/security contradictions must be resolved explicitly rather than chosen opportunistically. Historical evidence should remain historically accurate even when current-state documents evolve.

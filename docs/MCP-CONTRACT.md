@@ -1,44 +1,41 @@
 # MCP contract v1
 
-This document records the public MCP contract direction introduced by C2. It does not change Grist business logic, credentials, authentication, scopes or deployment authorization.
+This document records the current public MCP contract direction introduced by C2 and subsequently hardened. It does not by itself change Grist business logic, credentials, authentication, scopes or deployment authorization.
 
 ## Normative operation metadata
 
-`src/operations/registry.ts` is the authoritative registry for public operation metadata that is shared across the bridge:
+`src/operations/registry.ts` is authoritative for shared public operation metadata:
 
-- operation name and category;
+- operation name/category;
 - required bridge capability;
 - user-oriented title, summary and description;
 - `readOnlyHint` source value;
 - `destructiveHint` source value;
 - `openWorldHint` source value.
 
-MCP registrations derive these fields from the registry so titles, descriptions and risk annotations cannot silently diverge from the authorization/audit operation catalog.
-
-Input schemas remain next to their concrete MCP registrations because they contain transport validation and configured bounds. The registry is metadata, not an alternate business-operation dispatcher.
+MCP registrations derive these values from the registry so descriptions/risk metadata cannot silently diverge from authorization/audit policy. Input schemas remain next to concrete registrations because they contain transport validation and configured bounds.
 
 ## Risk annotations
 
-The current contract follows these rules:
+Current rules:
 
 - only operations with no state changes, including no audit writes, use `readOnlyHint: true`;
-- mutations use `readOnlyHint: false`;
-- additive create operations use `destructiveHint: false` because they do not overwrite or remove existing user state;
-- writes that can overwrite, rename, clear or delete existing Grist state use `destructiveHint: true`, including record/schema/UI updates and explicit deletions;
-- all current operations are confined to the configured Grist environment, so `openWorldHint: false`;
-- adding a new destructive capability remains a product/security decision, while correcting an annotation to match an existing operation's real effects is a contract-safety fix.
+- audited reads therefore use `readOnlyHint: false` while remaining non-destructive;
+- additive create operations use `destructiveHint: false`;
+- operations that may overwrite, rename, clear or delete existing Grist state use `destructiveHint: true`;
+- all current operations remain confined to the configured Grist environment, so `openWorldHint: false`.
 
-This follows the MCP annotation semantics and OpenAI plugin guidance: `destructiveHint: false` is appropriate for additive writes, not for an operation that may overwrite existing user state.
+Full-surface tests compare MCP registrations with the registry. Submission justifications are generated from the same registry through `src/operations/submissionAnnotations.ts` / `npm run submission:annotations`.
 
-Full-surface tests compare every MCP registration with the registry and pin the destructive/read-only sets.
+Current audited `doc:read` operations — `list_documents`, `list_tables`, `list_columns`, `query_records`, `inspect_document`, `get_pages`, `get_page_widgets` — intentionally use `readOnlyHint: false` because execution appends an audit event. `grist_help` remains the unaudited `readOnlyHint: true` utility.
 
-For OpenAI submission, `src/operations/submissionAnnotations.ts` derives a non-secret justification for each of the three annotation values for every registered operation. `npm run submission:annotations` prints the resulting submission artifact from the same registry so annotation values and justifications can be reviewed without hand-maintained drift.
+## Successful output direction
 
-`list_documents`, `list_tables`, `list_columns`, `query_records`, `inspect_document`, `get_pages` and `get_page_widgets` retain `doc:read` authorization but declare `readOnlyHint: false`, `destructiveHint: false` and `openWorldHint: false`: their execution appends an audit event without changing Grist user data. Only `grist_help` remains `readOnlyHint: true`. Audit remains enabled; hints do not change OAuth scopes or authorization.
+The contract distinguishes **stable semantic result projection** from formal MCP `outputSchema` coverage.
 
-## Structured successful outputs
+### UI family
 
-`outputSchema` and `structuredContent` are introduced only where the bridge already produces normalized, stable document-UI structures with identifiers intended for later calls:
+Stable `outputSchema` / `structuredContent` are already used where the bridge has normalized document-UI structures:
 
 - `get_pages`;
 - `get_page_widgets`;
@@ -47,35 +44,94 @@ For OpenAI submission, `src/operations/submissionAnnotations.ts` derives a non-s
 - `rename_page`;
 - `update_page_widget`.
 
-These outputs retain text content for compatibility and additionally expose structured content. Page IDs, widget IDs, table IDs/references and select-by source IDs therefore remain directly reusable without parsing prose.
+These outputs expose reusable stable IDs without requiring prose parsing. Page/widget inspection now includes bounded normalized sort/select-by information and explicit incompleteness/truncation signals where exact normalization is not possible.
 
-Raw Grist REST response shapes for records and schema operations are intentionally not declared stable in this tranche. Adding an `outputSchema` there should follow normalization of the relevant response rather than freezing an upstream implementation shape accidentally.
+### Discovery/schema projection
+
+Public table/column discovery no longer forwards open-ended raw Grist metadata. The authorized public layer projects only functional schema/context fields needed by supported workflows while internal service paths retain private numeric refs needed for bounded UI/semantic work.
+
+### Success-only mutations
+
+Several update/delete operations whose upstream success body is not semantically required now return bounded semantic acknowledgements instead of retaining arbitrary Grist/batch engine responses:
+
+- `update_records` — target table + exact record IDs + `updated: true`;
+- `delete_records` — target table + exact record IDs + `deleted: true`;
+- `update_tables` — exact requested table IDs + `updated: true`;
+- `update_columns` — target table + exact requested column IDs + `updated: true`;
+- `delete_columns` — target table + exact deleted column IDs + `deleted: true`;
+- fixed internal `RenameColumn` / `RemoveTable` paths return semantic acknowledgements rather than raw `/apply` response fields.
+
+Partial-batch error semantics are unchanged and continue to report completed work safely.
+
+### Creation results
+
+Create operations retain functional created identifiers because later bounded calls need them. On current `main`, broader create-result normalization/formal `outputSchema` coverage remains separate work; the contract must not freeze arbitrary upstream implementation fields merely for convenience.
+
+Consequently, absence of formal `outputSchema` on a tool does not mean its service result is still an unrestricted raw upstream response, and a normalized service acknowledgement does not automatically imply a formal public `outputSchema` has already been declared.
+
+## Semantic document context
+
+`inspect_document` is deliberately advisory/non-executing and avoids user-table row loading. Current context includes:
+
+- tables/columns/formulas;
+- local formula reference diagnostics;
+- bounded one-hop `$Ref.Field` / `$RefList.Field` diagnostics from already-loaded schema metadata;
+- normalized Ref/RefList relationships including verified reverse relationships;
+- normalized page/widget sort/select-by context where exact resolution is possible;
+- explicit incompleteness markers when internal metadata cannot be safely represented.
+
+No Python/formula execution, raw SQL or generic code execution is introduced.
+
+## Progressive help
+
+`grist_help` preserves the historical complete-catalog default and additionally supports bounded progressive discovery:
+
+- compact per-category operation counts;
+- optional category filtering, mutually exclusive with explicit operation-name filtering;
+- optional registry-derived workflow descriptions for common discover/read/create+verify/schema-change+verify/UI-configure+verify sequences.
+
+Workflows are descriptive only. They do not execute operations or duplicate tool input schemas.
 
 ## Typed error direction
 
-MCP tool failures use an additive JSON error envelope in text content with a stable `code` and human-readable `error` field. Current categories are:
+MCP tool failures use an additive JSON error envelope in text content with a stable `code` and human-readable `error` field. Current categories include:
 
-- `partial_write` — a non-atomic batched write failed after some work completed;
-- `write_verification_failed` — a UI write may have succeeded but its final state could not be verified safely;
-- `grist_upstream` — Grist returned an upstream HTTP/API failure;
-- `operation_failed` — other bounded validation or operation failures.
+- `partial_write` — non-atomic batched write failed after some work completed;
+- `write_verification_failed` — a UI write may have succeeded but final state could not be verified safely;
+- `grist_upstream` — bounded upstream Grist HTTP/API failure;
+- `operation_failed` — other bounded validation/operation failure.
 
-Errors deliberately do **not** include `structuredContent`. Success `outputSchema` describes the stable successful result only, and some MCP clients validate any present `structuredContent` against that success schema even for `isError: true`. Keeping the typed error envelope in text content avoids converting a recoverable tool error into a client-side schema failure. Upstream response bodies and internal stacks are not exposed.
+Errors deliberately do **not** include success `structuredContent`. Some MCP clients validate present structured content against the success schema even for errors, so typed errors remain text-envelope based rather than masquerading as successful result shapes.
 
-For `partial_write`, the contract preserves `operation`, `completedBatches`, `completedItems`, `failedBatch` and `retryWholeOperation: false`.
+For `partial_write`, the contract preserves operation, completed batches/items, failed batch and `retryWholeOperation: false`.
 
-For `write_verification_failed`, the contract preserves `operation`, an optional known `createdId`, and `retryWholeOperation: false`.
+For `write_verification_failed`, it preserves operation, optional known created ID and `retryWholeOperation: false`.
 
-`retryWholeOperation: false` is a safety invariant: callers must reconcile the reported state rather than blindly replaying a possibly partially successful write.
+`retryWholeOperation: false` is a safety invariant: callers reconcile known state instead of blindly replaying possibly partially successful work.
 
-## Deliberately unchanged
+## Authorization boundary
 
-This annotation correction does not:
+The public capability vocabulary remains exactly:
 
-- change the Grist credential model or credential storage;
-- change OAuth/provider selection;
-- add, remove or reinterpret public scopes/capabilities;
-- change server/resource authorization;
-- expose raw `/apply`, arbitrary UserActions, SQL or generic HTTP;
-- add new Grist feature breadth;
-- change the bounded semantics of existing operations.
+```text
+doc:read
+doc:write
+doc.schema:write
+```
+
+MCP OAuth mode maps validated token scopes into a dynamic principal and verifies issuer/resource/expiry before the principal reaches the Grist context. Static MCP bearer exists only as explicit development/backward compatibility. Neither OAuth tokens nor bridge bearer tokens cross into the upstream Grist credential provider.
+
+## Deliberate exclusions
+
+The MCP contract does not expose:
+
+- generic HTTP forwarding;
+- raw SQL;
+- arbitrary Grist `/apply`;
+- arbitrary UserActions;
+- generic user/ACL administration;
+- model-visible credentials;
+- broad destructive targeting when stable explicit identifiers can be required;
+- pseudo-transactions that obscure partial success.
+
+Adding/removing public OAuth scopes or exposing a new generic/destructive capability remains a human-gated product/security decision under `AGENTS.md`.
