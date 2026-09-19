@@ -34,7 +34,7 @@ The normal operating model is:
 - one **Controller** conversation responsible for global state, eligibility, dependency ordering, Worker assignment, review and integration;
 - normally two active **Workers**, with a third only when the work is demonstrably independent;
 - Workers implement one bounded chantier each and open/update PRs; they do not merge their own work;
-- the Controller may code when useful, but should prefer coordination when independent Worker work exists.
+- the Controller may code when useful, but should prefer coordination when independent worker work exists.
 
 Agents must not spend effort discovering whether other chats/agents exist. GitHub state is the coordination medium.
 
@@ -97,6 +97,36 @@ When several items are eligible, the Controller should choose without asking the
 
 Do not select a lower-value task merely because it is easier to automate.
 
+## External-reference protocol
+
+The product roadmap records external projects as design provenance. Use that provenance operationally instead of re-inventing known Grist/MCP behavior from memory.
+
+Before implementing a product slice when `docs/ROADMAP.md` names a relevant reference, or when a clearly relevant upstream implementation already exists, perform a bounded **reference-first** review when the source is accessible and likely to reduce uncertainty or duplicated work.
+
+Inspect only the parts relevant to the current slice and, where useful, identify:
+
+- public contract / user-visible semantics;
+- implementation approach and stable identifiers;
+- edge cases and failure semantics;
+- tests or fixtures that capture behavior;
+- known limitations/issues relevant to the slice;
+- license and attribution constraints before any code reuse.
+
+Classify the result explicitly as one of:
+
+- **REUSE** — code or tests can be reused under a compatible license and fit the architecture;
+- **ADAPT** — a licensed implementation can be adapted, while preserving required notices/attribution;
+- **REIMPLEMENT** — behavior/ideas/tests are useful but code should be independently implemented, including when no compatible reuse license is established;
+- **REJECT** — the reference conflicts with this repository's product/security invariants or does not improve the slice.
+
+Publicly readable source code is not automatically licensed for copying. Do not copy implementation code unless a compatible reuse license is verified. When direct reuse is not justified, it is still valid to study public contracts, behavior, tests and edge cases and then implement independently.
+
+Grist's official behavior/documentation remains the preferred functional oracle where available. External implementations never override this repository's security invariants, human gates, bounded-operation model or authoritative product decisions.
+
+Do not turn reference review into open-ended research. If no external reference materially helps the bounded slice, state that briefly and proceed from the repository's own contracts/tests.
+
+For a product PR informed by an external implementation, the PR body should record the relevant reference(s) and the `REUSE` / `ADAPT` / `REIMPLEMENT` / `REJECT` decision, including any licensing implication. This provenance is evidence, not a new dependency on the external repository.
+
 ## Security invariants
 
 These invariants must not be weakened incidentally:
@@ -136,11 +166,12 @@ A Worker should:
 2. read `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md` at that SHA;
 3. reconstruct GitHub facts relevant to its chantier;
 4. verify the chantier is eligible and its dependencies are satisfied;
-5. create/use one short branch;
-6. implement the smallest coherent slice with tests and docs where needed;
-7. run/observe CI on the exact head;
-8. open or update a PR with scope, evidence, dependencies and deferred work;
-9. stop at a human gate or when no useful eligible action remains.
+5. run the bounded external-reference protocol above when relevant and capture its decision for the PR;
+6. create/use one short branch;
+7. implement the smallest coherent slice with tests and docs where needed;
+8. run/observe CI on the exact head;
+9. open or update a PR with scope, evidence, dependencies, reference provenance when relevant and deferred work;
+10. stop at a human gate or when no useful eligible action remains.
 
 Workers must not silently expand scope merely because adjacent improvements are visible.
 
@@ -158,9 +189,12 @@ The Controller should:
 6. keep normally at most two independent Worker slots active, selecting different roadmap axes when that improves throughput and does not create races;
 7. use CI wait time to review or progress genuinely independent work;
 8. after every durable transition, resolve `main` again and rebuild the relevant state;
-9. update roadmap/evidence documentation through normal PR discipline when durable project state changes;
-10. continue while a useful eligible action exists;
-11. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful.
+9. after every integrated PR, reconcile `docs/ROADMAP.md` and relevant evidence docs against the new `main` before allowing stale roadmap text to drive the next tranche; if the PR changed durable tranche state, capability baseline, completed/remaining work or a dependency, update those docs in the same PR when practical or in an immediate follow-up documentation PR;
+10. never leave already-integrated work described as merely candidate/remaining work when that mismatch could affect autonomous selection;
+11. continue while a useful eligible action exists;
+12. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful.
+
+A documentation-only reconciliation PR is useful when needed to restore authoritative state, but should not become a ritual after every merge when the roadmap/evidence already remains accurate.
 
 The Controller must never infer project state from another chat's narrative when GitHub can provide the current fact.
 
