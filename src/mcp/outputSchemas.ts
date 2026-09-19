@@ -26,6 +26,14 @@ const widgetSelectBySchema = z.object({
   targetColumnRef: z.number().int().positive().optional()
 });
 
+const widgetSortEntrySchema = z.object({
+  columnId: z.string().min(1),
+  direction: z.enum(["asc", "desc"]),
+  emptyLast: z.boolean().optional(),
+  naturalSort: z.boolean().optional(),
+  orderByChoice: z.boolean().optional()
+});
+
 const pageWidgetSchema = z.object({
   id: z.number().int().positive(),
   pageId: z.number().int().positive(),
@@ -38,6 +46,8 @@ const pageWidgetSchema = z.object({
   options: z.unknown().optional(),
   layoutSpec: z.unknown().optional(),
   sortColRefs: z.unknown().optional(),
+  sort: z.array(widgetSortEntrySchema).optional(),
+  sortNormalizationIncomplete: z.boolean().optional(),
   selectBy: widgetSelectBySchema.optional()
 });
 
