@@ -197,13 +197,26 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
             "At least one of title, description, chartType, sort, selectBy or customWidgetSettings must be supplied."
           );
         }
+        const normalizedCustomWidgetSettings =
+          customWidgetSettings === undefined
+            ? undefined
+            : {
+                ...(customWidgetSettings.access !== undefined
+                  ? { access: customWidgetSettings.access }
+                  : {}),
+                ...(customWidgetSettings.columnsMapping !== undefined
+                  ? { columnsMapping: customWidgetSettings.columnsMapping }
+                  : {})
+              };
         const update: PageWidgetUpdateInput = {
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
           ...(chartType !== undefined ? { chartType } : {}),
           ...(sort !== undefined ? { sort } : {}),
           ...(selectBy !== undefined ? { selectBy } : {}),
-          ...(customWidgetSettings !== undefined ? { customWidgetSettings } : {})
+          ...(normalizedCustomWidgetSettings !== undefined
+            ? { customWidgetSettings: normalizedCustomWidgetSettings }
+            : {})
         };
         const output = widgetMutationOutputSchema.parse(
           await grist.updatePageWidget(documentId, pageId, widgetId, update)
