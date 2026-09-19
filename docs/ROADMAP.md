@@ -243,11 +243,17 @@ Do not introduce a Python interpreter, raw SQL or a generic code-execution surfa
 
 `inspect_document` is the existing first implementation of the `document_context` idea. P3 should improve it only where additional semantic value is demonstrated.
 
+Integrated normalized UI slice:
+
+- when expanded table metadata is available, widget context exposes additive stable-ID `sort` entries derived from native `sortColRefs`, plus `sortNormalizationIncomplete` when malformed, unsupported or unresolved raw entries prevent exact normalization;
+- normalization uses the same 20-key and 5,000-column bounds as saved-sort configuration, never guesses unsupported semantics, and retains raw `sortColRefs` for v1 compatibility;
+- non-expanded internal UI reads do not claim normalized saved-sort state.
+
 Candidate slices:
 
 - richer normalized relation graph;
 - more compact summaries for large schemas;
-- richer normalized UI/select-by context;
+- richer normalized UI/select-by context beyond the saved-sort slice above;
 - cache/invalidation behavior that remains principal-isolated;
 - optional MCP resource form such as `grist://documents/{id}/context` if it improves clients without duplicating unsafe data;
 - progressively discoverable help/examples derived from the normative registry.
