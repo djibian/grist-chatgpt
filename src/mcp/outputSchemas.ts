@@ -63,6 +63,20 @@ const widgetSortEntrySchema = z.object({
   orderByChoice: z.boolean().optional()
 });
 
+const customWidgetMappingValueSchema = z.union([
+  z.string().min(1),
+  z.array(z.string().min(1)),
+  z.null()
+]);
+
+const customWidgetSettingsSchema = z.object({
+  access: z.enum(["none", "read table", "full"]).optional(),
+  widgetId: z.string().min(1).optional(),
+  columnsMapping: z
+    .record(z.string().min(1), customWidgetMappingValueSchema)
+    .nullable()
+});
+
 const pageWidgetSchema = z.object({
   id: z.number().int().positive(),
   pageId: z.number().int().positive(),
@@ -79,7 +93,9 @@ const pageWidgetSchema = z.object({
   sortNormalizationIncomplete: z.boolean().optional(),
   selectBy: widgetSelectBySchema.optional(),
   selectByNormalized: normalizedSelectBySchema.optional(),
-  selectByNormalizationIncomplete: z.boolean().optional()
+  selectByNormalizationIncomplete: z.boolean().optional(),
+  customWidgetSettings: customWidgetSettingsSchema.optional(),
+  customWidgetSettingsNormalizationIncomplete: z.literal(true).optional()
 });
 
 const columnSelectByOptionSchema = normalizedSelectBySchema.refine(
