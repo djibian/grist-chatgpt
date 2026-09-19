@@ -1,8 +1,10 @@
 import {
   directSelectByValidator,
-  discoverColumnSelectByOptions
+  discoverColumnSelectByOptions,
+  type ColumnSelectByInput
 } from "./selectBy.js";
 import { GristApiError } from "./client.js";
+import { normalizeExistingSelectBy } from "./selectByContext.js";
 import {
   normalizeWidgetSort,
   type WidgetSortInput
@@ -34,6 +36,8 @@ export interface GristPageWidget {
     sourceColumnRef?: number;
     targetColumnRef?: number;
   };
+  selectByNormalized?: ColumnSelectByInput;
+  selectByNormalizationIncomplete?: boolean;
 }
 
 export interface GristPage {
@@ -199,7 +203,7 @@ export class DocumentUiService {
         return a.pageRecordId - b.pageRecordId;
       });
 
-    return {
+    const context: DocumentUiContext = {
       documentId,
       summary: {
         pageCount: pages.length,
@@ -207,6 +211,19 @@ export class DocumentUiService {
       },
       pages
     };
+
+    for (const page of context.pages) {
+      for (const widget of page.widgets) {
+        const normalizedSelectBy = normalizeExistingSelectBy(
+          context,
+          tableResponse,
+          widget
+        );
+        if (normalizedSelectBy) Object.assign(widget, normalizedSelectBy);
+      }
+    }
+
+    return context;
   }
 
   listPages(context: DocumentUiContext): unknown {
