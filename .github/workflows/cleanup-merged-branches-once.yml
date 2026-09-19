@@ -1,0 +1,90 @@
+name: Cleanup merged branches once
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only unchanged heads of merged PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const repoFullName = `${owner}/${repo}`;
+            const defaultBranch = context.payload.repository.default_branch;
+
+            const closedPulls = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'closed',
+              per_page: 100,
+            });
+            const openPulls = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const branches = await github.paginate(github.rest.repos.listBranches, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            const activeHeads = new Set(
+              openPulls
+                .filter(pr => pr.head.repo?.full_name === repoFullName)
+                .map(pr => pr.head.ref)
+            );
+
+            const mergedHeadTips = new Map();
+            for (const pr of closedPulls) {
+              if (!pr.merged_at || pr.head.repo?.full_name !== repoFullName) continue;
+              const tips = mergedHeadTips.get(pr.head.ref) ?? new Set();
+              tips.add(pr.head.sha);
+              mergedHeadTips.set(pr.head.ref, tips);
+            }
+
+            const deleted = [];
+            const skippedChanged = [];
+            const skippedActive = [];
+
+            for (const branch of branches) {
+              if (branch.name === defaultBranch) continue;
+              if (activeHeads.has(branch.name)) {
+                skippedActive.push(branch.name);
+                continue;
+              }
+
+              const mergedTips = mergedHeadTips.get(branch.name);
+              if (!mergedTips) continue;
+
+              // Delete only when the current remote tip is exactly a tip that was
+              // merged by a PR. This deliberately preserves a reused branch that
+              // received new commits after its merge.
+              if (!mergedTips.has(branch.commit.sha)) {
+                skippedChanged.push(branch.name);
+                continue;
+              }
+
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `heads/${branch.name}`,
+              });
+              deleted.push(branch.name);
+            }
+
+            core.info(`Deleted merged branches: ${deleted.length}`);
+            for (const branch of deleted) core.info(`deleted: ${branch}`);
+            core.info(`Skipped active PR heads: ${skippedActive.length}`);
+            core.info(`Skipped merged branch names with a newer tip: ${skippedChanged.length}`);
+            for (const branch of skippedChanged) core.info(`newer-tip: ${branch}`);
