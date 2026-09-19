@@ -179,9 +179,9 @@ function extractReferences(formula: string): {
         let memberEnd = end + 2;
         while (isIdentifierPart(formula[memberEnd])) memberEnd++;
         const member = formula.slice(end + 1, memberEnd);
-        // A called attribute is method-like rather than a direct Grist field lookup.
-        // Leave arbitrary Python/method semantics to Grist instead of guessing here.
-        if (formula[memberEnd] !== "(") {
+        // Called attributes and deeper chains are outside this deliberately one-hop
+        // Grist field-lookup slice. Leave those arbitrary Python semantics to Grist.
+        if (formula[memberEnd] !== "(" && formula[memberEnd] !== ".") {
           const key = `${reference}\u0000${member}`;
           if (!seenDereferences.has(key)) {
             if (dereferences.length === MAX_DEREFERENCES) {
