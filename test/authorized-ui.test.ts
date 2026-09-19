@@ -13,6 +13,7 @@ function buildHarness() {
   let widgetCreated = false;
   let pageName = "Vue générale";
   let widgetTitle = "";
+  let widgetDescription = "";
   let selectBySource = 0;
   const capabilities: string[] = [];
   const uiCalls: unknown[] = [];
@@ -68,7 +69,7 @@ function buildHarness() {
                     tableRef: 2,
                     parentKey: "record",
                     title: widgetTitle,
-                    description: "",
+                    description: widgetDescription,
                     chartType: "",
                     options: "{}",
                     layoutSpec: "",
@@ -138,10 +139,15 @@ function buildHarness() {
     updatePageWidget: async (
       documentId: string,
       widgetId: number,
-      update: { title?: string; selectBy?: { sourceSectionId: number } | null }
+      update: {
+        title?: string;
+        description?: string;
+        selectBy?: { sourceSectionId: number } | null;
+      }
     ) => {
       uiCalls.push({ action: "update-widget", documentId, widgetId, update });
       if (update.title !== undefined) widgetTitle = update.title;
+      if (update.description !== undefined) widgetDescription = update.description;
       if (update.selectBy !== undefined) {
         selectBySource = update.selectBy?.sourceSectionId ?? 0;
       }
@@ -251,7 +257,7 @@ test("page rename is re-read and verified", async () => {
   assert.deepEqual((result as { page: { name: string } }).page.name, "Suivi personnes");
 });
 
-test("widget title and same-table direct select-by are re-read and verified", async () => {
+test("widget title, description and same-table direct select-by are re-read and verified", async () => {
   const { service, capabilities, uiCalls } = buildHarness();
 
   await service.createPage("doc-1", "Personnes", "Vue générale");
@@ -261,6 +267,7 @@ test("widget title and same-table direct select-by are re-read and verified", as
 
   const result = await service.updatePageWidget("doc-1", 7, 12, {
     title: "Fiche personne",
+    description: "  Résumé affiché  ",
     selectBy: { sourceWidgetId: 11 }
   });
 
@@ -272,6 +279,7 @@ test("widget title and same-table direct select-by are re-read and verified", as
       widgetId: 12,
       update: {
         title: "Fiche personne",
+        description: "Résumé affiché",
         selectBy: { sourceSectionId: 11 }
       }
     }
@@ -286,11 +294,40 @@ test("widget title and same-table direct select-by are re-read and verified", as
       tableId: "Personnes",
       type: "record",
       title: "Fiche personne",
+      description: "Résumé affiché",
       options: {},
       sortColRefs: [],
       selectBy: { sourceSectionId: 11 }
     }
   });
+});
+
+test("widget description can be cleared and is verified as absent", async () => {
+  const { service, uiCalls } = buildHarness();
+
+  await service.createPage("doc-1", "Personnes", "Vue générale");
+  await service.addPageWidget("doc-1", 7, "Personnes", "record");
+  await service.updatePageWidget("doc-1", 7, 12, {
+    description: "Texte temporaire"
+  });
+  uiCalls.length = 0;
+
+  const result = await service.updatePageWidget("doc-1", 7, 12, {
+    description: "   "
+  });
+
+  assert.deepEqual(uiCalls, [
+    {
+      action: "update-widget",
+      documentId: "doc-1",
+      widgetId: 12,
+      update: { description: "" }
+    }
+  ]);
+  assert.equal(
+    (result as { widget: { description?: string } }).widget.description,
+    undefined
+  );
 });
 
 test("direct select-by rejects a cycle before any write", async () => {
