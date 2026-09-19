@@ -242,7 +242,7 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     title: "Inspect page widgets",
     summary: "Inspect normalized page widget metadata and select-by links.",
     description:
-      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, options, layout metadata, select-by links and directSelectByOptions. These snapshot options contain sourceWidgetId values supported by update_page_widget for this target (same page/table, safe source type, no cycle); an empty untruncated list means no supported source. Discovery budgets 1000 options and 10000 candidate checks per response in widget-ID order; directSelectByOptionsTruncated marks incomplete lists. Updates revalidate current metadata."
+      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, description, options, layout metadata, select-by links and directSelectByOptions. These snapshot options contain sourceWidgetId values supported by update_page_widget for this target (same page/table, safe source type, no cycle); an empty untruncated list means no supported source. Discovery budgets 1000 options and 10000 candidate checks per response in widget-ID order; directSelectByOptionsTruncated marks incomplete lists. Updates revalidate current metadata."
   },
   {
     name: "create_page",
@@ -288,9 +288,9 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     destructive: true,
     openWorld: false,
     title: "Update a page widget",
-    summary: "Update one widget title and/or its safe direct select-by link.",
+    summary: "Update one widget title, description and/or its safe direct select-by link.",
     description:
-      "Update one widget title and/or a safe direct select-by link. Direct select-by is limited to another widget on the same page backed by the same table; null clears the link. The result is verified by re-reading the page."
+      "Update one widget title, description and/or a safe direct select-by link. An empty description clears it. Direct select-by is limited to another widget on the same page backed by the same table; null clears the link. The result is verified by re-reading the page."
   },
   {
     name: "grist_help",
