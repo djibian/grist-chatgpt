@@ -24,7 +24,7 @@ S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct select-by option discovery, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, and explicit minimization of public document-discovery metadata.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct select-by option discovery, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document-discovery metadata, a documented production observability/audit contract, and bounded widget-description mutation with post-write verification.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -130,7 +130,7 @@ it records required choices without selecting a persistence or encryption design
 
 ### C6 — production hardening
 
-**Status: PARTLY ELIGIBLE; finalization blocked by C4/C5**  
+**Status: BLOCKED by C4/C5 for remaining finalization**  
 **Priority: high**
 
 Already integrated:
@@ -140,14 +140,11 @@ Already integrated:
 - repository CI/ruleset protection;
 - deployment/rollback operating documentation;
 - offline OAuth deployment preflight;
-- non-secret public post-deploy/rollback smoke checks.
+- non-secret public post-deploy/rollback smoke checks;
+- bounded production metrics vocabulary with low-cardinality label rules;
+- review and documentation of the current structured audit event contract, including correlation/privacy boundaries.
 
-Independent preparation that may proceed now:
-
-- metrics vocabulary;
-- audit event format review.
-
-Finalization after C4/C5:
+Remaining finalization after C4/C5:
 
 - per-principal rate limiting;
 - operational metrics and alerting;
@@ -199,7 +196,7 @@ Current baseline:
 - `create_page`;
 - `add_page_widget`;
 - `rename_page`;
-- bounded `update_page_widget` title/direct same-table `select-by` behavior;
+- bounded `update_page_widget` title/description/direct same-table `select-by` behavior, including explicit description clearing and normalized post-write verification;
 - bounded `directSelectByOptions` discovery for supported same-page/same-table sources, with cycle checks and explicit truncation semantics.
 
 Eligible non-generic work, in small slices:
