@@ -15,11 +15,6 @@ const pageInfoSchema = z.object({
   layoutSpec: z.unknown().optional()
 });
 
-const pageListItemSchema = pageInfoSchema.extend({
-  widgetCount: z.number().int().nonnegative(),
-  widgetIds: z.array(z.number().int().positive())
-});
-
 const widgetSelectBySchema = z.object({
   sourceSectionId: z.number().int().positive(),
   sourceColumnRef: z.number().int().positive().optional(),
@@ -47,15 +42,38 @@ export const pagesOutputSchema = z.object({
   pages: z.array(pageListItemSchema)
 });
 
+const pageListItemSchema = pageInfoSchema.extend({
+  widgetCount: z.number().int().nonnegative(),
+  widgetIds: z.array(z.number().int().positive())
+});
+
+const columnSelectByOptionSchema = z
+  .object({
+    sourceWidgetId: z.number().int().positive(),
+    sourceColumnId: z.string().min(1).optional(),
+    targetColumnId: z.string().min(1).optional()
+  })
+  .refine(
+    (value) =>
+      value.sourceColumnId !== undefined || value.targetColumnId !== undefined,
+    "At least one Ref/RefList column ID is required."
+  );
+
 export const pageWidgetsOutputSchema = z.object({
   documentId: z.string().min(1),
   page: pageInfoSchema,
-  widgets: z.array(pageWidgetSchema.extend({
-    directSelectByOptions: z.array(z.object({
-      sourceWidgetId: z.number().int().positive()
-    })),
-    directSelectByOptionsTruncated: z.boolean()
-  }))
+  widgets: z.array(
+    pageWidgetSchema.extend({
+      directSelectByOptions: z.array(
+        z.object({
+          sourceWidgetId: z.number().int().positive()
+        })
+      ),
+      directSelectByOptionsTruncated: z.boolean(),
+      columnSelectByOptions: z.array(columnSelectByOptionSchema),
+      columnSelectByOptionsTruncated: z.boolean()
+    })
+  )
 });
 
 export const pageMutationOutputSchema = z.object({
