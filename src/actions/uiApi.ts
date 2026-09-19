@@ -4,6 +4,10 @@ import * as z from "zod/v4";
 import type { PageWidgetUpdateInput } from "../grist/authorizedService.js";
 import { GRIST_CHART_TYPES } from "../grist/chartTypes.js";
 import {
+  MAX_CUSTOM_WIDGET_MAPPED_COLUMNS,
+  MAX_CUSTOM_WIDGET_MAPPING_KEYS
+} from "../grist/customWidgetSettings.js";
+import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
@@ -78,6 +82,30 @@ const widgetSortBodySchema = z
   )
   .max(MAX_WIDGET_SORT_COLUMNS);
 
+const customWidgetMappingValueSchema = z.union([
+  z.string().trim().min(1),
+  z.array(z.string().trim().min(1)).max(MAX_CUSTOM_WIDGET_MAPPED_COLUMNS),
+  z.null()
+]);
+
+const customWidgetColumnsMappingSchema = z
+  .record(z.string().min(1), customWidgetMappingValueSchema)
+  .refine(
+    (value) => Object.keys(value).length <= MAX_CUSTOM_WIDGET_MAPPING_KEYS,
+    `Custom widget mappings support at most ${MAX_CUSTOM_WIDGET_MAPPING_KEYS} keys.`
+  );
+
+const customWidgetSettingsUpdateSchema = z
+  .object({
+    access: z.enum(["none", "read table", "full"]).optional(),
+    columnsMapping: customWidgetColumnsMappingSchema.nullable().optional()
+  })
+  .strict()
+  .refine(
+    (value) => value.access !== undefined || value.columnsMapping !== undefined,
+    "At least one of access or columnsMapping must be supplied."
+  );
+
 const updateWidgetBodySchema = z
   .object({
     title: z.string().optional(),
@@ -92,7 +120,8 @@ const updateWidgetBodySchema = z
       })
       .strict()
       .nullable()
-      .optional()
+      .optional(),
+    customWidgetSettings: customWidgetSettingsUpdateSchema.optional()
   })
   .strict()
   .refine(
@@ -101,10 +130,11 @@ const updateWidgetBodySchema = z
       value.description !== undefined ||
       value.chartType !== undefined ||
       value.sort !== undefined ||
-      value.selectBy !== undefined,
+      value.selectBy !== undefined ||
+      value.customWidgetSettings !== undefined,
     {
       message:
-        "At least one of title, description, chartType, sort or selectBy must be supplied."
+        "At least one of title, description, chartType, sort, selectBy or customWidgetSettings must be supplied."
     }
   );
 
@@ -238,9 +268,9 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
       patch: {
         operationId: "updateGristPageWidget",
         summary:
-          "Update bounded metadata, saved sort or an explicit supported select-by link on one Grist widget",
+          "Update bounded metadata, custom settings, saved sort or an explicit supported select-by link on one Grist widget",
         description:
-          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. sort accepts at most 20 stable column IDs with asc/desc and the bounded emptyLast/naturalSort/orderByChoice flags; null or [] clears the saved sort. Column IDs are resolved against current widget-table metadata before write. selectBy may use a direct sourceWidgetId from directSelectByOptions, or an exact sourceWidgetId/sourceColumnId/targetColumnId combination returned by columnSelectByOptions; null clears the link. Ref/RefList column links are limited to the bridge's non-summary, non-attachment, non-custom safe subset and are revalidated against current metadata before write.",
+          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. sort accepts at most 20 stable column IDs with asc/desc and the bounded emptyLast/naturalSort/orderByChoice flags; null or [] clears the saved sort. Column IDs are resolved against current widget-table metadata before write. selectBy may use a direct sourceWidgetId from directSelectByOptions, or an exact sourceWidgetId/sourceColumnId/targetColumnId combination returned by columnSelectByOptions; null clears the link. customWidgetSettings is accepted only for an existing custom widget and may change only access plus bounded column mappings using stable current column IDs; URLs, plugin IDs, widget identity and arbitrary widget-owned options are never public write inputs. The complete existing options object is preserved and verified after write.",
         "x-openai-isConsequential": true,
         parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
         requestBody: {
@@ -336,6 +366,41 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
                       },
                       { type: "null" }
                     ]
+                  },
+                  customWidgetSettings: {
+                    type: "object",
+                    additionalProperties: false,
+                    minProperties: 1,
+                    description:
+                      "Bounded settings for the explicitly identified existing custom widget. Only access and stable-ID column mappings are writable; all other current options are preserved.",
+                    properties: {
+                      access: {
+                        type: "string",
+                        enum: ["none", "read table", "full"]
+                      },
+                      columnsMapping: {
+                        anyOf: [
+                          {
+                            type: "object",
+                            maxProperties: MAX_CUSTOM_WIDGET_MAPPING_KEYS,
+                            additionalProperties: {
+                              anyOf: [
+                                { type: "string", minLength: 1 },
+                                {
+                                  type: "array",
+                                  maxItems: MAX_CUSTOM_WIDGET_MAPPED_COLUMNS,
+                                  items: { type: "string", minLength: 1 }
+                                },
+                                { type: "null" }
+                              ]
+                            },
+                            description:
+                              "Widget mapping names to exact current stable column IDs, lists of IDs, or null. Numeric Grist colRefs are never accepted."
+                          },
+                          { type: "null" }
+                        ]
+                      }
+                    }
                   }
                 }
               }
@@ -406,7 +471,10 @@ export function registerUiActionApi(
             : {}),
           ...(parsed.chartType !== undefined ? { chartType: parsed.chartType } : {}),
           ...(parsed.sort !== undefined ? { sort: parsed.sort } : {}),
-          ...(parsed.selectBy !== undefined ? { selectBy: parsed.selectBy } : {})
+          ...(parsed.selectBy !== undefined ? { selectBy: parsed.selectBy } : {}),
+          ...(parsed.customWidgetSettings !== undefined
+            ? { customWidgetSettings: parsed.customWidgetSettings }
+            : {})
         };
         res.json(
           await options.grist.updatePageWidget(documentId, pageId, widgetId, update)
