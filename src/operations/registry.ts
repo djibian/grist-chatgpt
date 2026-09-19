@@ -240,9 +240,9 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     destructive: false,
     openWorld: false,
     title: "Inspect page widgets",
-    summary: "Inspect normalized page widget metadata and select-by links.",
+    summary: "Inspect normalized page widget metadata, saved sort and select-by links.",
     description:
-      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, description, native chart type, options, layout metadata and select-by links. directSelectByOptions advertises supported same-table cursor links. columnSelectByOptions advertises a stricter non-summary Ref/RefList subset using reusable sourceWidgetId/sourceColumnId/targetColumnId values. Both lists are bounded and carry explicit truncation flags; update_page_widget revalidates current metadata before writing."
+      "Inspect widgets on one Grist page, including stable widget IDs, widget type, table, title, description, native chart type, saved sort metadata, options, layout metadata and select-by links. directSelectByOptions advertises supported same-table cursor links. columnSelectByOptions advertises a stricter non-summary Ref/RefList subset using reusable sourceWidgetId/sourceColumnId/targetColumnId values. Both lists are bounded and carry explicit truncation flags; update_page_widget revalidates current metadata before writing."
   },
   {
     name: "create_page",
@@ -289,9 +289,9 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     openWorld: false,
     title: "Update a page widget",
     summary:
-      "Update bounded widget metadata and/or one explicitly advertised select-by link.",
+      "Update bounded widget metadata, saved sort and/or one explicitly advertised select-by link.",
     description:
-      "Update one widget title, description, native chart type and/or a bounded select-by link. An empty description clears it. chartType is rejected unless the target is a chart. Direct same-table links use sourceWidgetId only; supported Ref/RefList links use the exact sourceWidgetId/sourceColumnId/targetColumnId combination advertised by get_page_widgets. Column links exclude summary tables, attachments, chart/custom sources and cycles. null clears the link. The result is verified by re-reading the page."
+      "Update one widget title, description, native chart type, saved sort and/or a bounded select-by link. An empty description clears it. chartType is rejected unless the target is a chart. Saved sort uses at most 20 stable current column IDs with asc/desc plus optional emptyLast, Text-only naturalSort and Choice/ChoiceList-only orderByChoice; null or [] clears it, and numeric Grist colRefs are never public inputs. Direct same-table links use sourceWidgetId only; supported Ref/RefList links use the exact sourceWidgetId/sourceColumnId/targetColumnId combination advertised by get_page_widgets. Column links exclude summary tables, attachments, chart/custom sources and cycles. null clears the link. The result is verified by re-reading the page."
   },
   {
     name: "grist_help",

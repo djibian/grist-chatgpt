@@ -1,5 +1,6 @@
 import type { GristClient } from "./client.js";
 import { GRIST_CHART_TYPES, type GristChartType } from "./chartTypes.js";
+import type { ResolvedWidgetSortSpec } from "./widgetSort.js";
 
 export const NATIVE_WIDGET_TYPES = [
   "record",
@@ -23,6 +24,7 @@ export interface WidgetUiUpdate {
   title?: string;
   description?: string;
   chartType?: GristChartType;
+  sortColRefs?: readonly ResolvedWidgetSortSpec[];
   selectBy?: WidgetSelectByRefs | null;
 }
 
@@ -194,6 +196,9 @@ export class GristUiActionsAdapter {
         throw new Error(`Unsupported Grist chart type "${update.chartType}".`);
       }
       fields.chartType = update.chartType;
+    }
+    if (update.sortColRefs !== undefined) {
+      fields.sortColRefs = JSON.stringify(update.sortColRefs);
     }
     if (update.selectBy !== undefined) {
       if (update.selectBy === null) {

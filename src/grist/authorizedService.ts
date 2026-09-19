@@ -27,12 +27,29 @@ import {
   UiWriteVerificationError,
   type NativeWidgetType
 } from "./uiActionsAdapter.js";
+import {
+  resolveWidgetSort,
+  type ResolvedWidgetSortSpec,
+  type WidgetSortInput
+} from "./widgetSort.js";
 
 export interface PageWidgetUpdateInput {
   title?: string;
   description?: string;
   chartType?: GristChartType;
+  sort?: readonly WidgetSortInput[] | null;
   selectBy?: ColumnSelectByInput | null;
+}
+
+function sameSortSpec(
+  actual: unknown,
+  expected: readonly ResolvedWidgetSortSpec[]
+): boolean {
+  return (
+    Array.isArray(actual) &&
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
 }
 
 export class AuthorizedGristService {
@@ -261,6 +278,7 @@ export class AuthorizedGristService {
       update.title === undefined &&
       update.description === undefined &&
       update.chartType === undefined &&
+      update.sort === undefined &&
       update.selectBy === undefined
     ) {
       throw new Error("At least one widget UI field must be updated.");
@@ -273,7 +291,7 @@ export class AuthorizedGristService {
         (update.selectBy.sourceColumnId !== undefined ||
           update.selectBy.targetColumnId !== undefined);
       const tableResponse = await this.inner.listTables(id, {
-        expandColumns: usesColumnSelectBy
+        expandColumns: usesColumnSelectBy || update.sort !== undefined
       });
       const before = await this.loadDocumentUi(id, tableResponse);
       const page = before.pages.find((candidate) => candidate.id === pageId);
@@ -301,6 +319,13 @@ export class AuthorizedGristService {
       const expectedChartType = update.chartType;
       if (expectedChartType !== undefined) {
         adapterUpdate.chartType = expectedChartType;
+      }
+      const expectedSortColRefs =
+        update.sort !== undefined
+          ? resolveWidgetSort(target, tableResponse, update.sort)
+          : undefined;
+      if (expectedSortColRefs !== undefined) {
+        adapterUpdate.sortColRefs = expectedSortColRefs;
       }
 
       let expectedSourceWidgetId: number | null | undefined;
@@ -366,6 +391,12 @@ export class AuthorizedGristService {
           widget.chartType !== expectedChartType
         ) {
           throw new Error(`Updated widget ${widgetId} did not match the requested chart type on re-read.`);
+        }
+        if (
+          expectedSortColRefs !== undefined &&
+          !sameSortSpec(widget.sortColRefs, expectedSortColRefs)
+        ) {
+          throw new Error(`Updated widget ${widgetId} did not match the requested saved sort on re-read.`);
         }
         if (expectedSourceWidgetId === null && widget.selectBy !== undefined) {
           throw new Error(`Updated widget ${widgetId} still had a select-by link after clearing it.`);

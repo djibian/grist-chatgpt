@@ -7,6 +7,10 @@ import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
+import {
+  MAX_WIDGET_SORT_COLUMNS,
+  WIDGET_SORT_DIRECTIONS
+} from "../grist/widgetSort.js";
 import { getMcpToolMetadata } from "../operations/registry.js";
 import {
   pageMutationOutputSchema,
@@ -30,6 +34,20 @@ interface UiOperations {
     update: PageWidgetUpdateInput
   ): Promise<unknown>;
 }
+
+const widgetSortSchema = z
+  .array(
+    z
+      .object({
+        columnId: z.string().trim().min(1),
+        direction: z.enum(WIDGET_SORT_DIRECTIONS),
+        emptyLast: z.boolean().optional(),
+        naturalSort: z.boolean().optional(),
+        orderByChoice: z.boolean().optional()
+      })
+      .strict()
+  )
+  .max(MAX_WIDGET_SORT_COLUMNS);
 
 export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
@@ -113,6 +131,7 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
         title: z.string().optional(),
         description: z.string().optional(),
         chartType: z.enum(GRIST_CHART_TYPES).optional(),
+        sort: widgetSortSchema.nullable().optional(),
         selectBy: z
           .object({
             sourceWidgetId: z.number().int().positive(),
@@ -132,6 +151,7 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
       title,
       description,
       chartType,
+      sort,
       selectBy
     }) => {
       try {
@@ -139,16 +159,18 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           title === undefined &&
           description === undefined &&
           chartType === undefined &&
+          sort === undefined &&
           selectBy === undefined
         ) {
           throw new Error(
-            "At least one of title, description, chartType or selectBy must be supplied."
+            "At least one of title, description, chartType, sort or selectBy must be supplied."
           );
         }
         const update: PageWidgetUpdateInput = {
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
           ...(chartType !== undefined ? { chartType } : {}),
+          ...(sort !== undefined ? { sort } : {}),
           ...(selectBy !== undefined ? { selectBy } : {})
         };
         const output = widgetMutationOutputSchema.parse(
