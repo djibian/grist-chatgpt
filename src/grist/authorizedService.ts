@@ -13,6 +13,7 @@ import type {
   NewGristRecord,
   UpdateGristRecord
 } from "./client.js";
+import type { GristChartType } from "./chartTypes.js";
 import { assertDirectSelectByAllowed } from "./selectBy.js";
 import { DocumentContextService } from "./documentContext.js";
 import { DocumentUiService, type DocumentUiContext, type GristPageWidget } from "./documentUi.js";
@@ -26,6 +27,7 @@ import {
 export interface PageWidgetUpdateInput {
   title?: string;
   description?: string;
+  chartType?: GristChartType;
   selectBy?: { sourceWidgetId: number } | null;
 }
 
@@ -253,6 +255,7 @@ export class AuthorizedGristService {
     if (
       update.title === undefined &&
       update.description === undefined &&
+      update.chartType === undefined &&
       update.selectBy === undefined
     ) {
       throw new Error("At least one widget UI field must be updated.");
@@ -268,6 +271,9 @@ export class AuthorizedGristService {
       if (!target) {
         throw new Error(`Grist widget ${widgetId} does not exist on page ${pageId}.`);
       }
+      if (update.chartType !== undefined && target.type !== "chart") {
+        throw new Error(`Grist widget ${widgetId} is not a chart widget.`);
+      }
 
       const adapterUpdate: Parameters<GristUiActionsAdapter["updatePageWidget"]>[2] = {};
       const expectedTitle = update.title !== undefined ? update.title.trim() : undefined;
@@ -278,6 +284,10 @@ export class AuthorizedGristService {
         update.description !== undefined ? update.description.trim() : undefined;
       if (expectedDescription !== undefined) {
         adapterUpdate.description = expectedDescription;
+      }
+      const expectedChartType = update.chartType;
+      if (expectedChartType !== undefined) {
+        adapterUpdate.chartType = expectedChartType;
       }
 
       let expectedSourceWidgetId: number | null | undefined;
@@ -321,6 +331,12 @@ export class AuthorizedGristService {
             : widget.description !== expectedDescription)
         ) {
           throw new Error(`Updated widget ${widgetId} did not match the requested description on re-read.`);
+        }
+        if (
+          expectedChartType !== undefined &&
+          widget.chartType !== expectedChartType
+        ) {
+          throw new Error(`Updated widget ${widgetId} did not match the requested chart type on re-read.`);
         }
         if (expectedSourceWidgetId === null && widget.selectBy !== undefined) {
           throw new Error(`Updated widget ${widgetId} still had a select-by link after clearing it.`);
