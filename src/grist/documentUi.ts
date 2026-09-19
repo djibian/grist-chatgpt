@@ -116,6 +116,12 @@ function tableRefMap(tableResponse: unknown): Map<number, string> {
   return result;
 }
 
+function hasExpandedColumns(tableResponse: unknown): boolean {
+  const root = record(tableResponse);
+  const source = Array.isArray(root?.tables) ? root.tables : [];
+  return source.some((entry) => Array.isArray(record(entry)?.columns));
+}
+
 export class DocumentUiService {
   build(
     documentId: string,
@@ -212,14 +218,16 @@ export class DocumentUiService {
       pages
     };
 
-    for (const page of context.pages) {
-      for (const widget of page.widgets) {
-        const normalizedSelectBy = normalizeExistingSelectBy(
-          context,
-          tableResponse,
-          widget
-        );
-        if (normalizedSelectBy) Object.assign(widget, normalizedSelectBy);
+    if (hasExpandedColumns(tableResponse)) {
+      for (const page of context.pages) {
+        for (const widget of page.widgets) {
+          const normalizedSelectBy = normalizeExistingSelectBy(
+            context,
+            tableResponse,
+            widget
+          );
+          if (normalizedSelectBy) Object.assign(widget, normalizedSelectBy);
+        }
       }
     }
 
