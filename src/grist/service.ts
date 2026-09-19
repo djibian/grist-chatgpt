@@ -55,6 +55,51 @@ function batchedResult(results: unknown[]): unknown {
   };
 }
 
+type JsonRecord = Record<string, unknown>;
+type CreatedIdKind = "string" | "positiveInteger";
+
+function jsonRecord(value: unknown): JsonRecord | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : null;
+}
+
+function validCreatedId(value: unknown, kind: CreatedIdKind): value is string | number {
+  if (kind === "string") return typeof value === "string" && value.length > 0;
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function projectCreatedItems(
+  response: unknown,
+  collection: "tables" | "columns" | "records",
+  expectedCount: number,
+  idKind: CreatedIdKind
+): unknown {
+  const root = jsonRecord(response);
+  const rawItems = root && Array.isArray(root[collection]) ? root[collection] : [];
+  let incomplete = root === null || !Array.isArray(root?.[collection]);
+  const items: Array<{ id: string | number }> = [];
+
+  for (const value of rawItems) {
+    const item = jsonRecord(value);
+    const id = item?.id;
+    if (!validCreatedId(id, idKind)) {
+      incomplete = true;
+      continue;
+    }
+    items.push({ id });
+  }
+
+  if (rawItems.length !== expectedCount || items.length !== expectedCount) {
+    incomplete = true;
+  }
+
+  return {
+    [collection]: items,
+    ...(incomplete ? { resultNormalizationIncomplete: true } : {})
+  };
+}
+
 export class GristService {
   constructor(
     private readonly client: GristClient,
@@ -126,7 +171,8 @@ export class GristService {
         }
       }
     }
-    return this.client.createTables(documentId, tables);
+    const result = await this.client.createTables(documentId, tables);
+    return projectCreatedItems(result, "tables", tables.length, "string");
   }
 
   async updateTables(
@@ -171,7 +217,8 @@ export class GristService {
     this.assertSchemaCount(columns.length);
     this.assertUniqueStrings(columns.map((column) => column.id), "Column IDs");
     for (const column of columns) this.assertIdentifier(column.id, "Column ID");
-    return this.client.createColumns(documentId, tableId, columns);
+    const result = await this.client.createColumns(documentId, tableId, columns);
+    return projectCreatedItems(result, "columns", columns.length, "string");
   }
 
   async updateColumns(
@@ -258,7 +305,10 @@ export class GristService {
     return this.executeBatches(
       "createRecords",
       chunk(records, this.options.writeBatchRecords),
-      async (batch) => this.client.createRecords(documentId, tableId, batch)
+      async (batch) => {
+        const result = await this.client.createRecords(documentId, tableId, batch);
+        return projectCreatedItems(result, "records", batch.length, "positiveInteger");
+      }
     );
   }
 
