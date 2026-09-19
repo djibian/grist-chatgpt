@@ -2,7 +2,7 @@
 
 **Status:** current plan aligned with OpenAI documentation checked 2026-09-19.
 
-See also `docs/PLUGIN-READY-AUDIT.md` for the readiness matrix and blocking gaps.
+See also `docs/PLUGIN-READY-AUDIT.md` for the readiness matrix and blocking gaps and `docs/OPENAI-REVIEWER-TESTS.md` for the canonical reviewer-test specification.
 
 ## Intended submission
 
@@ -117,25 +117,27 @@ Final remote-MCP submission requires:
 
 No screenshot should be supplied for the initial MCP-only version unless the current tool scan identifies actual UI output; screenshots are for plugins with UI.
 
-## Candidate review scenarios
+## Canonical reviewer scenarios
 
-The final wording must be tested against the production reviewer fixture, but the intended exact set is:
+`docs/OPENAI-REVIEWER-TESTS.md` is the canonical human-readable specification for the exact five positive and three negative submission cases. `chatgpt-app-submission.json` carries the corresponding import/portal representation, and repository tests lock its 5+3 shape.
 
-### Positive — 5
+The five positive cases cover:
 
-1. Inspect a synthetic Grist document's tables, columns, relations, pages and widgets without reading rows unnecessarily.
-2. Query and filter synthetic table records.
-3. Create bounded records and independently verify the created values.
-4. Create/update bounded schema objects (table/columns/formula metadata) and verify the resulting schema.
-5. Create a page, add a supported native widget, configure a safe direct `select-by` link and verify by re-read.
+1. structural inspection without unnecessary row disclosure;
+2. bounded filtering/sorting plus a deterministic no-match query;
+3. bounded record creation followed by ID-based verification;
+4. bounded schema creation/update followed by metadata verification;
+5. page/widget creation plus safe direct select-by and re-read verification.
 
-### Negative — 3
+The three canonical submission negatives are safe **non-invocation** cases for:
 
-1. Attempt a write with a principal/token lacking `doc:write`; reject before any Grist mutation.
-2. Attempt access to a document outside the deployment/principal resource boundary; reject before protected data is returned.
-3. Attempt an invalid UI linkage/target; fail without unintended write and preserve explicit retry semantics.
+1. unrelated personal-calendar access;
+2. arbitrary HTTP forwarding;
+3. Grist account/ACL administration.
 
-These scenarios should be automated where possible and mirrored in reviewer instructions.
+They are intentionally distinct from runtime security/error-path scenarios. Insufficient OAuth capability, access outside document/resource grants, and invalid UI-link targets remain separate security tests because they exercise transport/authorization/business enforcement after a supported Grist intent has already selected the plugin.
+
+The reviewer-test specification records required fixture data and expected result structures but does not claim that the C7 reviewer account or synthetic document has been provisioned or that the eight cases have been executed live.
 
 ## Submission-specific implementation gaps
 
@@ -148,7 +150,7 @@ These scenarios should be automated where possible and mirrored in reviewer inst
 
 - prove Logto final-client `openid`/`email` and verified UserInfo behavior;
 - add per-tool annotation justification metadata or a generated submission artifact;
-- formalize the exact 5 positive / 3 negative test fixtures;
+- maintain the canonical 5 positive / 3 negative reviewer specification and keep the tracked import artifact aligned with it;
 - audit tool outputs for data minimization.
 
 The domain-verification code path is prepared: `OPENAI_APPS_CHALLENGE_TOKEN` is
@@ -184,7 +186,7 @@ Once the eligibility gate is viable and the product is review-ready:
 5. Complete domain verification when the portal issues its challenge token: set the exact value through `OPENAI_APPS_CHALLENGE_TOKEN`, deploy, and verify the well-known response before asking the portal to validate it.
 6. Run **Scan Tools** and resolve all blocking findings.
 7. Fill public listing metadata and policy URLs.
-8. Add starter prompts, exact 5 positive tests, exact 3 negative tests, expected outcomes, release notes and demo recording URL.
+8. Add starter prompts, the canonical exact 5 positive tests, exact 3 negative tests, expected outcomes, release notes and demo recording URL.
 9. Submit for review.
 10. Remediate review findings without weakening security invariants.
 11. After approval, choose when to publish.
@@ -204,14 +206,13 @@ Official references to re-check again immediately before submission:
 - https://developers.openai.com/plugins/deploy/submission-errors
 - https://developers.openai.com/plugins/build/auth
 
-
 ## Prepared import draft
 
 `chatgpt-app-submission.json` follows the official skill v1 import format and contains
 22 tools, five positive scenarios and three negative **non-invocation** scenarios.
-The authorization/invalid-link negative scenarios above remain separate runtime
-security checks: they invoke tools and therefore are not the skill's negative
-routing tests. Neither set is evidence of live reviewer-fixture execution.
+The authorization/invalid-link runtime security scenarios remain separate checks:
+they invoke supported Grist workflows and therefore are not the submission package's
+negative routing/refusal tests. Neither set is evidence of live reviewer-fixture execution.
 
 Remote MCP only, no distributed skills or Apps SDK UI. Enter
 `https://grist-chatgpt.loeildumaitre.fr/mcp` in the portal's MCP URL field: the
@@ -226,7 +227,7 @@ invented publisher, authentication or domain-verification fields.
 - Select countries/regions, release notes and up to three starter prompts.
 - Resolve S0 authorization/eligibility before final public submission.
 - Supply reviewer login and instructions securely through the portal; never put credentials in this JSON or the repository.
-- Provision an isolated synthetic Grist fixture, record its document/table identifiers in reviewer instructions, and execute/reset the proposed scenarios.
+- Provision an isolated synthetic Grist fixture, record its document/table identifiers in reviewer instructions, and execute/reset the canonical scenarios from `docs/OPENAI-REVIEWER-TESTS.md`.
 - Supply the demo recording URL; attachments and expected-output URLs remain null because none were provided.
 - Complete production/OAuth/UserInfo validation and portal tool scan; for domain verification, set only the exact portal-issued `OPENAI_APPS_CHALLENGE_TOKEN`, deploy it to the production challenge host, verify the response, then complete the portal check.
 
