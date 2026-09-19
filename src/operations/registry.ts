@@ -289,9 +289,9 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     openWorld: false,
     title: "Update a page widget",
     summary:
-      "Update bounded widget metadata, saved sort and/or one explicitly advertised select-by link.",
+      "Update bounded widget metadata, custom settings, saved sort and/or one explicitly advertised select-by link.",
     description:
-      "Update one widget title, description, native chart type, saved sort and/or a bounded select-by link. An empty description clears it. chartType is rejected unless the target is a chart. Saved sort uses at most 20 stable current column IDs with asc/desc plus optional emptyLast, Text-only naturalSort and Choice/ChoiceList-only orderByChoice; null or [] clears it, and numeric Grist colRefs are never public inputs. Direct same-table links use sourceWidgetId only; supported Ref/RefList links use the exact sourceWidgetId/sourceColumnId/targetColumnId combination advertised by get_page_widgets. Column links exclude summary tables, attachments, chart/custom sources and cycles. null clears the link. The result is verified by re-reading the page."
+      "Update one widget title, description, native chart type, saved sort, bounded custom-widget settings and/or a bounded select-by link. An empty description clears it. chartType is rejected unless the target is a chart. Saved sort uses at most 20 stable current column IDs with asc/desc plus optional emptyLast, Text-only naturalSort and Choice/ChoiceList-only orderByChoice; null or [] clears it, and numeric Grist colRefs are never public inputs. Direct same-table links use sourceWidgetId only; supported Ref/RefList links use the exact sourceWidgetId/sourceColumnId/targetColumnId combination advertised by get_page_widgets. Column links exclude summary tables, attachments, chart/custom sources and cycles. null clears the link. For an existing custom widget, customWidgetSettings may change only access (`none`, `read table`, `full`) and bounded column mappings expressed with exact stable current column IDs; URL, plugin/widget identity and arbitrary widget-owned options are never write inputs. Existing untargeted options are preserved and the complete expected options object is verified after write."
   },
   {
     name: "grist_help",
