@@ -54,21 +54,33 @@ test("renamePage emits only the bounded _grist_Views name update", async () => {
   ]);
 });
 
-test("updatePageWidget combines title and direct select-by in one bounded action", async () => {
+test("updatePageWidget combines title, description and direct select-by in one bounded action", async () => {
   const { adapter, observed } = harness();
 
   await adapter.updatePageWidget("doc-1", 11, {
     title: "Fiche personne",
+    description: "  Résumé affiché  ",
     selectBy: { sourceSectionId: 9 }
   });
 
   assert.deepEqual(observed, [
     [["UpdateRecord", "_grist_Views_section", 11, {
       title: "Fiche personne",
+      description: "Résumé affiché",
       linkSrcSectionRef: 9,
       linkSrcColRef: 0,
       linkTargetColRef: 0
     }]]
+  ]);
+});
+
+test("updatePageWidget clears a description with an empty string", async () => {
+  const { adapter, observed } = harness();
+
+  await adapter.updatePageWidget("doc-1", 11, { description: "   " });
+
+  assert.deepEqual(observed, [
+    [["UpdateRecord", "_grist_Views_section", 11, { description: "" }]]
   ]);
 });
 
