@@ -123,6 +123,9 @@ Human decisions still required:
 
 No second real user/reviewer may rely on the current static Grist credential path as if it were isolated per user.
 
+The minimum human decision package is maintained in `docs/C5-DECISION.md`;
+it records required choices without selecting a persistence or encryption design.
+
 ### C6 — production hardening
 
 **Status: PARTLY ELIGIBLE; finalization blocked by C4/C5**  
