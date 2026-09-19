@@ -50,11 +50,17 @@ test("optional workflows contain only current registry operations and risk metad
   assert.ok("workflows" in help);
   const workflows = help.workflows ?? [];
   assert.ok(workflows.length >= 4);
+  assert.equal(new Set(workflows.map((workflow) => workflow.id)).size, workflows.length);
 
   for (const workflow of workflows) {
     assert.ok(workflow.id.length > 0);
     assert.ok(workflow.summary.length > 0);
     assert.ok(workflow.steps.length >= 2);
+    assert.equal(
+      workflow.steps.some((step) => step.operation === "grist_help"),
+      false,
+      `${workflow.id} must describe business operations rather than recurse into help`
+    );
     for (const step of workflow.steps) {
       const operation = getOperation(step.operation);
       assert.equal(step.title, operation.title);
