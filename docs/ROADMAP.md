@@ -24,7 +24,7 @@ S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document-discovery metadata, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document/table/column discovery metadata, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -247,13 +247,16 @@ Integrated normalized UI slice:
 
 - when expanded table metadata is available, widget context exposes additive stable-ID `sort` entries derived from native `sortColRefs`, plus `sortNormalizationIncomplete` when malformed, unsupported or unresolved raw entries prevent exact normalization;
 - normalization uses the same 20-key and 5,000-column bounds as saved-sort configuration, never guesses unsupported semantics, and retains raw `sortColRefs` for v1 compatibility;
-- non-expanded internal UI reads do not claim normalized saved-sort state.
+- non-expanded internal UI reads do not claim normalized saved-sort state;
+- existing direct select-by links expose additive stable-ID `selectByNormalized: { sourceWidgetId }` when the source widget resolves exactly;
+- existing column select-by links additionally expose stable `sourceColumnId` / `targetColumnId` values when expanded table metadata resolves every numeric reference exactly, while `selectByNormalizationIncomplete` marks unresolved/unsupported raw state and no partial normalized link is guessed;
+- select-by normalization is bounded to 5,000 columns and retains raw v1 numeric `selectBy` metadata for compatibility.
 
 Candidate slices:
 
 - richer normalized relation graph;
 - more compact summaries for large schemas;
-- richer normalized UI/select-by context beyond the saved-sort slice above;
+- richer normalized UI/select-by context beyond the saved-sort/select-by slices above;
 - cache/invalidation behavior that remains principal-isolated;
 - optional MCP resource form such as `grist://documents/{id}/context` if it improves clients without duplicating unsafe data;
 - progressively discoverable help/examples derived from the normative registry.
@@ -342,6 +345,7 @@ Completed:
 - canonical reviewer-test specification for exactly five positive and three negative submission cases, with explicit prompts, expected behavior/result structure and synthetic fixture requirements; repository tests lock the tracked artifact's 5+3 shape while live fixture execution remains a C7 concern;
 - real ChatGPT CIMD/OIDC connection proving `openid` / `email` compatibility after enabling the corresponding Dynamic app permissions;
 - document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields;
+- table/column discovery now projects only stable functional schema metadata while keeping Grist engine references and arbitrary upstream extension fields server-side for internal bridge use;
 - safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected.
 
 Remaining eligible work:

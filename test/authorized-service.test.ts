@@ -15,8 +15,62 @@ function harness() {
     maxWriteRecords: 500,
     writeBatchRecords: 200,
     maxSchemaItems: 100,
-    listTables: async () => ({
-      tables: [{ id: "MCP_Test", fields: { tableRef: 1 } }]
+    listTables: async (_documentId: string, options: { expandColumns?: boolean } = {}) => ({
+      tables: [
+        {
+          id: "MCP_Test",
+          fields: {
+            tableRef: 1,
+            primaryViewId: 99,
+            rawViewSectionRef: 98,
+            summarySourceTable: 0,
+            onDemand: false,
+            internalSecret: "must-not-leak"
+          },
+          ...(options.expandColumns
+            ? {
+                columns: [
+                  {
+                    id: "Amount",
+                    fields: {
+                      colRef: 11,
+                      parentId: 1,
+                      parentPos: 2,
+                      label: "Amount",
+                      type: "Numeric",
+                      isFormula: false,
+                      formula: "",
+                      description: "Synthetic amount",
+                      widgetOptions: "{}",
+                      displayCol: 12,
+                      rules: ["L", 13],
+                      internalSecret: "must-not-leak"
+                    }
+                  }
+                ]
+              }
+            : {})
+        }
+      ]
+    }),
+    listColumns: async () => ({
+      columns: [
+        {
+          id: "Amount",
+          fields: {
+            colRef: 11,
+            parentId: 1,
+            label: "Amount",
+            type: "Numeric",
+            isFormula: false,
+            formula: "",
+            description: "Synthetic amount",
+            widgetOptions: "{}",
+            recalcWhen: 2,
+            internalSecret: "must-not-leak"
+          }
+        }
+      ]
     }),
     queryRecords: async (_documentId: string, tableId: string) => {
       queriedTables.push(tableId);
@@ -108,7 +162,49 @@ test("raw Grist metadata tables cannot be queried through model-facing query_rec
   assert.deepEqual(queriedTables, []);
 });
 
-test("semantic page inspection reads only the fixed internal metadata allowlist", async () => {
+test("public table and column discovery removes internal Grist metadata refs", async () => {
+  const { service } = harness();
+
+  assert.deepEqual(await service.listTables("doc-1", { expandColumns: true }), {
+    tables: [
+      {
+        id: "MCP_Test",
+        fields: { onDemand: false, isSummary: false },
+        columns: [
+          {
+            id: "Amount",
+            fields: {
+              label: "Amount",
+              type: "Numeric",
+              isFormula: false,
+              formula: "",
+              description: "Synthetic amount",
+              widgetOptions: "{}"
+            }
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.deepEqual(await service.listColumns("doc-1", "MCP_Test"), {
+    columns: [
+      {
+        id: "Amount",
+        fields: {
+          label: "Amount",
+          type: "Numeric",
+          isFormula: false,
+          formula: "",
+          description: "Synthetic amount",
+          widgetOptions: "{}"
+        }
+      }
+    ]
+  });
+});
+
+test("semantic page inspection still reads raw internal table references", async () => {
   const { service, queriedTables } = harness();
 
   const result = (await service.getPages("doc-1")) as {
