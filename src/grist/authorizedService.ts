@@ -25,6 +25,7 @@ import {
 
 export interface PageWidgetUpdateInput {
   title?: string;
+  description?: string;
   selectBy?: { sourceWidgetId: number } | null;
 }
 
@@ -249,7 +250,11 @@ export class AuthorizedGristService {
     if (!Number.isInteger(widgetId) || widgetId < 1) {
       throw new Error("Grist widget ID must be a positive integer.");
     }
-    if (update.title === undefined && update.selectBy === undefined) {
+    if (
+      update.title === undefined &&
+      update.description === undefined &&
+      update.selectBy === undefined
+    ) {
       throw new Error("At least one widget UI field must be updated.");
     }
 
@@ -268,6 +273,11 @@ export class AuthorizedGristService {
       const expectedTitle = update.title !== undefined ? update.title.trim() : undefined;
       if (expectedTitle !== undefined) {
         adapterUpdate.title = expectedTitle;
+      }
+      const expectedDescription =
+        update.description !== undefined ? update.description.trim() : undefined;
+      if (expectedDescription !== undefined) {
+        adapterUpdate.description = expectedDescription;
       }
 
       let expectedSourceWidgetId: number | null | undefined;
@@ -303,6 +313,14 @@ export class AuthorizedGristService {
         }
         if (expectedTitle !== undefined && widget.title !== expectedTitle) {
           throw new Error(`Updated widget ${widgetId} did not match the requested title on re-read.`);
+        }
+        if (
+          expectedDescription !== undefined &&
+          (expectedDescription === ""
+            ? widget.description !== undefined
+            : widget.description !== expectedDescription)
+        ) {
+          throw new Error(`Updated widget ${widgetId} did not match the requested description on re-read.`);
         }
         if (expectedSourceWidgetId === null && widget.selectBy !== undefined) {
           throw new Error(`Updated widget ${widgetId} still had a select-by link after clearing it.`);

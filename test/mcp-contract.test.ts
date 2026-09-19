@@ -155,3 +155,58 @@ test("stable page discovery returns reusable IDs in structuredContent", async ()
     result.structuredContent
   );
 });
+
+test("widget description is forwarded through the MCP update contract", async () => {
+  const registrations: Registration[] = [];
+  const observed: unknown[] = [];
+  const server = {
+    registerTool: (name: string, options: Registration["options"], callback: Registration["callback"]) => {
+      registrations.push({ name, options, callback });
+      return {};
+    }
+  } as unknown as McpServer;
+
+  registerUiTools(server, {
+    createPage: async () => ({}),
+    addPageWidget: async () => ({}),
+    renamePage: async () => ({}),
+    updatePageWidget: async (documentId, pageId, widgetId, update) => {
+      observed.push({ documentId, pageId, widgetId, update });
+      return {
+        documentId,
+        pageId,
+        widget: {
+          id: widgetId,
+          pageId,
+          tableRef: 2,
+          tableId: "Personnes",
+          type: "record",
+          title: "",
+          description: update.description
+        }
+      };
+    }
+  });
+
+  const updateWidget = registrations.find(
+    (entry) => entry.name === "update_page_widget"
+  );
+  assert.ok(updateWidget);
+  const result = await updateWidget.callback({
+    documentId: "doc-1",
+    pageId: 7,
+    widgetId: 12,
+    description: "Résumé affiché"
+  });
+
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(observed, [
+    {
+      documentId: "doc-1",
+      pageId: 7,
+      widgetId: 12,
+      update: { description: "Résumé affiché" }
+    }
+  ]);
+  assert.equal(result.structuredContent.widget.description, "Résumé affiché");
+});

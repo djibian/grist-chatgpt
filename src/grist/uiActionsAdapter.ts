@@ -20,6 +20,7 @@ export interface WidgetSelectByRefs {
 
 export interface WidgetUiUpdate {
   title?: string;
+  description?: string;
   selectBy?: WidgetSelectByRefs | null;
 }
 
@@ -182,6 +183,9 @@ export class GristUiActionsAdapter {
     const fields: Record<string, unknown> = {};
     if (update.title !== undefined) {
       fields.title = update.title.trim();
+    }
+    if (update.description !== undefined) {
+      fields.description = update.description.trim();
     }
     if (update.selectBy !== undefined) {
       if (update.selectBy === null) {

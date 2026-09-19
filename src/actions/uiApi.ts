@@ -62,6 +62,7 @@ const renamePageBodySchema = z
 const updateWidgetBodySchema = z
   .object({
     title: z.string().optional(),
+    description: z.string().optional(),
     selectBy: z
       .object({ sourceWidgetId: z.number().int().positive() })
       .strict()
@@ -69,9 +70,15 @@ const updateWidgetBodySchema = z
       .optional()
   })
   .strict()
-  .refine((value) => value.title !== undefined || value.selectBy !== undefined, {
-    message: "At least one of title or selectBy must be supplied."
-  });
+  .refine(
+    (value) =>
+      value.title !== undefined ||
+      value.description !== undefined ||
+      value.selectBy !== undefined,
+    {
+      message: "At least one of title, description or selectBy must be supplied."
+    }
+  );
 
 export function buildUiOpenApiPaths(): Record<string, unknown> {
   const documentIdParameter = {
@@ -202,9 +209,9 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
     "/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}": {
       patch: {
         operationId: "updateGristPageWidget",
-        summary: "Update one Grist widget title or safe direct select-by link",
+        summary: "Update one Grist widget title, description or safe direct select-by link",
         description:
-          "Updates only bounded widget metadata. selectBy links one widget directly to another widget on the same page backed by the same table; null clears the link. Column-reference select-by is intentionally not exposed in this tranche.",
+          "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. selectBy links one widget directly to another widget on the same page backed by the same table; null clears the link. Column-reference select-by is intentionally not exposed in this tranche.",
         "x-openai-isConsequential": true,
         parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
         requestBody: {
@@ -217,6 +224,11 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
                 minProperties: 1,
                 properties: {
                   title: { type: "string" },
+                  description: {
+                    type: "string",
+                    description:
+                      "Widget description. Surrounding whitespace is trimmed; an empty string clears the description."
+                  },
                   selectBy: {
                     anyOf: [
                       {
@@ -299,6 +311,9 @@ export function registerUiActionApi(
         const parsed = updateWidgetBodySchema.parse(req.body);
         const update: PageWidgetUpdateInput = {
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+          ...(parsed.description !== undefined
+            ? { description: parsed.description }
+            : {}),
           ...(parsed.selectBy !== undefined ? { selectBy: parsed.selectBy } : {})
         };
         res.json(
