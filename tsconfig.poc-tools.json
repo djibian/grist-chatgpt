@@ -10,6 +10,7 @@
     "tools/mcp-http-oauth-probe.ts",
     "tools/chatgpt-oauth-readiness-probe.ts",
     "tools/plugin-submission-annotations.ts",
-    "tools/oauth-deployment-preflight.ts"
+    "tools/oauth-deployment-preflight.ts",
+    "tools/oauth-operational-smoke.ts"
   ]
 }
