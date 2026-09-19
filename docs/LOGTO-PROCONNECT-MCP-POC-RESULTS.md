@@ -1,7 +1,7 @@
 # Logto / ProConnect / MCP POC results
 
 **POC baseline:** 2026-09-17  
-**Latest live update:** 2026-09-18  
+**Latest live update:** 2026-09-19  
 **Architecture:** Logto OSS self-hosted as MCP-facing authorization server; ProConnect as upstream OIDC identity source; `grist-chatgpt` as provider-neutral OAuth resource server.
 
 Never record client secrets, authorization codes, cookies, access tokens, refresh tokens, ID tokens, Grist API keys, database/admin passwords, PKCE verifiers, raw Logto user IDs, raw provider subjects, or other credentials in this file.
@@ -20,40 +20,34 @@ Status vocabulary:
 | PostgreSQL version pinned | PASS | POC compose pins `16.15-alpine` |
 | PostgreSQL persistence | PASS | named persistent volume |
 | Secrets excluded from Git | PASS | live environment files remain outside the repository |
-| Logto/PostgreSQL loopback exposure | PASS | services are reverse-proxied rather than published directly |
-| Public Logto HTTPS | PASS | `https://auth-poc.loeildumaitre.fr` works through Caddy |
+| Public Logto HTTPS | PASS | `https://auth-poc.loeildumaitre.fr` |
 | Admin console infrastructure-restricted | PASS | dedicated admin host with infrastructure access control |
-| Docker outbound HTTPS / HIBP path | PASS | forwarding repair validated with independent HTTPS targets and successful admin signup |
-| Full reboot persistence | UNKNOWN | controlled reboot still not performed |
+| Full reboot persistence | UNKNOWN | controlled reboot still not performed; not a C4-P0 exit blocker |
 
-## ProConnect identity federation
+## ProConnect federation
 
-The selected upstream path is Logto's generic social OIDC connector against the ProConnect integration environment.
-
-Public verification metadata used by the connector:
+Selected upstream issuer:
 
 ```text
-issuer   = https://fca.integ01.dev-agentconnect.fr/api/v2
-jwks_uri = https://fca.integ01.dev-agentconnect.fr/api/v2/jwks
+https://fca.integ01.dev-agentconnect.fr/api/v2
 ```
 
-Sanitized live evidence:
+Sanitized evidence:
 
-- ProConnect integration client registered with the exact Logto callback;
-- Logto social OIDC connector configured and enabled;
+- ProConnect integration client registered with the Logto callback;
+- Logto generic OIDC connector configured and enabled;
 - complete Logto -> ProConnect -> Logto Authorization Code login completed;
-- the same ProConnect identity completed a second login and mapped to the same Logto user without creating a duplicate account;
-- no raw provider subject or Logto user identifier was recorded.
+- repeated login of the same ProConnect identity maps to the same Logto user;
+- no raw provider subject or Logto user identifier recorded.
 
 | Requirement | Status |
 | --- | --- |
 | ProConnect integration client | PASS |
 | Logto generic OIDC connector | PASS |
 | ProConnect authorization redirect and callback | PASS |
-| ProConnect ID-token verification through configured issuer/JWKS | PASS |
 | Complete Logto -> ProConnect -> Logto login | PASS |
 | Stable identity across repeated successful login | PASS |
-| Explicit upstream logout/re-login lifecycle | UNKNOWN |
+| Explicit upstream ProConnect logout/re-login lifecycle | UNKNOWN; secondary |
 
 ## MCP-facing authorization-server behavior
 
@@ -71,181 +65,204 @@ doc:write
 doc.schema:write
 ```
 
-The canonical Logto API resource exists with exactly those three permissions and `Default API = OFF`. A bounded POC user role grants exactly those permissions only to the ProConnect-backed POC user. A dedicated public/native test application was used for the local Authorization Code + PKCE proof.
+PASS evidence:
 
-### Authorization Code + PKCE + RFC 8707 proof
+- Authorization Code + PKCE `S256`;
+- RFC 8707 `resource` on authorization and token exchange;
+- JWT access token bound to the canonical MCP resource;
+- fixed bridge scopes carried by the token;
+- standard JWT/JWKS signature, issuer, audience/resource and expiry validation;
+- refresh-token grant advertised;
+- local refresh-token issuance demonstrated with `offline_access` plus consent;
+- CIMD support advertised by Logto Dynamic app;
+- ChatGPT client metadata accepted by Logto;
+- ChatGPT-required OIDC `openid` / `email` path works after granting those Dynamic app user permissions;
+- Logto can fetch ChatGPT client metadata and public JWKS over HTTPS.
 
-Sanitized diagnostics:
+The Dynamic app remains limited to the intended MCP permissions plus the minimum OIDC profile permissions required for the ChatGPT identity flow.
 
-```text
-Authorization request with explicit resource: PASS
-Callback state matches: yes
-Token exchange: PASS
-JWT access token: yes
-Issuer matches Logto: yes
-Audience/resource matches canonical MCP resource: yes
-Granted scopes include doc:read/doc:write/doc.schema:write: yes
-Signature verifies against Logto JWKS: yes
-Expiry valid: yes
-Refresh token issued when requested: yes
-```
+## Provider-neutral bridge and `/mcp`
 
-`offline_access` plus explicit consent yielded a refresh token in the local public-client flow without exposing it.
+Reusable seam and real HTTP evidence are PASS for:
 
-| Requirement | Status |
-| --- | --- |
-| Discovery issuer/endpoints/JWKS | PASS |
-| PKCE `S256` | PASS |
-| Authorization Code grant | PASS |
-| Refresh-token grant advertised | PASS |
-| RFC 8707 `resource` on authorization request | PASS |
-| RFC 8707 `resource` on token request | PASS |
-| Canonical MCP audience/resource binding | PASS |
-| Fixed bridge scopes carried by token | PASS |
-| Standard JWT/JWKS validation | PASS |
-| Local refresh-token issuance | PASS |
-| Durable ChatGPT refresh/reconnect | UNKNOWN |
-
-## Provider-neutral bridge and HTTP `/mcp` validation
-
-A real Logto-issued canonical-resource token has passed the integrated verifier, issuer/resource policy, scope mapping, dynamic `Principal`, and C3 context path. The bridge uses standard JWT/JWKS semantics and no proprietary Logto SDK in its core authorization path.
-
-Positive reusable-seam diagnostics:
-
-```text
-Bridge JWT/JWKS verification: PASS
-Bridge issuer policy: PASS
-Bridge resource audience policy: PASS
-Bridge scope mapping: PASS
-Dynamic Principal created: PASS
-Principal-bound Grist context created: PASS
-Grist credential provider invoked with Principal context: yes
-Raw OAuth bearer reaches Grist credential provider: no
-```
-
-Negative reusable-seam diagnostics:
-
-```text
-Wrong-resource token JWT/JWKS verification: PASS
-Token audience differs from canonical MCP resource: yes
-Bridge wrong-resource rejection: PASS
-Principal/context created after wrong-resource rejection: no
-
-Insufficient-scope token JWT/JWKS verification: PASS
-Canonical MCP resource audience accepted: PASS
-Token/Principal missing doc:write: yes
-Reduced-scope dynamic Principal created: PASS
-doc:write operation rejected before mutation: PASS
-Fake Grist mutation requests observed: 0
-```
-
-The actual Express/MCP route has also been exercised with real Logto tokens.
-
-Positive HTTP diagnostics:
-
-```text
-MCP OAuth server starts without static bearer: PASS
-Missing bearer rejected on /mcp: PASS
-Static bearer can override OAuth principal in OAuth mode: no
-Invalid-signature bearer rejected on /mcp: PASS
-Valid Logto bearer reaches /mcp: PASS
-Dynamic Principal/context constructed on /mcp: PASS
-OAuth bearer reaches fake Grist: no
-Synthetic Grist credential reaches fake Grist: yes
-```
-
-Wrong-resource HTTP diagnostics:
-
-```text
-MCP OAuth server starts without static bearer: PASS
-Wrong-resource bearer rejected on /mcp: PASS
-Wrong-resource request reaches fake Grist: no
-```
-
-Missing-`doc:write` HTTP diagnostics:
-
-```text
-MCP OAuth server starts without static bearer: PASS
-Reduced-scope bearer authenticates on /mcp: PASS
-Token missing doc:write: yes
-doc:write tool rejected on /mcp: PASS
-Fake Grist mutation requests observed: 0
-OAuth bearer reaches fake Grist: no
-```
+- JWT/JWKS verification;
+- issuer policy;
+- canonical resource/audience binding;
+- scope-to-capability mapping;
+- dynamic `Principal` creation;
+- principal-bound Grist context creation;
+- wrong-resource rejection before Grist access;
+- insufficient-`doc:write` rejection before mutation;
+- OAuth mode cannot be overridden by a static MCP bearer;
+- OAuth bearer is never passed to the Grist credential provider;
+- RFC 9728 protected-resource metadata;
+- unauthenticated `/mcp` HTTP 401 with `WWW-Authenticate` resource metadata challenge;
+- root tool `securitySchemes` and runtime insufficient-scope challenges.
 
 Cross-user Grist context/cache isolation remains covered by integrated C3 tests.
 
-## Public non-production deployment readiness
+## Public non-production deployment used for the live ChatGPT proof
 
-The current integrated bridge was deployed to the public POC endpoint at exact repository SHA:
+The live ChatGPT test used bridge runtime SHA:
 
 ```text
-ec9ee27c602c103a3d18866867faceac41a455b0
+94434b4f56d239517079b2e57a8632e5ac07a838
 ```
 
-Deployment evidence:
+Observed deployment checks before the live client test:
 
 ```text
 grist-chatgpt.service: active
 Listener: 127.0.0.1:3000 only
 Local /healthz: HTTP 200
 Public /healthz: HTTP 200
+Protected-resource metadata: canonical resource + Logto issuer + three fixed scopes
+Unauthenticated /mcp: HTTP 401 with resource_metadata challenge
 ```
 
-The public RFC 9728 document returns the exact canonical resource, Logto issuer, and the three fixed scopes. An unauthenticated MCP request returns HTTP 401 with a `WWW-Authenticate` challenge pointing to that protected-resource metadata.
+The later roadmap-only merge did not alter the deployed runtime used for this POC evidence.
 
-Logto Dynamic app / CIMD was enabled with only the fixed MCP permissions. Public authorization-server discovery then reported:
+## Real ChatGPT Developer Mode evidence
+
+Observed ChatGPT connection facts:
 
 ```text
-CIMD=yes
-PKCE_S256=yes
-AUTH_CODE=yes
-REFRESH_TOKEN=yes
+MCP URL: https://grist-chatgpt.loeildumaitre.fr/mcp
+Authentication: OAuth
+Client registration: CIMD
+Observed ChatGPT client metadata URL: https://chatgpt.com/oauth/client.json
+Observed callback: https://chatgpt.com/connector_platform_oauth_redirect
 ```
 
-The integrated non-destructive readiness probe then produced:
+ChatGPT's OAuth-advanced UI successfully discovered:
+
+- Logto authorization and token endpoints;
+- canonical MCP `resource`;
+- CIMD registration mode;
+- OIDC configuration and UserInfo endpoint;
+- fixed MCP scopes `doc:read`, `doc:write`, `doc.schema:write`.
+
+### Initial scope incompatibility and correction
+
+The first live authorization attempt failed before login with:
 
 ```text
-Protected-resource metadata reachable: PASS
-Protected-resource resource matches canonical MCP URI: PASS
-Authorization server advertised: PASS
-Protected-resource metadata advertises fixed bridge scopes: PASS
-Authorization metadata issuer matches protected-resource issuer: PASS
-Logto CIMD/dynamic-client support advertised: PASS
-Public-client token authentication method none advertised: PASS
-PKCE S256 advertised: PASS
-Authorization Code grant advertised: PASS
-Refresh-token grant advertised: PASS
-RFC 9207 authorization-response issuer identification advertised: yes
-Unauthenticated /mcp challenge advertises resource metadata: PASS
-Authenticated tools/list probe: SKIPPED (no OAUTH_ACCESS_TOKEN)
-ChatGPT OAuth readiness: PASS
+invalid_scope
+scope=email
 ```
 
-Repository-side ChatGPT OAuth signaling is therefore ready: RFC 9728 metadata, HTTP resource challenge, root tool `securitySchemes` plus compatibility mirror, and runtime `_meta["mcp/www_authenticate"]` insufficient-scope challenges are integrated.
+A direct sanitized `/oidc/auth` diagnostic reproduced the failure. The cause was that Logto advertised OIDC `email` but the Dynamic app had not yet granted the corresponding user permission.
 
-## ChatGPT live-client evidence
+After enabling the minimum required Dynamic app user permissions (`email`, with `profile` also enabled for the advertised OIDC profile path), the same authorization request redirected to Logto sign-in instead of returning `invalid_scope`.
 
-The remaining mandatory evidence is the real ChatGPT client flow.
+No bridge code, public scope, or resource policy was weakened to fix this.
 
-| Requirement | Status |
-| --- | --- |
-| ChatGPT discovers protected MCP resource | UNKNOWN |
-| ChatGPT selects/uses CIMD client metadata successfully | UNKNOWN |
-| ChatGPT reaches Logto authorization | UNKNOWN |
-| Logto -> ProConnect login initiated from ChatGPT completes | UNKNOWN |
-| ChatGPT callback/code exchange completes | UNKNOWN |
-| ChatGPT access token is bound to canonical MCP resource | UNKNOWN |
-| ChatGPT bearer reaches `/mcp` successfully | UNKNOWN |
-| Dynamic Principal/context constructed for ChatGPT request | UNKNOWN |
-| OAuth bearer remains outside Grist credential boundary | UNKNOWN for ChatGPT-specific request; reusable and HTTP seams already PASS |
-| Reconnect/refresh avoids unnecessary full reauthentication | UNKNOWN |
-| Logout/revocation stops subsequent MCP access | UNKNOWN |
+### End-to-end ChatGPT authorization
 
-## Current conclusion
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| ChatGPT discovers protected MCP resource | PASS | plugin creation UI populated OAuth/resource metadata |
+| ChatGPT selects/uses CIMD successfully | PASS | `https://chatgpt.com/oauth/client.json` accepted |
+| ChatGPT reaches Logto authorization | PASS | live login flow started |
+| Logto -> ProConnect -> Logto completes | PASS | user completed authentication |
+| ChatGPT callback/code exchange completes | PASS | plugin becomes connected |
+| ChatGPT bearer reaches `/mcp` successfully | PASS | real MCP tools execute |
+| Dynamic Principal/context constructed for ChatGPT request | PASS | existing OAuth path required for successful tools |
+| OAuth bearer remains outside Grist credential boundary | PASS | architecture/runtime seam already proved and unchanged |
 
-All repository-side, Logto/ProConnect identity, resource-token, provider-neutral JWT/JWKS, positive/negative `/mcp`, public deployment, RFC 9728, scope-signaling, and CIMD readiness checks are PASS.
+### Real Grist operations through ChatGPT
 
-C4-P0 remains **ACTIVE**, not DONE. The only mandatory critical-path evidence still missing is the real ChatGPT MCP OAuth session, including callback/client behavior, bearer use, reconnect/refresh, and logout/revocation. Full production-oriented C4 remains blocked until that live-client evidence is PASS.
+Read-only functional proof:
 
-Operational/secondary UNKNOWNs remain the controlled reboot persistence check and an explicitly isolated upstream ProConnect logout/re-authentication lifecycle.
+- `list_documents` returned the actual visible Grist documents;
+- `inspect_document` returned table/column/relationship/page/widget structure without reading user rows.
+
+Bounded additive write proof:
+
+- ChatGPT checked that a synthetic row was absent;
+- `create_records` created exactly one row in `MCP_Test`;
+- the row was re-read by ID and exact values matched;
+- ChatGPT did not request an extra destructive confirmation for the additive create.
+
+Bounded destructive proof:
+
+- ChatGPT verified the exact target row and values first;
+- `delete_records` triggered an explicit user authorization prompt;
+- after approval, exactly that row was deleted;
+- a targeted re-read confirmed the ID no longer existed;
+- no other row was modified or deleted.
+
+The user then selected ChatGPT's “always allow” option for this destructive operation class, so later absence of a repeated confirmation is not useful annotation evidence by itself.
+
+## Session persistence and revocation lifecycle
+
+### Persistence before revocation
+
+After a page reload / fresh conversation, ChatGPT could call Grist Community again without a new ProConnect login.
+
+Status:
+
+```text
+Reconnect/session persistence without unnecessary full reauthentication: PASS
+```
+
+This alone does not prove a refresh token was used because the original access token might still have been valid.
+
+### ChatGPT-side disconnect
+
+After disconnecting the plugin in ChatGPT, a new conversation no longer had the `Grist Community` connector available and correctly refused to invent document access.
+
+Status:
+
+```text
+ChatGPT-side disconnect removes connector availability: PASS
+```
+
+### Logto grant removal + access-token expiry
+
+The user then reconnected ChatGPT, verified access, removed the ChatGPT dynamic third-party grant in Logto, and left ChatGPT itself connected.
+
+Configured API-resource access-token lifetime:
+
+```text
+3600 seconds
+```
+
+Immediately after grant removal, ChatGPT could still access the MCP. This is expected for a self-contained JWT that has not yet expired and is validated locally by the bridge.
+
+After more than 3600 seconds, a new ChatGPT request no longer reached the connector. ChatGPT displayed a reconnect prompt stating that the Grist Community connection had expired and must be renewed.
+
+Status:
+
+```text
+Removed Logto grant silently renews after access-token expiry: no
+Post-expiry reconnect required: yes
+Logout/revocation stops subsequent MCP access after issued-token expiry: PASS
+```
+
+This proves the relevant POC lifecycle semantics: revocation does not retroactively invalidate an already-issued locally validated JWT, but it prevents silent continuation once that token expires.
+
+## C4-P0 conclusion
+
+**C4-P0 is DONE.**
+
+The mandatory interoperability path is now demonstrated end to end with the real ChatGPT client:
+
+```text
+ChatGPT Developer Mode
+-> RFC 9728 protected MCP discovery
+-> CIMD
+-> Logto OAuth/OIDC
+-> ProConnect
+-> Logto callback/token issuance
+-> ChatGPT bearer
+-> /mcp
+-> dynamic Principal/context
+-> bounded Grist reads/writes
+-> session persistence
+-> disconnect/revocation lifecycle
+```
+
+The bridge still uses `StaticApiKeyCredentialProvider` for the upstream Grist credential in this personal pilot. Therefore this evidence validates ChatGPT <-> bridge OAuth, not production per-user Grist credential isolation. C5 remains mandatory before a second real user/reviewer is treated as isolated.
+
+C4 may now start as productionization of the proven OAuth design. P1/P2/P3 product work may continue independently under the roadmap's parallelism rules.

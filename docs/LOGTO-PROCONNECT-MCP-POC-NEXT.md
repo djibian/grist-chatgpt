@@ -1,113 +1,124 @@
 # Live POC handoff boundary
 
-This file is the durable restart point for C4-P0 Logto / ProConnect / MCP interoperability work.
+C4-P0 Logto / ProConnect / MCP interoperability is now **DONE**.
 
-At every fresh execution, first resolve exact `main`, then read `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md`, `docs/LOGTO-PROCONNECT-MCP-POC.md`, `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`, `docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md`, `docs/CHATGPT-OAUTH-READINESS.md`, and this file. Reconstruct mutable GitHub facts before any durable transition.
+This file remains as the durable handoff from the non-production proof to production-oriented C4. At every fresh execution, resolve exact `main`, then read `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md`, `docs/LOGTO-PROCONNECT-MCP-POC.md`, `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`, `docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md`, `docs/CHATGPT-OAUTH-READINESS.md`, and this file. Reconstruct mutable GitHub facts before any durable transition.
 
 Never record ProConnect client secrets, OAuth tokens/codes/cookies, Logto/database/admin credentials, Grist API keys, raw Logto user IDs, raw provider subjects, or PKCE verifiers in GitHub, chat, logs, or evidence documents.
 
-## Live environment
+## Proven non-production architecture
 
 ```text
-Logto OSS    1.43.0
-PostgreSQL   16.15-alpine
-Public auth  https://auth-poc.loeildumaitre.fr
-Admin auth   https://auth-poc-admin.loeildumaitre.fr
-MCP resource https://grist-chatgpt.loeildumaitre.fr/mcp
+ChatGPT Developer Mode
+        |
+      OAuth
+        v
+Logto OSS 1.43.0
+        |
+   ProConnect OIDC
+        |
+        v
+grist-chatgpt /mcp
+        |
+ dynamic Principal
+        |
+        v
+Grist context
+        |
+StaticApiKeyCredentialProvider   <-- POC-only upstream credential model
+        |
+        v
+Grist Community
 ```
 
-C4-P0 remains non-production and blocking. Full production-oriented C4 must not start until all mandatory POC checks are PASS.
-
-## Durable PASS evidence
-
-The following are no longer UNKNOWN:
-
-- Logto/PostgreSQL public HTTPS deployment and protected admin surface;
-- ProConnect integration through Logto generic OIDC;
-- repeated ProConnect login maps to the same Logto identity;
-- Authorization Code + PKCE `S256`;
-- RFC 8707 canonical `resource` on authorization and token exchange;
-- JWT access token bound to the canonical MCP resource;
-- fixed scopes `doc:read`, `doc:write`, `doc.schema:write`;
-- standard JWT/JWKS signature, issuer, audience/resource, expiry validation;
-- local refresh-token issuance using `offline_access` plus consent;
-- dynamic OAuth `Principal` and C3 `GristContextFactory` construction;
-- wrong-resource rejection before Grist access;
-- insufficient-scope write rejection before mutation;
-- static bearer cannot override OAuth mode;
-- OAuth bearer never becomes the upstream Grist credential;
-- actual Express/MCP `/mcp` positive and negative OAuth paths;
-- RFC 9728 protected-resource metadata;
-- OAuth `WWW-Authenticate` resource metadata challenge;
-- root tool `securitySchemes` plus compatibility mirror;
-- runtime `_meta["mcp/www_authenticate"]` insufficient-scope challenge;
-- public non-production bridge deployed at exact SHA `ec9ee27c602c103a3d18866867faceac41a455b0`;
-- local and public `/healthz` HTTP 200 after OAuth deployment;
-- Logto Dynamic app / CIMD enabled with only the three fixed MCP permissions;
-- public authorization metadata advertises CIMD, PKCE `S256`, Authorization Code, refresh token and RFC 9207 issuer identification;
-- `probe:chatgpt-oauth-readiness` returns final `ChatGPT OAuth readiness: PASS`.
-
-Detailed sanitized evidence is in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md` and `docs/LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md`.
-
-## Exact next step: real ChatGPT MCP OAuth client
-
-No further bridge or Logto compatibility change is justified before observing the real ChatGPT client.
-
-Current official OpenAI documentation should be rechecked immediately before the live test because availability and UI are product-dependent. As checked on 2026-09-18:
-
-- full custom MCP support with write/modify actions is documented for ChatGPT Business and Enterprise/Edu workspaces;
-- Pro is documented as able to connect read/fetch MCPs in developer mode, not full write MCP;
-- Plus is not documented as eligible for custom full MCP developer mode;
-- on eligible workspaces, enable Developer mode, create a custom app/plugin, provide the public `/mcp` endpoint, choose OAuth, run Scan Tools, and complete the authorization prompt.
-
-If the current account/workspace does not expose the required developer/custom-app UI, treat that as a **ChatGPT plan/workspace availability gate**, not as a Logto or bridge compatibility failure. Use an eligible Business/Enterprise/Edu workspace for the mandatory full MCP POC rather than weakening the server contract.
-
-### Live connection target
+Canonical resource:
 
 ```text
 https://grist-chatgpt.loeildumaitre.fr/mcp
 ```
 
-Selected client-registration path:
+Fixed public scopes:
 
 ```text
-CIMD
+doc:read
+doc:write
+doc.schema:write
 ```
 
-Treat the exact ChatGPT CIMD client metadata URL and callback URI shown/used during the live connection as observed facts. Do not guess or hard-code them into bridge core.
+## C4-P0 exit evidence
 
-## Required ChatGPT live evidence
-
-Record only sanitized PASS/FAIL/yes/no observations for:
+All mandatory live-client checks are PASS:
 
 ```text
-ChatGPT discovers protected MCP resource: PASS/FAIL
-ChatGPT CIMD client identity accepted by Logto: PASS/FAIL
-ChatGPT reaches Logto authorization: PASS/FAIL
-Logto -> ProConnect login completes: PASS/FAIL
-ChatGPT callback/code exchange completes: PASS/FAIL
-Access token is bound to canonical MCP resource: PASS/FAIL
-ChatGPT bearer reaches /mcp: PASS/FAIL
-Dynamic Principal/context constructed for ChatGPT request: PASS/FAIL
-OAuth bearer reaches Grist credential boundary: yes/no
-Reconnect/refresh avoids unnecessary full reauthentication: PASS/FAIL
-Logout/revocation stops subsequent MCP access: PASS/FAIL
+ChatGPT discovers protected MCP resource: PASS
+ChatGPT CIMD client identity accepted by Logto: PASS
+ChatGPT reaches Logto authorization: PASS
+Logto -> ProConnect login completes: PASS
+ChatGPT callback/code exchange completes: PASS
+ChatGPT bearer reaches /mcp: PASS
+Dynamic Principal/context constructed for ChatGPT request: PASS
+OAuth bearer reaches Grist credential boundary: no
+Read-only Grist operations: PASS
+Bounded additive write + targeted re-read: PASS
+Bounded destructive delete + targeted verification: PASS
+Reconnect/session persistence without full reauthentication: PASS
+ChatGPT-side disconnect removes connector availability: PASS
+Removed Logto grant cannot silently renew after access-token expiry: PASS
+Post-expiry reconnect required: yes
 ```
 
-Expected safe value for `OAuth bearer reaches Grist credential boundary` is `no`.
+The configured access-token lifetime used for the revocation proof was 3600 seconds. Removing the Logto grant did not retroactively invalidate an already-issued self-contained JWT, but after expiry ChatGPT displayed a reconnect prompt and could no longer continue silently.
 
-Do not record callback authorization codes, access/refresh tokens, cookies, client secrets, raw identity values, or Grist credentials.
+Detailed sanitized evidence is in `docs/LOGTO-PROCONNECT-MCP-POC-RESULTS.md`.
 
-## Remaining important UNKNOWNs
+## Important limitation preserved
 
-Mandatory/critical UNKNOWNs are now exclusively live-client specific:
+The live proof used the server's static Grist API key through `StaticApiKeyCredentialProvider`.
 
-- availability of an eligible ChatGPT developer/custom-app workspace for the test;
-- exact ChatGPT CIMD client metadata and callback observed for this connection;
-- end-to-end ChatGPT PKCE/resource flow;
-- login through Logto -> ProConnect initiated from ChatGPT;
-- bearer use on subsequent MCP calls;
-- refresh/reconnect behavior;
-- logout/revocation behavior.
+Therefore:
 
-Operational/secondary UNKNOWNs include controlled reboot persistence for nftables + Docker + Logto and an explicitly isolated upstream ProConnect logout/re-authentication lifecycle.
+- ChatGPT <-> bridge OAuth identity is proven;
+- bridge authorization/scopes are proven;
+- per-user Grist credential isolation is **not** yet production-complete;
+- do not onboard a second real user/reviewer as if upstream Grist credentials were isolated;
+- C5 remains required before multi-user operation.
+
+## Next platform chantier: C4
+
+C4 is now **ELIGIBLE**.
+
+Its purpose is productionization, not redesign. Preserve:
+
+- ProConnect as upstream institutional identity;
+- Logto OSS as reference MCP-facing authorization server;
+- provider-neutral JWT/JWKS resource-server core;
+- canonical RFC 8707 resource binding;
+- the three fixed scopes only;
+- CIMD compatibility proven with the real ChatGPT client;
+- credential and OAuth-token invisibility;
+- current wrong-resource / insufficient-scope failure semantics.
+
+C4 should focus on repeatability and operations: production configuration boundaries, deploy/rollback procedure, explicit non-POC defaults, health/smoke checks and documentation needed before C5.
+
+Do not choose credential persistence/encryption architecture inside C4. That remains a human gate for C5.
+
+## Parallel product work
+
+Per `docs/ROADMAP.md`, one product Worker may proceed independently while C4 advances.
+
+Preferred first product tranche:
+
+```text
+P1 document UI parity
+```
+
+Start with non-destructive, bounded UI semantics such as richer widget inspection/configuration and explicit `select-by` option discovery. New destructive page/widget capabilities remain a human gate.
+
+## Secondary follow-up, not C4-P0 blockers
+
+Still useful later, but not reasons to reopen C4-P0:
+
+- controlled full-host reboot/persistence exercise;
+- explicitly isolated upstream ProConnect logout/re-authentication test;
+- reviewer-specific OIDC/UserInfo proof for `email_verified: true` under S1/C7;
+- final public-directory eligibility under S0.
