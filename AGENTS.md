@@ -9,14 +9,32 @@ This file is the operational contract for autonomous work on `djibian/grist-chat
 - Reconstruct mutable GitHub facts instead of trusting remembered state: open PRs, exact PR heads, Draft/Ready state, CI, reviews, issues, dependencies and current `main`.
 - The state of one agent/chat/controller execution is never project state.
 
+## Single-entry controller mode
+
+The normal user-facing entry point is one stable Controller invocation, not a succession of task-specific Worker prompts.
+
+A sufficient invocation is:
+
+```text
+You are the Controller of djibian/grist-chatgpt. Execute AGENTS.md from the current GitHub state and continue useful eligible work from docs/ROADMAP.md until a human gate is reached or no useful eligible work remains.
+```
+
+The Controller must derive the current work plan from GitHub plus the authoritative repository documents. The user should not need to choose a tranche, branch or Worker prompt when those choices are already determined by the roadmap and current state.
+
+The Controller owns Worker assignment. When independent work exists, it should select the most useful eligible tranches, define bounded Worker mandates, and coordinate their PRs. A Worker mandate is ephemeral execution context, not project state, and should be generated from the current exact `main` rather than copied from an old chat.
+
+If the execution environment cannot actually spawn parallel agents, the Controller should preserve the same logical Worker boundaries while progressing the selected tranches sequentially. Do not invent a separate orchestration database or hidden state machine: GitHub, this file and `docs/ROADMAP.md` remain the coordination system.
+
+A human should be interrupted only when a documented human gate is reached, when external/operator action is genuinely required, or when the authoritative documents are insufficient to make a safe decision. In that case, return the smallest concrete decision/action package needed to resume.
+
 ## Roles
 
 The normal operating model is:
 
-- one **Controller** conversation responsible for global state, eligibility, dependency ordering, review and integration;
+- one **Controller** conversation responsible for global state, eligibility, dependency ordering, Worker assignment, review and integration;
 - normally two active **Workers**, with a third only when the work is demonstrably independent;
 - Workers implement one bounded chantier each and open/update PRs; they do not merge their own work;
-- the Controller may code when useful, but should prefer coordination when independent worker work exists.
+- the Controller may code when useful, but should prefer coordination when independent Worker work exists.
 
 Agents must not spend effort discovering whether other chats/agents exist. GitHub state is the coordination medium.
 
@@ -69,6 +87,16 @@ A high-priority blocked item does not prevent useful independent work. Conversel
 
 `docs/ROADMAP.md` is the authoritative dependency map. When code reality and roadmap text diverge, do not silently guess; make the mismatch durable through an appropriate PR or human decision.
 
+When several items are eligible, the Controller should choose without asking the user unless a human gate applies. Prefer, in order:
+
+1. finishing or integrating already-open eligible work;
+2. work that unlocks another blocked tranche;
+3. the highest-priority independent work from different roadmap axes so useful parallelism is preserved;
+4. smaller bounded slices over speculative broad rewrites;
+5. low-risk preparation while a higher-priority item is externally blocked.
+
+Do not select a lower-value task merely because it is easier to automate.
+
 ## Security invariants
 
 These invariants must not be weakened incidentally:
@@ -116,6 +144,8 @@ A Worker should:
 
 Workers must not silently expand scope merely because adjacent improvements are visible.
 
+A Controller-generated Worker mandate should normally contain only what is not already durable in the repository: the assigned tranche/slice, expected branch purpose, relevant dependency/head facts, and explicit stop conditions. It should not duplicate the full product vision, roadmap or security doctrine.
+
 ## Controller execution protocol
 
 The Controller should:
@@ -123,13 +153,18 @@ The Controller should:
 1. resolve exact `main` SHA and reload the three normative documents;
 2. reconstruct all relevant mutable GitHub state;
 3. identify ready-to-integrate PRs, blocked work and independent eligible work;
-4. prefer finishing eligible existing work before spawning unnecessary new branches;
-5. use CI wait time to review or progress genuinely independent work;
-6. after every durable transition, resolve `main` again and rebuild the relevant state;
-7. continue while a useful eligible action exists;
-8. stop at a human gate or when remaining work is blocked/non-useful.
+4. choose and assign the best eligible work itself using the roadmap and selection rules above;
+5. prefer finishing eligible existing work before spawning unnecessary new branches;
+6. keep normally at most two independent Worker slots active, selecting different roadmap axes when that improves throughput and does not create races;
+7. use CI wait time to review or progress genuinely independent work;
+8. after every durable transition, resolve `main` again and rebuild the relevant state;
+9. update roadmap/evidence documentation through normal PR discipline when durable project state changes;
+10. continue while a useful eligible action exists;
+11. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful.
 
 The Controller must never infer project state from another chat's narrative when GitHub can provide the current fact.
+
+The Controller must not ask the user to supply task-specific Worker prompts when it can derive those prompts from the repository. If parallel Worker execution is available, the Controller should generate those mandates itself. If it is unavailable, execute the same bounded work sequentially rather than offloading orchestration back to the user.
 
 ## Documentation authority
 
