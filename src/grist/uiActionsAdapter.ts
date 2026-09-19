@@ -1,4 +1,5 @@
 import type { GristClient } from "./client.js";
+import { GRIST_CHART_TYPES, type GristChartType } from "./chartTypes.js";
 
 export const NATIVE_WIDGET_TYPES = [
   "record",
@@ -21,6 +22,7 @@ export interface WidgetSelectByRefs {
 export interface WidgetUiUpdate {
   title?: string;
   description?: string;
+  chartType?: GristChartType;
   selectBy?: WidgetSelectByRefs | null;
 }
 
@@ -186,6 +188,12 @@ export class GristUiActionsAdapter {
     }
     if (update.description !== undefined) {
       fields.description = update.description.trim();
+    }
+    if (update.chartType !== undefined) {
+      if (!GRIST_CHART_TYPES.includes(update.chartType)) {
+        throw new Error(`Unsupported Grist chart type "${update.chartType}".`);
+      }
+      fields.chartType = update.chartType;
     }
     if (update.selectBy !== undefined) {
       if (update.selectBy === null) {
