@@ -11,9 +11,9 @@ export type WidgetSortDirection = (typeof WIDGET_SORT_DIRECTIONS)[number];
 export interface WidgetSortInput {
   columnId: string;
   direction: WidgetSortDirection;
-  emptyLast?: boolean;
-  naturalSort?: boolean;
-  orderByChoice?: boolean;
+  emptyLast?: boolean | undefined;
+  naturalSort?: boolean | undefined;
+  orderByChoice?: boolean | undefined;
 }
 
 export type ResolvedWidgetSortSpec = number | string;
@@ -102,6 +102,9 @@ export function resolveWidgetSort(
   return sort.map((input) => {
     const columnId = input.columnId.trim();
     if (!columnId) throw new Error("Widget sort column ID must not be empty.");
+    if (!WIDGET_SORT_DIRECTIONS.includes(input.direction)) {
+      throw new Error(`Unsupported widget sort direction "${input.direction}".`);
+    }
     if (seen.has(columnId)) {
       throw new Error(`Widget sort column "${columnId}" is duplicated.`);
     }
