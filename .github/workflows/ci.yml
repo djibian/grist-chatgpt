@@ -16,6 +16,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      # npm 10 still falls back to the retired Quick Audit endpoint when the
+      # registry's Bulk Audit response is invalid. Pin npm 11, which uses the
+      # Bulk Advisory endpoint without that retired fallback.
+      - run: npm install --global npm@11.19.1
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run check
