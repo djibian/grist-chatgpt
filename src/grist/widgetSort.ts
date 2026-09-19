@@ -1,5 +1,3 @@
-import type { GristPageWidget } from "./documentUi.js";
-
 type JsonRecord = Record<string, unknown>;
 
 export const MAX_WIDGET_SORT_COLUMNS = 20;
@@ -18,6 +16,18 @@ export interface WidgetSortInput {
 
 export type ResolvedWidgetSortSpec = number | string;
 
+interface WidgetSortTarget {
+  id: number;
+  tableRef: number;
+  tableId?: string | undefined;
+  sortColRefs?: unknown;
+}
+
+export interface NormalizedWidgetSort {
+  sort: WidgetSortInput[];
+  sortNormalizationIncomplete: boolean;
+}
+
 function record(value: unknown): JsonRecord | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as JsonRecord)
@@ -34,10 +44,13 @@ function positiveInteger(value: unknown): number | undefined {
     : undefined;
 }
 
-function tableForWidget(widget: GristPageWidget, tableResponse: unknown): JsonRecord {
+function findTableForWidget(
+  widget: WidgetSortTarget,
+  tableResponse: unknown
+): JsonRecord | undefined {
   const root = record(tableResponse);
   const tables = Array.isArray(root?.tables) ? root.tables : [];
-  const table = tables
+  return tables
     .map(record)
     .find((candidate) => {
       if (!candidate) return false;
@@ -46,7 +59,11 @@ function tableForWidget(widget: GristPageWidget, tableResponse: unknown): JsonRe
         (widget.tableId !== undefined && candidate.id === widget.tableId) ||
         positiveInteger(fields?.tableRef) === widget.tableRef
       );
-    });
+    }) ?? undefined;
+}
+
+function tableForWidget(widget: WidgetSortTarget, tableResponse: unknown): JsonRecord {
+  const table = findTableForWidget(widget, tableResponse);
   if (!table) {
     throw new Error(
       `Widget ${widget.id} table metadata is unavailable; refusing to configure saved sort.`
@@ -65,7 +82,7 @@ function encodeSortSpec(input: WidgetSortInput, colRef: number): ResolvedWidgetS
 }
 
 export function resolveWidgetSort(
-  widget: GristPageWidget,
+  widget: WidgetSortTarget,
   tableResponse: unknown,
   sort: readonly WidgetSortInput[] | null
 ): ResolvedWidgetSortSpec[] {
@@ -132,4 +149,82 @@ export function resolveWidgetSort(
     }
     return encodeSortSpec({ ...input, columnId }, column.ref);
   });
+}
+
+function parseStoredSortSpec(
+  value: unknown
+): { colRef: number; direction: WidgetSortDirection; flags: string[] } | undefined {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value === 0) return undefined;
+    return {
+      colRef: Math.abs(value),
+      direction: value < 0 ? "desc" : "asc",
+      flags: []
+    };
+  }
+  if (typeof value !== "string") return undefined;
+
+  const parts = value.split(":");
+  if (parts.length > 2) return undefined;
+  const signed = Number(parts[0]);
+  if (!Number.isInteger(signed) || signed === 0) return undefined;
+  const flags = parts[1] === undefined || parts[1] === "" ? [] : parts[1].split(";");
+  const allowed = new Set(["emptyLast", "naturalSort", "orderByChoice"]);
+  if (flags.some((flag) => !allowed.has(flag))) return undefined;
+
+  return {
+    colRef: Math.abs(signed),
+    direction: signed < 0 ? "desc" : "asc",
+    flags
+  };
+}
+
+export function normalizeWidgetSort(
+  widget: WidgetSortTarget,
+  tableResponse: unknown
+): NormalizedWidgetSort | undefined {
+  const table = findTableForWidget(widget, tableResponse);
+  if (!table || !Array.isArray(table.columns)) return undefined;
+
+  const raw = widget.sortColRefs;
+  if (raw === undefined) {
+    return { sort: [], sortNormalizationIncomplete: false };
+  }
+  if (!Array.isArray(raw)) {
+    return { sort: [], sortNormalizationIncomplete: true };
+  }
+
+  const columns = table.columns;
+  if (columns.length > MAX_WIDGET_SORT_SCHEMA_COLUMNS) {
+    return { sort: [], sortNormalizationIncomplete: true };
+  }
+
+  const byRef = new Map<number, string>();
+  for (const value of columns) {
+    const column = record(value);
+    const id = text(column?.id);
+    const fields = record(column?.fields);
+    const ref = positiveInteger(fields?.colRef);
+    if (id && ref) byRef.set(ref, id);
+  }
+
+  let incomplete = raw.length > MAX_WIDGET_SORT_COLUMNS;
+  const sort: WidgetSortInput[] = [];
+  for (const value of raw.slice(0, MAX_WIDGET_SORT_COLUMNS)) {
+    const parsed = parseStoredSortSpec(value);
+    const columnId = parsed ? byRef.get(parsed.colRef) : undefined;
+    if (!parsed || !columnId) {
+      incomplete = true;
+      continue;
+    }
+    sort.push({
+      columnId,
+      direction: parsed.direction,
+      ...(parsed.flags.includes("emptyLast") ? { emptyLast: true } : {}),
+      ...(parsed.flags.includes("naturalSort") ? { naturalSort: true } : {}),
+      ...(parsed.flags.includes("orderByChoice") ? { orderByChoice: true } : {})
+    });
+  }
+
+  return { sort, sortNormalizationIncomplete: incomplete };
 }

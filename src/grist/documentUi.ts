@@ -3,6 +3,10 @@ import {
   discoverColumnSelectByOptions
 } from "./selectBy.js";
 import { GristApiError } from "./client.js";
+import {
+  normalizeWidgetSort,
+  type WidgetSortInput
+} from "./widgetSort.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -23,6 +27,8 @@ export interface GristPageWidget {
   options?: unknown;
   layoutSpec?: unknown;
   sortColRefs?: unknown;
+  sort?: WidgetSortInput[];
+  sortNormalizationIncomplete?: boolean;
   selectBy?: {
     sourceSectionId: number;
     sourceColumnRef?: number;
@@ -156,6 +162,9 @@ export class DocumentUiService {
             }
           : {})
       };
+      const normalizedSort = normalizeWidgetSort(widget, tableResponse);
+      if (normalizedSort) Object.assign(widget, normalizedSort);
+
       const widgets = widgetsByPage.get(pageId) ?? [];
       widgets.push(widget);
       widgetsByPage.set(pageId, widgets);
