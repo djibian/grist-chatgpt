@@ -114,7 +114,11 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
         description: z.string().optional(),
         chartType: z.enum(GRIST_CHART_TYPES).optional(),
         selectBy: z
-          .object({ sourceWidgetId: z.number().int().positive() })
+          .object({
+            sourceWidgetId: z.number().int().positive(),
+            sourceColumnId: z.string().min(1).optional(),
+            targetColumnId: z.string().min(1).optional()
+          })
           .strict()
           .nullable()
           .optional()
