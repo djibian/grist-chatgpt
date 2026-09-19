@@ -24,7 +24,7 @@ S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document/table/column discovery metadata and targeted apply-backed schema mutation results, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded advisory formula-reference and one-hop reference-field inspection, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document/table/column discovery metadata and targeted apply-backed schema mutation results, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -223,14 +223,16 @@ Bounded adapters may internally emit known Grist UserActions, but no arbitrary `
 
 Goal: add a bounded `FormulaInspector`-style layer that helps the model detect likely schema/formula mistakes before mutation while leaving Grist authoritative for actual formula evaluation.
 
-Integrated first slice:
+Integrated advisory slices:
 
 - `inspect_document` detects referenced `$Column` identifiers without executing formulas;
 - references in quoted strings/comments are ignored and analysis is bounded/deduplicated;
 - exact matches, unique case mismatches and missing columns are distinguished;
 - up to three deterministic close existing-column suggestions are surfaced without rewriting user intent;
 - matching/suggested Ref/RefList columns expose their target table;
-- document context summarizes formula-reference and warning counts.
+- when expanded document schema is already available, exact one-hop `$Ref.Field` and `$RefList.Field` lookups are checked against the referenced table with the same exact/case-mismatch/missing semantics and suggestions;
+- one-hop dereference inspection is independently capped at 100, ignores method-like/deeper-chain Python expressions and implicit `id`, performs no extra upstream read, and never invents a warning when target-table metadata is unavailable;
+- document context summarizes local formula references, checked dereferences, dereference warnings and aggregate formula warnings.
 
 Further P2 work should proceed only where additional advisory schema/formula value is demonstrated and can stay non-executing and bounded.
 
