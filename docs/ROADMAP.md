@@ -24,7 +24,7 @@ S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct select-by option discovery, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, and explicit minimization of public document-discovery metadata.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -95,7 +95,9 @@ Fixed architecture:
 - provider-specific behavior stays at the edge;
 - static bearer may exist only as explicit development/backward-compatible mode.
 
-C4 must turn POC deployment/configuration/evidence into a repeatable production-quality operating model while preserving provider neutrality.
+Integrated productionization preparation now includes the offline OAuth deployment preflight, the operator release/rollback runbook, and `smoke:oauth-deployment`, a non-secret public smoke check for `/healthz`, protected-resource metadata and the unauthenticated MCP challenge. These checks intentionally do not substitute for authenticated issuer/JWKS, token, federation or Grist evidence.
+
+C4 must still turn POC deployment/configuration/evidence into a repeatable production-quality operating model while preserving provider neutrality. Remaining C4 evidence includes exercising the documented release/rollback path on the intended deployment and recording issuer/JWKS key-rotation and outage/recovery behavior.
 
 ### C5 — secure Grist onboarding and credential lifecycle
 
@@ -135,12 +137,13 @@ Already integrated:
 
 - explicit Grist upstream abort timeout;
 - bounded HTTP request/header reception;
-- repository CI/ruleset protection.
+- repository CI/ruleset protection;
+- deployment/rollback operating documentation;
+- offline OAuth deployment preflight;
+- non-secret public post-deploy/rollback smoke checks.
 
 Independent preparation that may proceed now:
 
-- deployment/rollback documentation;
-- non-secret operational health/smoke-test design;
 - metrics vocabulary;
 - audit event format review.
 
@@ -150,8 +153,8 @@ Finalization after C4/C5:
 - operational metrics and alerting;
 - structured audit export if required;
 - secret/key rotation procedure;
-- controlled deployment and rollback procedure;
-- post-deploy synthetic smoke tests.
+- controlled production deployment and rollback evidence;
+- authenticated post-deploy synthetic smoke evidence.
 
 ## Axis B — product capabilities
 
@@ -196,12 +199,13 @@ Current baseline:
 - `create_page`;
 - `add_page_widget`;
 - `rename_page`;
-- bounded `update_page_widget` title/direct same-table `select-by` behavior.
+- bounded `update_page_widget` title/direct same-table `select-by` behavior;
+- bounded `directSelectByOptions` discovery for supported same-page/same-table sources, with cycle checks and explicit truncation semantics.
 
 Eligible non-generic work, in small slices:
 
 - richer safe widget configuration;
-- explicit `select-by` option discovery and bounded configuration;
+- further explicit `select-by` configuration only where semantics remain bounded and verifiable;
 - layout inspection and bounded layout mutation where semantics can be verified;
 - configuration of known existing custom widgets/mappings where the upstream contract can be kept bounded.
 
@@ -220,13 +224,16 @@ Bounded adapters may internally emit known Grist UserActions, but no arbitrary `
 
 Goal: add a bounded `FormulaInspector`-style layer that helps the model detect likely schema/formula mistakes before mutation while leaving Grist authoritative for actual formula evaluation.
 
-Candidate first slice:
+Integrated first slice:
 
-- detect referenced `$Column` identifiers;
-- detect missing columns and case mismatches;
-- surface close existing column names without silently rewriting user intent;
-- expose relevant Ref/RefList target information;
-- keep formula validation advisory and non-executing.
+- `inspect_document` detects referenced `$Column` identifiers without executing formulas;
+- references in quoted strings/comments are ignored and analysis is bounded/deduplicated;
+- exact matches, unique case mismatches and missing columns are distinguished;
+- up to three deterministic close existing-column suggestions are surfaced without rewriting user intent;
+- matching/suggested Ref/RefList columns expose their target table;
+- document context summarizes formula-reference and warning counts.
+
+Further P2 work should proceed only where additional advisory schema/formula value is demonstrated and can stay non-executing and bounded.
 
 Do not introduce a Python interpreter, raw SQL or a generic code-execution surface.
 
@@ -327,14 +334,15 @@ Completed:
 - annotation semantics and per-tool justifications;
 - submission artifact generation;
 - draft `chatgpt-app-submission.json` with 22 tools, five positive and three negative routing scenarios;
-- real ChatGPT CIMD/OIDC connection proving `openid` / `email` compatibility after the corresponding Dynamic app permissions were enabled.
+- real ChatGPT CIMD/OIDC connection proving `openid` / `email` compatibility after the corresponding Dynamic app permissions were enabled;
+- document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields.
 
 Remaining eligible work:
 
 - prove UserInfo returns `email` with `email_verified: true` on the final reviewer-compatible path;
 - prepare the safe deployment path for `/.well-known/openai-apps-challenge`; activate it only when the OpenAI portal issues the exact token;
 - formalize exactly five positive and three negative reviewer scenarios with expected outcomes against the eventual synthetic reviewer fixture;
-- audit tool outputs for data minimization and unnecessary diagnostic/internal fields.
+- continue auditing other tool outputs for unnecessary diagnostic/internal fields.
 
 ### C7 — reviewer environment
 
