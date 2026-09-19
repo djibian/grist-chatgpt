@@ -19,7 +19,8 @@
     "probe:oauth-negative": "tsx tools/oauth-negative-probe.ts",
     "probe:mcp-http-oauth": "tsx tools/mcp-http-oauth-probe.ts",
     "probe:chatgpt-oauth-readiness": "tsx tools/chatgpt-oauth-readiness-probe.ts",
-    "submission:annotations": "tsx tools/plugin-submission-annotations.ts"
+    "submission:annotations": "tsx tools/plugin-submission-annotations.ts",
+    "check:oauth-deployment": "tsx tools/oauth-deployment-preflight.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",

@@ -60,7 +60,7 @@ ChatGPT GPT Actions                 MCP client
 
 `DeploymentResourcePolicy` is shared because it contains only configured document/workspace ceilings. Every `GristContextFactory.create(principal)` call creates a fresh credential-derived client, discovery cache, access policy and service graph for that principal.
 
-The current development deployment still uses static bridge bearer principals and one configured `GRIST_API_KEY` through `StaticApiKeyCredentialProvider`. Those are prototype substitutions, not the final multi-user credential model.
+The completed C4-P0 deployment authenticates MCP users through Logto OSS federated with ProConnect and constructs dynamic OAuth principals. Static bearer remains a development/compatibility mode. Both modes currently use one configured `GRIST_API_KEY` through `StaticApiKeyCredentialProvider`; this is a POC substitution, not the final multi-user credential model. See [OAuth operating model](OAUTH-OPERATIONS.md) for repeatable configuration checks and the remaining C4/C5 boundaries.
 
 ## Product architecture target
 
@@ -115,7 +115,7 @@ Each authenticated bridge client is represented as a `Principal` with:
 - one or more resource grants;
 - Grist-aligned capabilities.
 
-The current single-user deployment creates two static principals from bearer tokens. The plugin-ready target replaces the production MCP static principal with an OAuth-authenticated dynamic principal.
+MCP OAuth mode constructs dynamic principals from validated issuer/subject and scopes. Static MCP mode and the GPT Actions compatibility adapter use static bearer principals.
 
 ### Capabilities
 
@@ -133,7 +133,7 @@ Semantics:
 - `doc:write`: record creation/update/deletion;
 - `doc.schema:write`: table/column/document-UI structural mutations.
 
-These capabilities are candidates for the OAuth scopes of the production plugin. They deliberately express bridge authority, not the raw power of a user's Grist API key.
+These capabilities are the fixed public OAuth scopes. They deliberately express bridge authority, not the raw power of a user's Grist API key.
 
 ### Deployment resource policy
 
@@ -326,7 +326,7 @@ The validated prototype remains intentionally simple:
 ```text
 ChatGPT / MCP client
    |
-   | static bridge bearer
+   | OAuth via Logto / ProConnect (static bearer optional in development)
    v
 personal VPS bridge
    |
@@ -359,17 +359,17 @@ The bridge continues to exclude:
 
 ## Near-term architecture roadmap
 
-Identity/security work remains ahead of additional Grist feature breadth:
+Identity/security and independently useful bounded product work proceed on parallel axes under `ROADMAP.md`:
 
 1. **DONE:** credential abstraction and credential-aware client construction (C1);
 2. **DONE:** MCP contract-v1 metadata/structured-result hardening (C2);
 3. **DONE:** principal-isolated Grist clients, discovery caches and service contexts (C3);
-4. **BLOCKED by human gate:** select the OAuth/identity-provider approach, then implement OAuth 2.1 MCP authentication and dynamic principals (C4);
+4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto OSS / ProConnect OAuth path and dynamic principals with repeatable operating evidence;
 5. **BLOCKED by C4 and human persistence/encryption decisions:** secure per-user Grist credential onboarding/storage/disconnect (C5);
 6. production observability, rate limits and release controls;
 7. synthetic reviewer fixture and plugin submission package.
 
-Layout mutation, page/widget deletion and further UI breadth remain lower priority than identity/security readiness.
+Bounded non-destructive P1 UI work is independently eligible. New destructive page/widget surfaces remain human-gated.
 
 ## Architectural invariant
 
