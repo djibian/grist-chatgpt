@@ -38,14 +38,27 @@ Required configuration boundaries:
 
 This is a stricter operating check, not a change to runtime development defaults or public authorization policy. It does not verify issuer/JWKS correspondence, remote availability, TLS/proxy correctness, token issuance, user isolation, or actual Grist ACLs. Passing exit status means only the offline configuration checks passed. The output always declares `multi_user_readiness: BLOCKED_C5_STATIC_GRIST_CREDENTIAL` and `live_oauth_validation: REQUIRED_SEPARATELY`.
 
+## Unauthenticated operational smoke
+
+After an authorized deployment or rollback, the public bridge surface can be checked without any OAuth token, Grist API key or synthetic document identifier:
+
+```sh
+MCP_RESOURCE_URI='https://example.invalid/mcp' npm run smoke:oauth-deployment
+```
+
+Supply the intended canonical public MCP resource URI through the operator environment; do not add credentials or query parameters. The smoke command performs only three public, non-mutating requests: `/healthz`, RFC 9728 protected-resource metadata, and an unauthenticated request to `/mcp`. It validates the service/version health payload, exact resource binding, the fixed three public scopes, one HTTPS authorization server, and the expected `WWW-Authenticate` resource-metadata challenge. It never accepts or sends a bearer token and prints only fixed PASS/FAIL identifiers.
+
+A PASS proves only that the deployed public bridge and its published OAuth boundary are internally consistent at that instant. It does not validate token issuance, JWKS key acceptance, ProConnect federation, authenticated Grist access, per-user credential isolation or reviewer readiness. Use the authenticated probes separately where their stronger evidence is required.
+
 ## Release and evidence sequence
 
 1. Resolve the exact candidate commit and successful CI on that head. Retain the previous working commit and its protected configuration as the rollback reference; never commit secret snapshots.
 2. Run the offline preflight against the intended environment. Confirm the reverse proxy terminates HTTPS and forwards only to the existing localhost-bound server. Confirm issuer, canonical resource and fixed scopes against the operator's Logto resource configuration.
-3. In an isolated environment, run the existing `probe:oauth-bridge`, `probe:oauth-negative`, `probe:mcp-http-oauth` and `probe:chatgpt-oauth-readiness` procedures using their documented protected environment inputs. Follow [POC HTTP evidence](LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md) and [ChatGPT OAuth readiness](CHATGPT-OAUTH-READINESS.md); these probes are not invoked automatically by preflight. Inspect probe effects before running: authenticated probes can access the configured synthetic fixture. Never substitute real user data or replay a possibly completed write.
-4. Record exact commit, UTC time, environment label, test/probe names and sanitized PASS/FAIL results only. Confirm wrong-resource and insufficient-scope rejection, metadata/challenges, valid signed token acceptance, and ChatGPT connection continuity. Keep subjects, principal IDs, tokens, codes, cookies and keys out of durable evidence.
-5. Deployment remains an operator action. Do not replace the shared live POC endpoint to validate a feature branch. After an authorized release, repeat metadata/authentication smoke checks and bounded reads against the synthetic fixture; investigate ambiguous writes by targeted re-read, never automatic replay.
-6. On failure, stop further operations and restore the previous reviewed application artifact and compatible protected environment using the operator's existing service procedure. Repeat the same preflight and smoke checks. Application rollback does not reverse Grist writes or Logto configuration changes; record and resolve these separately. Do not downgrade to static bearer to make OAuth checks pass.
+3. After the authorized release, run `smoke:oauth-deployment` against the canonical public MCP URI. Record only exact commit, UTC time, environment label and the fixed PASS/FAIL identifiers. This smoke is safe to repeat because it is unauthenticated and non-mutating.
+4. In an isolated environment, run the existing `probe:oauth-bridge`, `probe:oauth-negative`, `probe:mcp-http-oauth` and `probe:chatgpt-oauth-readiness` procedures using their documented protected environment inputs. Follow [POC HTTP evidence](LOGTO-PROCONNECT-MCP-POC-HTTP-EVIDENCE.md) and [ChatGPT OAuth readiness](CHATGPT-OAUTH-READINESS.md); these probes are not invoked automatically by preflight or smoke. Inspect probe effects before running: authenticated probes can access the configured synthetic fixture. Never substitute real user data or replay a possibly completed write.
+5. Record exact commit, UTC time, environment label, test/probe names and sanitized PASS/FAIL results only. Confirm wrong-resource and insufficient-scope rejection, metadata/challenges, valid signed token acceptance, and ChatGPT connection continuity. Keep subjects, principal IDs, tokens, codes, cookies and keys out of durable evidence.
+6. Deployment remains an operator action. Do not replace the shared live POC endpoint to validate a feature branch. After an authorized release, use bounded reads against the synthetic fixture only when authenticated evidence is required; investigate ambiguous writes by targeted re-read, never automatic replay.
+7. On failure, stop further operations and restore the previous reviewed application artifact and compatible protected environment using the operator's existing service procedure. Repeat the same preflight and unauthenticated smoke before stronger authenticated checks. Application rollback does not reverse Grist writes or Logto configuration changes; record and resolve these separately. Do not downgrade to static bearer to make OAuth checks pass.
 
 ## Remaining gates
 
