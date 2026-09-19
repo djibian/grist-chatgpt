@@ -23,11 +23,16 @@ The current contract follows these rules:
 
 - true reads use `readOnlyHint: true`;
 - mutations use `readOnlyHint: false`;
-- only record, table and column deletion use `destructiveHint: true`;
+- additive create operations use `destructiveHint: false` because they do not overwrite or remove existing user state;
+- writes that can overwrite, rename, clear or delete existing Grist state use `destructiveHint: true`, including record/schema/UI updates and explicit deletions;
 - all current operations are confined to the configured Grist environment, so `openWorldHint: false`;
-- adding or changing a public destructive capability remains a product/security decision, not a metadata refactor.
+- adding a new destructive capability remains a product/security decision, while correcting an annotation to match an existing operation's real effects is a contract-safety fix.
+
+This follows the MCP annotation semantics and OpenAI plugin guidance: `destructiveHint: false` is appropriate for additive writes, not for an operation that may overwrite existing user state.
 
 Full-surface tests compare every MCP registration with the registry and pin the destructive/read-only sets.
+
+For OpenAI submission, `src/operations/submissionAnnotations.ts` derives a non-secret justification for each of the three annotation values for every registered operation. `npm run submission:annotations` prints the resulting submission artifact from the same registry so annotation values and justifications can be reviewed without hand-maintained drift.
 
 ## Structured successful outputs
 
@@ -63,10 +68,10 @@ For `write_verification_failed`, the contract preserves `operation`, an optional
 
 ## Deliberately unchanged
 
-C2 does not:
+This annotation correction does not:
 
 - change the Grist credential model or credential storage;
-- start OAuth or select an identity provider;
+- change OAuth/provider selection;
 - add, remove or reinterpret public scopes/capabilities;
 - change server/resource authorization;
 - expose raw `/apply`, arbitrary UserActions, SQL or generic HTTP;
