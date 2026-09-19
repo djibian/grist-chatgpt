@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import type { PageWidgetUpdateInput } from "../grist/authorizedService.js";
+import { GRIST_CHART_TYPES } from "../grist/chartTypes.js";
 import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
@@ -111,6 +112,7 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
         widgetId: z.number().int().positive(),
         title: z.string().optional(),
         description: z.string().optional(),
+        chartType: z.enum(GRIST_CHART_TYPES).optional(),
         selectBy: z
           .object({ sourceWidgetId: z.number().int().positive() })
           .strict()
@@ -119,18 +121,30 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
       }),
       outputSchema: widgetMutationOutputSchema
     },
-    async ({ documentId, pageId, widgetId, title, description, selectBy }) => {
+    async ({
+      documentId,
+      pageId,
+      widgetId,
+      title,
+      description,
+      chartType,
+      selectBy
+    }) => {
       try {
         if (
           title === undefined &&
           description === undefined &&
+          chartType === undefined &&
           selectBy === undefined
         ) {
-          throw new Error("At least one of title, description or selectBy must be supplied.");
+          throw new Error(
+            "At least one of title, description, chartType or selectBy must be supplied."
+          );
         }
         const update: PageWidgetUpdateInput = {
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
+          ...(chartType !== undefined ? { chartType } : {}),
           ...(selectBy !== undefined ? { selectBy } : {})
         };
         const output = widgetMutationOutputSchema.parse(
