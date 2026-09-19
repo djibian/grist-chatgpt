@@ -24,7 +24,7 @@ S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct select-by option discovery, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document-discovery metadata, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, the first advisory formula-reference inspection slice, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public document-discovery metadata, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -196,8 +196,9 @@ Current baseline:
 - `create_page`;
 - `add_page_widget`;
 - `rename_page`;
-- bounded `update_page_widget` title/description/native chart-type/direct same-table `select-by` behavior, including explicit description clearing, chart-only enforcement and normalized post-write verification;
-- bounded `directSelectByOptions` discovery for supported same-page/same-table sources, with cycle checks and explicit truncation semantics.
+- bounded `update_page_widget` title/description/native chart-type/select-by behavior, including explicit description clearing, chart-only enforcement and normalized post-write verification;
+- bounded `directSelectByOptions` discovery for supported same-page/same-table sources, with cycle checks and explicit truncation semantics;
+- bounded `columnSelectByOptions` discovery/configuration for explicit non-summary `Ref`/`RefList` links, using reusable column IDs rather than invented numeric refs, excluding Attachments, chart/custom sources and cycles, with a 5,000-column schema ceiling plus response/candidate truncation semantics.
 
 Eligible non-generic work, in small slices:
 
@@ -332,13 +333,12 @@ Completed:
 - submission artifact generation;
 - draft `chatgpt-app-submission.json` with 22 tools, five positive and three negative routing scenarios;
 - real ChatGPT CIMD/OIDC connection proving `openid` / `email` compatibility after the corresponding Dynamic app permissions were enabled;
-- document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields;
-- safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected.
+- document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields.
 
 Remaining eligible work:
 
 - prove UserInfo returns `email` with `email_verified: true` on the final reviewer-compatible path;
-- when the OpenAI portal eventually issues the production domain token, activate the prepared challenge path with that exact value and verify the deployed response before portal validation;
+- prepare the safe deployment path for `/.well-known/openai-apps-challenge`; activate it only when the OpenAI portal issues the exact token;
 - formalize exactly five positive and three negative reviewer scenarios with expected outcomes against the eventual synthetic reviewer fixture;
 - continue auditing other tool outputs for unnecessary diagnostic/internal fields.
 
