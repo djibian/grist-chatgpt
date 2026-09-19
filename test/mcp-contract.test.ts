@@ -73,16 +73,7 @@ test("complete MCP surface is derived from the operation registry without annota
     OPERATION_REGISTRY.filter((operation) => operation.readOnly)
       .map((operation) => operation.name)
       .sort(),
-    [
-      "get_page_widgets",
-      "get_pages",
-      "grist_help",
-      "inspect_document",
-      "list_columns",
-      "list_documents",
-      "list_tables",
-      "query_records"
-    ]
+    ["grist_help"]
   );
   assert.deepEqual(
     OPERATION_REGISTRY.filter((operation) => operation.destructive)

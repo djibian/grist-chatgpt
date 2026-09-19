@@ -13,6 +13,8 @@ export interface OperationDefinition {
   category: OperationCategory;
   capability: GristCapability | null;
   readOnly: boolean;
+  /** The only state change is an appended audit event; Grist data is unchanged. */
+  auditOnly?: boolean;
   destructive: boolean;
   openWorld: boolean;
   title: string;
@@ -35,7 +37,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "list_documents",
     category: "discovery",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "List available Grist documents",
@@ -47,7 +50,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "list_tables",
     category: "discovery",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "List document tables",
@@ -59,7 +63,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "list_columns",
     category: "discovery",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "Inspect table columns",
@@ -71,7 +76,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "query_records",
     category: "data",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "Read table records",
@@ -203,7 +209,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "inspect_document",
     category: "context",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "Inspect document structure",
@@ -215,7 +222,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "get_pages",
     category: "ui",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "List document pages",
@@ -227,7 +235,8 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
     name: "get_page_widgets",
     category: "ui",
     capability: "doc:read",
-    readOnly: true,
+    readOnly: false,
+    auditOnly: true,
     destructive: false,
     openWorld: false,
     title: "Inspect page widgets",

@@ -188,7 +188,8 @@ Completed:
 - MCP annotation semantics rechecked against current OpenAI/MCP definitions;
 - overwrite/rename/clear/delete operations now use `destructiveHint: true`, while additive create operations remain `false`;
 - explicit per-tool justifications for `readOnlyHint`, `openWorldHint` and `destructiveHint` are generated from the normative registry;
-- `npm run submission:annotations` produces the review artifact and tests pin the destructive/additive sets.
+- `npm run submission:annotations` produces the review artifact and tests pin the destructive/additive/audited-read sets; audited reads explicitly use `readOnlyHint: false` while retaining `doc:read`.
+- `chatgpt-app-submission.json` packages the draft listing, 22 tools, five positive and three negative routing scenarios; live reviewer-fixture validation remains pending.
 
 Remaining eligible work:
 
