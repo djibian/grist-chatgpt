@@ -419,11 +419,18 @@ Completed:
 - success-only record/schema update and delete operations discard upstream success bodies and return bounded acknowledgements containing only the exact requested stable targets; create operations project successful upstream results to functional table/column/record IDs and mark successful but unexpectedly shaped responses with `resultNormalizationIncomplete: true` instead of forwarding arbitrary engine fields;
 - safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected.
 
-Remaining eligible work:
+Exit criteria:
 
-- prove UserInfo returns `email` with `email_verified: true` on the final reviewer-compatible path;
-- when the OpenAI portal eventually issues the production domain token, activate the prepared challenge path with that exact value and verify the deployed response before portal validation;
-- continue auditing other tool outputs for unnecessary diagnostic/internal fields.
+- the final reviewer-compatible identity path has durable evidence that UserInfo returns `email` with `email_verified: true`;
+- one bounded audit of the current public operation outputs against the repository's data-minimization contract is completed, with concrete unnecessary-field findings fixed or explicitly dispositioned;
+- the tracked submission preparation artifacts remain coherent with the current public contract.
+
+Committed remaining S1 work:
+
+1. prove and record UserInfo `email` with `email_verified: true` on the final reviewer-compatible path;
+2. perform one bounded current-surface output-minimization audit and integrate/disposition concrete findings.
+
+The production OpenAI domain token does not yet exist. Activating the already-prepared challenge endpoint with that future exact token is an external-triggered C8/submission action, not recurring S1 work.
 
 ### C7 — reviewer environment
 
