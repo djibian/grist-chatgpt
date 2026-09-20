@@ -86,6 +86,8 @@ A Controller execution that materially authored or modified a review-required ex
 
 Independence normally comes from a later fresh Controller execution. A genuinely isolated Reviewer subagent that did not participate in authoring the head may also satisfy the gate. GitHub identity may be the same; independence is about execution context, not account identity.
 
+A synchronization of a PR branch with a newer `main` does **not** by itself constitute material authorship when the execution performs only a mechanical base update (for example, a clean merge of `main`), performs no manual conflict resolution or semantic edit, and verifies that the synchronization itself did not alter the PR-authored contribution. The resulting commit is still a new exact head: every earlier PASS is stale and exact-head CI must run again. After green CI, that same otherwise-independent execution may perform a fresh review of the new head, including its interactions with the newly integrated `main`, and may merge it on PASS. If synchronization requires conflict resolution, adaptation, or any semantic/manual change to the PR contribution, it is material authorship and the new head must be left for later independent review.
+
 ### G7 — A PR review gate is not a Controller execution gate
 
 When the current execution materially authors or modifies a review-required PR head, that PR is frozen for independent review for the remainder of the execution.
