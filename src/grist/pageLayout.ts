@@ -8,12 +8,12 @@ export type NormalizedPageLayoutNode =
   | {
       kind: "widget";
       widgetId: number;
-      size?: number;
+      size?: number | undefined;
     }
   | {
       kind: "group";
       children: NormalizedPageLayoutNode[];
-      size?: number;
+      size?: number | undefined;
     };
 
 export interface NormalizedPageLayout {
@@ -24,7 +24,7 @@ export interface NormalizedPageLayout {
 
 export interface PageLayoutUpdateInput {
   root: NormalizedPageLayoutNode;
-  collapsedWidgetIds?: readonly number[];
+  collapsedWidgetIds?: readonly number[] | undefined;
 }
 
 export interface ResolvedPageLayoutUpdate {
