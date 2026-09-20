@@ -3,8 +3,8 @@
   "schema_version": 1,
   "app_info": {
     "display_name": "grist-chatgpt",
-    "subtitle": "Consulter et modifier Grist",
-    "description": "grist-chatgpt permet de consulter les documents Grist Community autorisés, filtrer et modifier des lignes, gérer des tables et colonnes, et organiser des pages et widgets par des opérations ciblées. Les outils restent limités au périmètre Grist configuré. Projet indépendant, sans affiliation officielle à Grist Labs, DINUM ou OpenAI.",
+    "subtitle": "Concevoir et maintenir des documents Grist",
+    "description": "Inspecter, structurer et faire évoluer des documents Grist Community avec des opérations sémantiques bornées et vérifiées sur les données, le schéma, les pages et les widgets. Autorisation et garde-fous restent côté serveur, sur une instance Grist configurée. Projet indépendant, sans affiliation officielle à Grist Labs, DINUM ou OpenAI.",
     "category": "PRODUCTIVITY"
   },
   "tools": {
