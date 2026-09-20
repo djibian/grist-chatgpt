@@ -38,6 +38,7 @@ P0 product architecture baseline  DONE
 P1 document UI parity             DONE
 P2 formula/schema safety          DONE
 P3 semantic context/discovery     DONE
+P4 compact MCP surface            DONE
 Q0 retrospective code assurance  DONE
 ```
 
@@ -49,8 +50,8 @@ The project advances on three product/platform/distribution axes. Q0 remains rec
 
 ```text
 QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT CAPABILITIES       PUBLIC DISTRIBUTION
-Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 DONE         S0 + S1
-                                                       -> P4                     -> C7 -> C8
+Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE    S0 + S1
+                                                                                -> C7 -> C8
 ```
 
 Q0 established the post-audit runtime trust baseline. New bounded product work may proceed only when its own finite roadmap tranche is explicitly defined and eligible.
@@ -100,7 +101,7 @@ No fourth cleanup slice is committed. Generic cleanup, style-only, broad rewrite
 Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
-- P4's former P1/Q0/P2/P3 dependency chain is satisfied and its finite evaluation-only tranche is eligible; no runtime/public-contract migration is implied by that evaluation;
+- P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -232,7 +233,7 @@ Remaining finalization after C4/C5:
 
 ## Axis B — product capabilities
 
-The product axis may advance now that Q0, P1, P2 and P3 are DONE only when a later tranche has an explicit finite roadmap contract and preserves the existing identity, authorization and bounded-operation invariants.
+The product axis may advance now that Q0, P1, P2, P3 and P4 are DONE only when a later tranche has an explicit finite roadmap contract and preserves the existing identity, authorization and bounded-operation invariants.
 
 Reference inspirations are design provenance, not dependencies:
 
@@ -390,8 +391,8 @@ Deferred P3 candidates — not autonomously eligible unless explicitly promoted:
 
 ### P4 — compact MCP surface
 
-**Status: ELIGIBLE**  
-**Priority: medium**
+**Status: DONE**  
+**Priority: completed product-capability evaluation**
 
 Goal: evaluate whether the public surface should converge from many narrow tools toward a smaller user-intent surface such as records/schema/pages managers while preserving:
 
@@ -411,11 +412,15 @@ Exit criteria:
 - the evaluation itself changes no runtime behavior, public tool schema, OAuth scope or compatibility contract;
 - if the decision is MIGRATE, no implementation becomes eligible until a separate reviewed roadmap slice defines the exact migration/deprecation contract and tests; if the decision is KEEP, no speculative compaction work remains.
 
-Committed next P4 slices:
+Integrated tranche review: **PASS** against exact `main` `2e2a9a6457a709fce630d7c1e21a0e12eb5a58d8`. PR #119 integrated the P4-E1 evaluation from exact head `aaef06427d6464af5d85933d6a06fdb52830ee04` after exact-head CI success and an independent exact-head PASS. The integrated change is documentation-only: `src/operations/registry.ts` on the reviewed `main` still exposes exactly the 23 operations inventoried by P4-E1, with the same category/capability/risk split and operation-specific partial/ambiguous-write semantics. The recorded KEEP decision preserves the stable v1 tool schemas, OAuth scopes, authorization boundaries and runtime behavior; no implementation or migration slice follows from P4-E1, and no committed P4 work remains.
 
-1. **P4-E1 — bounded compact-surface evaluation** — document the exact current 23-operation surface, evaluate concrete grouping alternatives, and record a KEEP/MIGRATE decision with rationale. Documentation/evaluation only; no public tool or runtime change.
+Completed P4 slice:
 
-No P4 implementation slice is committed by this setup decision.
+1. **P4-E1 — bounded compact-surface evaluation** — exact 23-operation inventory and concrete grouping alternatives evaluated; decision **KEEP** the current narrow v1 execution surface. Documentation/evaluation only; no public tool or runtime change.
+
+Committed next P4 slices: **none**.
+
+Any future compaction or v2 surface requires a new explicit roadmap decision; it is not continuation of P4-E1.
 
 ### P5 — attachments
 
@@ -488,7 +493,7 @@ Completed:
 - fixed internal `RenameColumn` / `RemoveTable` operations now discard raw Grist `/apply` engine responses and return only bounded semantic acknowledgements with stable target identifiers;
 - success-only record/schema update and delete operations discard upstream success bodies and return bounded acknowledgements containing only the exact requested stable targets; create operations project successful upstream results to functional table/column/record IDs and mark successful but unexpectedly shaped responses with `resultNormalizationIncomplete: true` instead of forwarding arbitrary engine fields;
 - safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected;
-- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract.
+- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, remains accepted v1 compatibility debt after P4-E1 KEEP; any future removal requires a separate explicit versioned migration/deprecation contract and tests.
 
 Exit criteria:
 
@@ -526,10 +531,10 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-Preferred steady state after P1 completion:
+Preferred steady state after P4 completion:
 
 ```text
-Worker A: P4-E1 bounded compact-surface evaluation
+Worker A: no product-capability tranche currently committed
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration, review/dependency control, human gates, S0/S1 coordination
 ```
@@ -541,9 +546,8 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress P4-E1's bounded evaluation-only slice without changing the public v1 contract;
-3. progress independent C4 operational evidence when the required intended environment/operator support is available;
-4. progress low-risk S1 evidence while S0 remains unresolved and the required external identity evidence is available;
-5. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
+2. progress independent C4 operational evidence when the required intended environment/operator support is available;
+3. progress low-risk S1 evidence while S0 remains unresolved and the required external identity evidence is available;
+4. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
