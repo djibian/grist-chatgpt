@@ -248,6 +248,18 @@
         "destructive_justification": "Rename a document page can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
       }
     },
+    "update_page_layout": {
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Update a page layout changes Grist state, so it is not read-only.",
+        "open_world_justification": "Update a page layout is confined to the configured Grist deployment and the principal's bounded documents or workspaces; it does not access arbitrary public Internet entities.",
+        "destructive_justification": "Update a page layout can overwrite, rename, clear, or delete existing Grist state, so the change may be destructive or require an explicit confirmation."
+      }
+    },
     "update_page_widget": {
       "annotations": {
         "readOnlyHint": false,

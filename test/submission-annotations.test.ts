@@ -15,6 +15,7 @@ const destructiveWrites = [
   "rename_column",
   "rename_page",
   "update_columns",
+  "update_page_layout",
   "update_page_widget",
   "update_records",
   "update_tables"
