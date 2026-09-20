@@ -476,7 +476,7 @@ This is **not an approval**. It establishes that a separate written pre-approval
 
 Submission positioning must therefore remain factual and product-oriented:
 
-- describe the concrete workflow/value — inspecting, structuring and maintaining Grist documents through bounded verified operations — rather than presenting a generic “Grist connector”;
+- describe the concrete workflow/value — inspecting, structuring and maintaining Grist documents through bounded semantic operations — rather than presenting a generic “Grist connector”;
 - preserve the fixed single configured Grist instance boundary and the permanent non-goals above;
 - maintain the explicit independent/non-official relationship unless durable authorization says otherwise;
 - keep any Grist Labs / DINUM / operator permission or branding evidence separate, factual and no broader than what was actually granted.
@@ -511,8 +511,8 @@ Completed:
 - fixed internal `RenameColumn` / `RemoveTable` operations now discard raw Grist `/apply` engine responses and return only bounded semantic acknowledgements with stable target identifiers;
 - success-only record/schema update and delete operations discard upstream success bodies and return bounded acknowledgements containing only the exact requested stable targets; create operations project successful upstream results to functional table/column/record IDs and mark successful but unexpectedly shaped responses with `resultNormalizationIncomplete: true` instead of forwarding arbitrary engine fields;
 - safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected;
-- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract;
-- real OpenAI submission draft created on 2026-09-20, with the current `grist-chatgpt.loeildumaitre.fr` domain successfully verified and Tool Scan completed successfully; non-blocking recommendations to add `outputSchema` remain follow-up rather than a scan failure.
+- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly retains raw UI v1 compatibility fields as accepted v1 debt after P4-E1 KEEP; any future removal requires a separate explicit versioned migration/deprecation contract and tests;
+- real OpenAI submission draft created on 2026-09-20, with the current `grist-chatgpt.loeildumaitre.fr` domain successfully verified and Tool Scan completed successfully; formal `outputSchema` coverage gaps remain separately tracked as contract-quality follow-up.
 
 Exit criteria:
 
