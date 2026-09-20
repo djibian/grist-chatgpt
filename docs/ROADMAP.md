@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is the authoritative dependency map for autonomous development. It separates product/platform work from public-directory distribution so useful engineering can continue even while publication eligibility remains unresolved.
+This roadmap is the authoritative dependency map for autonomous development. It separates product/platform work from public-directory distribution so useful engineering can continue while final publication eligibility remains review-dependent.
 
 Status vocabulary:
 
@@ -49,13 +49,13 @@ The project advances on three product/platform/distribution axes. Q0 remains rec
 
 ```text
 QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT CAPABILITIES       PUBLIC DISTRIBUTION
-Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 DONE         S0 + S1
-                                                       -> P4                     -> C7 -> C8
+Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 DONE         S0 ACTIVE + S1
+                                                       -> P4                     -> C7 -> C8 -> review
 ```
 
 Q0 established the post-audit runtime trust baseline. New bounded product work may proceed only when its own finite roadmap tranche is explicitly defined and eligible.
 
-Public-directory eligibility is a distribution gate. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
+OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
 ## Cross-cutting quality assurance
 
@@ -446,19 +446,42 @@ These are architectural boundaries, not deferred feature requests:
 
 ### S0 — public-plugin eligibility
 
-**Status: BLOCKED / HUMAN-INSTITUTIONAL GATE**  
+**Status: ACTIVE — final classification occurs during OpenAI review**  
 **Priority: highest only for public OpenAI directory publication**
 
-S0 blocks public publication and publication-specific reviewer investment. It does **not** block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
+Goal: reach an actual OpenAI review with an accurate, defensible bounded-product submission and record the resulting eligibility decision without implying any unofficial affiliation.
 
-The unresolved question is whether OpenAI will accept this independent Grist Community integration under its current rule against plugins whose primary function is acting as unofficial connectors to third-party services.
+Durable pre-review evidence now exists in issue #58:
 
-Resolve a durable path before public submission is treated as viable:
+- a real MCP-only draft submission was created in the OpenAI portal;
+- the current MCP hostname was successfully domain-verified;
+- Tool Scan completed successfully on the current draft endpoint;
+- OpenAI AI-assisted support explicitly declined to pre-confirm eligibility outside review;
+- after receiving the exact architecture, support described the fixed single-instance, finite semantic-tool design as materially different from a generic relay/proxy or usual pass-through intermediary, while warning that reviewers may still apply the guideline's primary-function test and view the product as primarily connecting ChatGPT to Grist;
+- support stated that explicit Grist/operator permission can reduce policy risk but does not guarantee approval or override the primary-function test.
 
-1. obtain written OpenAI clarification that the product is eligible; and, only if required,
-2. obtain the relevant Grist Labs / DINUM authorization basis.
+This is **not an approval**. It establishes that a separate written pre-approval is not an available prerequisite: the actual review is the decision point.
 
-Issue #58 contains the exact clarification package. Do not claim an official relationship that has not been explicitly established.
+Submission positioning must therefore remain factual and product-oriented:
+
+- describe the concrete workflow/value — inspecting, structuring and maintaining Grist documents through bounded verified operations — rather than presenting a generic “Grist connector”;
+- preserve the fixed single configured Grist instance boundary and the permanent non-goals above;
+- maintain the explicit independent/non-official relationship unless durable authorization says otherwise;
+- keep any Grist Labs / DINUM / operator permission or branding evidence separate, factual and no broader than what was actually granted.
+
+Exit criteria:
+
+- reviewer/submission prerequisites in C4-C8 are complete enough for a real review;
+- the submitted listing and reviewer package accurately describe the bounded workflow, fixed deployment target and independent status;
+- the actual OpenAI review returns an approval or a concrete eligibility finding that can be durably recorded and acted on.
+
+Committed remaining S0 work:
+
+1. keep submission copy aligned with the bounded-workflow positioning and issue #58 evidence;
+2. obtain/document the minimum factual rights/permission basis needed to operate against the intended Grist deployment and use any submitted branding, without claiming partnership unless granted;
+3. when C4-C8 permit review, submit the real draft and record the review outcome as the final S0 decision.
+
+A rejection under the unofficial-connector/primary-function rule returns S0 to BLOCKED pending the smallest explicit authorization, product-boundary or submission-positioning change identified by the review. Do not guess around a rejection.
 
 ### S1 — low-risk OpenAI submission protocol preparation
 
@@ -476,7 +499,8 @@ Completed:
 - fixed internal `RenameColumn` / `RemoveTable` operations now discard raw Grist `/apply` engine responses and return only bounded semantic acknowledgements with stable target identifiers;
 - success-only record/schema update and delete operations discard upstream success bodies and return bounded acknowledgements containing only the exact requested stable targets; create operations project successful upstream results to functional table/column/record IDs and mark successful but unexpectedly shaped responses with `resultNormalizationIncomplete: true` instead of forwarding arbitrary engine fields;
 - safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected;
-- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract.
+- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract;
+- real OpenAI submission draft created on 2026-09-20, with the current `grist-chatgpt.loeildumaitre.fr` domain successfully verified and Tool Scan completed successfully; non-blocking recommendations to add `outputSchema` remain follow-up rather than a scan failure.
 
 Exit criteria:
 
@@ -488,21 +512,21 @@ Committed remaining S1 work:
 
 1. prove and record UserInfo `email` with `email_verified: true` on the final reviewer-compatible path.
 
-The production OpenAI domain token does not yet exist. Activating the already-prepared challenge endpoint with that future exact token is an external-triggered C8/submission action, not recurring S1 work.
+A real portal challenge token has now been issued and verified against the current draft hostname. The token remains deployment-only secret-like configuration and must never be committed. If the final production MCP hostname changes, repeat portal domain verification against that final hostname rather than assuming the draft verification transfers.
 
 ### C7 — reviewer environment
 
-**Status: BLOCKED by C5 and S0 viability; final auth path also depends on production C4**
+**Status: BLOCKED by C5; final auth path also depends on production C4**
 
-Required only if S0 becomes viable. The reviewer path must use synthetic data and ready-to-use credentials without MFA/SMS/email-confirmation/private-network dependencies, while not weakening normal production authentication.
+S0 no longer imposes a separate pre-approval dependency because OpenAI support states that final eligibility classification occurs during review. Once C4/C5 permit the reviewer identity path, provision a synthetic reviewer account/document and ready-to-use credentials without MFA/SMS/email-confirmation/private-network dependencies, while not weakening normal production authentication.
 
 ### C8 — publisher/submission package
 
-**Status: BLOCKED by S0, C6 and C7**
+**Status: BLOCKED by C6 and C7; final publication remains contingent on the S0 review outcome**
 
 Final package includes the current production MCP URL, Tool Scan, domain challenge, publisher/legal metadata, annotations and justifications, reviewer credentials/instructions, demo recording and the exact current review-test package.
 
-Initial submission remains MCP-only. Custom UI and skills are not required.
+Initial submission remains MCP-only. Custom UI and skills are not required. The C8 submit-for-review transition is the mechanism that resolves S0's remaining primary-function classification; do not require a circular S0 pre-approval before reaching it.
 
 ## Parallelism policy
 
@@ -519,7 +543,7 @@ Preferred steady state after P1 completion:
 ```text
 Worker A: next explicitly committed product tranche when finite and eligible
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
-Controller: integration, review/dependency control, human gates, S0/S1 coordination
+Controller: integration, review/dependency control, human gates, S0/S1/C7/C8 coordination
 ```
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
@@ -530,8 +554,8 @@ When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
 2. progress independent C4 operational evidence when the required intended environment/operator support is available;
-3. progress low-risk S1 evidence while S0 remains unresolved and the required external identity evidence is available;
+3. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
 4. define a finite P4 evaluation tranche through an explicit roadmap decision before any compact-surface implementation is attempted;
-5. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
+5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
