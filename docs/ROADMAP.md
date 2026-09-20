@@ -55,7 +55,7 @@ Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 DONE         S0 
 
 Q0 established the post-audit runtime trust baseline. New bounded product work may proceed only when its own finite roadmap tranche is explicitly defined and eligible.
 
-Public-directory eligibility is a distribution gate. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
+Public-directory approval remains an external review risk. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering. After the 2026-09-20 pre-review clarification recorded in issue #58, it also does not create a separate pre-approval prerequisite for C7/C8 preparation: actual OpenAI review is the point that resolves final eligibility.
 
 ## Cross-cutting quality assurance
 
@@ -345,7 +345,7 @@ Further formula/schema ideas remain deferred until an explicit roadmap decision 
 
 Goal: provide compact semantic document context and progressive discovery that expose useful stable relationships/UI state without indiscriminate row disclosure or guessed normalization.
 
-Integrated tranche review: **PASS** against exact `main` `9aa5cc42edcf1306c2d14b742a1deefa40dfdf43`. The integrated UI/relation normalizers fail closed with explicit incompleteness markers, progressive help derives operation metadata from the normative registry, `inspect_document` does not load user-table rows, and credential-derived contexts/caches remain principal-isolated. No committed P3 slice remains.
+Integrated tranche review: **PASS** against exact `main` `9aa5cc42edcf1306c2d14b742a1deefa40dfdf43`. The integrated UI/relation normalizers fail closed with explicit incompleteness markers, progressive help derives operation metadata from the normative registry, `inspect_document` does not load user-table rows, and credential-derived contexts/caches remain principal-isolated. No committed P3 work remains.
 
 Integrated normalized UI slice:
 
@@ -458,19 +458,29 @@ These are architectural boundaries, not deferred feature requests:
 
 ### S0 — public-plugin eligibility
 
-**Status: BLOCKED / HUMAN-INSTITUTIONAL GATE**  
+**Status: ACTIVE — final eligibility is an external OpenAI review decision; no separate pre-review blocker**  
 **Priority: highest only for public OpenAI directory publication**
 
-S0 blocks public publication and publication-specific reviewer investment. It does **not** block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
+Issue #58 records the 2026-09-20 clarification attempt using a real MCP-only draft. Durable non-secret evidence now includes:
 
-The unresolved question is whether OpenAI will accept this independent Grist Community integration under its current rule against plugins whose primary function is acting as unofficial connectors to third-party services.
+- creation of a real MCP-only submission draft;
+- successful verification of `grist-chatgpt.loeildumaitre.fr`;
+- successful portal Tool Scan for that draft;
+- OpenAI AI-assisted support declining to pre-confirm public eligibility outside actual review;
+- support describing the bounded architecture as materially different from a generic relay/proxy while noting that final reviewers may still apply the guideline's primary-function test.
 
-Resolve a durable path before public submission is treated as viable:
+This evidence is **not approval**. It establishes instead that no available pre-review mechanism can durably mark S0 PASS. Actual OpenAI app/plugin review is the decision point.
 
-1. obtain written OpenAI clarification that the product is eligible; and, only if required,
-2. obtain the relevant Grist Labs / DINUM authorization basis.
+Operational consequences:
 
-Issue #58 contains the exact clarification package. Do not claim an official relationship that has not been explicitly established.
+- S0 no longer blocks C7 reviewer-environment preparation or C8 package preparation as a circular prerequisite;
+- public approval must still never be described as guaranteed;
+- preserve the independent/non-official positioning;
+- describe the submission as a specific bounded workflow/product with explicit authorization and safety constraints rather than a generic relay/connector;
+- keep any Grist Labs / DINUM permission or branding evidence separate and factual; do not invent affiliation;
+- if actual review rejects the primary-function classification or requires materially different rights/product behavior, that outcome becomes new external evidence for an explicit human/product roadmap decision.
+
+S0 is resolved only by the actual OpenAI review outcome or a later explicit product decision based on that outcome. There is no further autonomous pre-approval task under S0.
 
 ### S1 — low-risk OpenAI submission protocol preparation
 
@@ -488,7 +498,8 @@ Completed:
 - fixed internal `RenameColumn` / `RemoveTable` operations now discard raw Grist `/apply` engine responses and return only bounded semantic acknowledgements with stable target identifiers;
 - success-only record/schema update and delete operations discard upstream success bodies and return bounded acknowledgements containing only the exact requested stable targets; create operations project successful upstream results to functional table/column/record IDs and mark successful but unexpectedly shaped responses with `resultNormalizationIncomplete: true` instead of forwarding arbitrary engine fields;
 - safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected;
-- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract.
+- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract;
+- real MCP-only submission draft created, with successful domain verification and portal Tool Scan recorded in issue #58.
 
 Exit criteria:
 
@@ -500,19 +511,23 @@ Committed remaining S1 work:
 
 1. prove and record UserInfo `email` with `email_verified: true` on the final reviewer-compatible path.
 
-The production OpenAI domain token does not yet exist. Activating the already-prepared challenge endpoint with that future exact token is an external-triggered C8/submission action, not recurring S1 work.
+Domain verification and Tool Scan have already succeeded for the current real draft as recorded in issue #58. Repeat or refresh those portal checks only if the final endpoint/contract or portal requires it; do not treat them as recurring S1 work.
 
 ### C7 — reviewer environment
 
-**Status: BLOCKED by C5 and S0 viability; final auth path also depends on production C4**
+**Status: BLOCKED by C5; final auth path also depends on production C4**
 
-Required only if S0 becomes viable. The reviewer path must use synthetic data and ready-to-use credentials without MFA/SMS/email-confirmation/private-network dependencies, while not weakening normal production authentication.
+C7 no longer waits for a separate S0 pre-approval. Once C4/C5 permit a production-safe reviewer path, provision synthetic data and ready-to-use reviewer credentials without MFA/SMS/email-confirmation/private-network dependencies, while not weakening normal production authentication.
+
+C7 must also execute the canonical reviewer cases against the isolated fixture and record the final reviewer-compatible UserInfo evidence required by S1.
 
 ### C8 — publisher/submission package
 
-**Status: BLOCKED by S0, C6 and C7**
+**Status: BLOCKED by C6 and C7**
 
-Final package includes the current production MCP URL, Tool Scan, domain challenge, publisher/legal metadata, annotations and justifications, reviewer credentials/instructions, demo recording and the exact current review-test package.
+C8 no longer waits for a separate S0 pre-approval. The actual submission/review is how the remaining S0 eligibility question is resolved.
+
+Final package includes the current production MCP URL, current Tool Scan/domain state, publisher/legal metadata, annotations and justifications, reviewer credentials/instructions, demo recording and the exact current review-test package. Issue #58 already records successful Tool Scan and domain verification for the current draft; refresh them only as needed for the exact final endpoint/contract.
 
 Initial submission remains MCP-only. Custom UI and skills are not required.
 
@@ -531,7 +546,7 @@ Preferred steady state after P1 completion:
 ```text
 Worker A: P4-E1 bounded compact-surface evaluation
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
-Controller: integration, review/dependency control, human gates, S0/S1 coordination
+Controller: integration, review/dependency control, S1/C7/C8 coordination and human gates
 ```
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
@@ -543,7 +558,9 @@ When multiple actions are eligible, prefer:
 1. close a ready existing dependency or prior-execution review-required PR;
 2. progress P4-E1's bounded evaluation-only slice without changing the public v1 contract;
 3. progress independent C4 operational evidence when the required intended environment/operator support is available;
-4. progress low-risk S1 evidence while S0 remains unresolved and the required external identity evidence is available;
-5. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
+4. progress low-risk S1 evidence when the required external identity evidence is available;
+5. after C4/C5 permit it, progress C7 reviewer-environment evidence without waiting for a separate S0 pre-approval;
+6. after C6/C7, finalize C8 and use actual OpenAI review as the S0 decision point;
+7. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
