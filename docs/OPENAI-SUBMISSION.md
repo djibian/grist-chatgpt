@@ -29,7 +29,7 @@ After receiving the concrete architecture, support mapped the fixed single-insta
 
 Operational consequence: there is no separate pre-review `PASS` available for S0. The actual public review is the decision point. This is **not an approval** and must never be represented as one.
 
-Submission copy must therefore describe the distinct bounded product workflow accurately — inspecting, structuring and maintaining Grist documents with semantic, verified operations and server-side safety controls — rather than presenting the product as a generic “Grist connector”. The repository remains explicitly independent/non-official unless a durable authorization basis says otherwise.
+Submission copy must therefore describe the distinct bounded product workflow accurately — inspecting, structuring and maintaining Grist documents with bounded semantic operations and server-side safety controls — rather than presenting the product as a generic “Grist connector”. The repository remains explicitly independent/non-official unless a durable authorization basis says otherwise.
 
 Issue #58 records the durable clarification. Any Grist Labs / DINUM / La Suite numérique or operator permission and branding basis must be factual, separately evidenced and no broader than what was actually granted.
 
@@ -154,7 +154,8 @@ On 2026-09-20 the real portal-issued token was configured only in the protected 
 - real ChatGPT OAuth interoperability POC;
 - real OpenAI MCP-only draft created;
 - current draft hostname successfully domain-verified;
-- current Tool Scan completed successfully, with non-blocking `outputSchema` recommendations remaining as contract-quality follow-up;
+- current Tool Scan completed successfully;
+- formal `outputSchema` coverage remains incomplete for several non-UI tools and is tracked separately as contract-quality follow-up;
 - pre-review support clarification recorded in issue #58: no pre-approval is available, the architecture is materially different from a generic pass-through proxy, and the primary-function classification remains a review-time decision.
 
 ### Low-risk work that may proceed independently
@@ -191,7 +192,7 @@ A real draft already exists. Once the production/reviewer environment is ready:
 2. Set the final production universal MCP URL.
 3. Configure OAuth and provide reviewer demo credentials/instructions.
 4. If the final hostname differs from the currently verified draft host, configure only the exact portal-issued challenge token for that host, deploy it and complete domain verification again.
-5. Run Tool Scan on the final endpoint and resolve blocking findings; treat `outputSchema` recommendations as bounded contract-quality work rather than inventing unstable schemas.
+5. Run Tool Scan on the final endpoint and resolve blocking findings. Separately, add formal `outputSchema` only where the normalized result contract is intentionally stable; do not invent unstable schemas.
 6. Fill public listing metadata/policy URLs/availability/release notes/starter prompts using bounded-workflow positioning and accurate affiliation language.
 7. Add the canonical exact 5 positive and 3 negative tests with expected behavior and the demo recording URL.
 8. Submit for review. This review is the final S0 eligibility decision point.
@@ -230,4 +231,4 @@ Start each run from the documented clean fixture and use an operator-managed res
 
 ## Output-schema follow-up
 
-Formal MCP `outputSchema` remains incomplete for several non-UI tools. The current portal Tool Scan succeeds but recommends `outputSchema` for affected tools. Recent data-minimization work means many record/schema update/delete service results are already semantic bounded acknowledgements rather than raw upstream payloads, but formal schemas should be added only when the normalized result contract is intentionally stable. Creation tools must preserve the functional created identifiers needed for later calls while avoiding unnecessary engine-only data.
+Formal MCP `outputSchema` remains incomplete for several non-UI tools. The current portal Tool Scan succeeds. Separately, repository contract review shows that formal `outputSchema` coverage remains incomplete for several non-UI tools. Recent data-minimization work means many record/schema update/delete service results are already semantic bounded acknowledgements rather than raw upstream payloads, but formal schemas should be added only when the normalized result contract is intentionally stable. Creation tools must preserve the functional created identifiers needed for later calls while avoiding unnecessary engine-only data.
