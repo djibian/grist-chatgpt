@@ -3,6 +3,10 @@ import * as z from "zod/v4";
 
 import type { GristService } from "../grist/service.js";
 import { getMcpToolMetadata } from "../operations/registry.js";
+import {
+  columnMutationFieldsSchema,
+  tableMutationFieldsSchema
+} from "../operations/schemaMutationContract.js";
 import { errorResult, textResult } from "./results.js";
 
 type SchemaOperations = Pick<
@@ -28,14 +32,13 @@ export function registerSchemaTools(
   grist: SchemaOperations,
   maxSchemaItems: number
 ): void {
-  const fieldsSchema = z.record(z.string(), z.unknown());
   const columnSpecSchema = z.object({
     id: z.string().min(1),
-    fields: fieldsSchema.optional()
+    fields: columnMutationFieldsSchema.optional()
   });
   const columnUpdateSchema = z.object({
     id: z.string().min(1),
-    fields: fieldsSchema
+    fields: columnMutationFieldsSchema
   });
   const tableSpecSchema = z.object({
     id: z.string().min(1),
@@ -43,7 +46,7 @@ export function registerSchemaTools(
   });
   const tableUpdateSchema = z.object({
     id: z.string().min(1),
-    fields: fieldsSchema
+    fields: tableMutationFieldsSchema
   });
 
   server.registerTool(
