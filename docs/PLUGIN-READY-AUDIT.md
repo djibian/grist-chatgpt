@@ -2,7 +2,7 @@
 
 **Status:** current submission-readiness audit  
 **Audit date:** 2026-09-20  
-**Audit baseline:** `main` at `984edb61508927e44d5ae3b4cefd27ebbde66be9` plus the 2026-09-20 OpenAI draft/support evidence recorded in issue #58  
+**Audit baseline:** `main` at `2e2a9a6457a709fce630d7c1e21a0e12eb5a58d8` plus the 2026-09-20 OpenAI draft/support evidence recorded in issue #58  
 **Official requirements rechecked:** OpenAI plugin guidelines, remote MCP submission, authentication and submission errors on 2026-09-19.
 
 This document is an assessment. It does not select credential persistence/encryption, add scopes, claim authorization from Grist Labs/DINUM, or create an institutional commitment.
@@ -49,7 +49,7 @@ Official references rechecked:
 | Synthetic reviewer Grist fixture | MISSING | Canonical fixture requirements are specified but no isolated reviewer account/document is claimed provisioned. |
 | Exactly 5 positive + 3 negative tests | PASS for specification/package | Canonical scenarios are documented in `OPENAI-REVIEWER-TESTS.md`, represented in `chatgpt-app-submission.json` and locked by repository tests; live reviewer-fixture execution remains pending. |
 | Domain verification route | PASS for current draft host | Optional exact-token route is implemented; a real portal-issued token was configured only in protected deployment state and `grist-chatgpt.loeildumaitre.fr` was successfully verified on 2026-09-20. Re-verify if the final hostname changes. |
-| Tool scan | PASS for current draft endpoint | Real portal Tool Scan succeeds. Non-blocking recommendations to add `outputSchema` remain contract-quality follow-up and final production-endpoint scan is still required. |
+| Tool scan | PASS for current draft endpoint | Real portal Tool Scan succeeds. Formal `outputSchema` coverage gaps are separately tracked as contract-quality follow-up; final production-endpoint scan is still required. |
 | Public website/support/privacy/terms | MISSING | Final HTTPS URLs must match the verified publisher identity. |
 | Output/data minimization | PARTIAL / materially advanced | Public table/column metadata and success-only update/delete/apply results are projected to bounded functional data. Creation results still intentionally preserve functional created IDs; final create-result normalization/outputSchema review remains useful. |
 | Developer/business identity verification | HUMAN / UNKNOWN | Must be completed in the OpenAI Platform organization used for submission. |
