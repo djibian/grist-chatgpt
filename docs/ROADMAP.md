@@ -100,7 +100,7 @@ No fourth cleanup slice is committed. Generic cleanup, style-only, broad rewrite
 Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
-- P4's former P1/Q0/P2/P3 dependency chain is satisfied, but P4 remains blocked until its evaluation tranche has an explicit finite completion path rather than being expanded implicitly;
+- P4's former P1/Q0/P2/P3 dependency chain is satisfied and its finite evaluation-only tranche is eligible; no runtime/public-contract migration is implied by that evaluation;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -390,7 +390,7 @@ Deferred P3 candidates — not autonomously eligible unless explicitly promoted:
 
 ### P4 — compact MCP surface
 
-**Status: BLOCKED pending an explicit finite P4 evaluation contract; Q0 and P1/P2/P3 prerequisites are satisfied**  
+**Status: ELIGIBLE**  
 **Priority: medium**
 
 Goal: evaluate whether the public surface should converge from many narrow tools toward a smaller user-intent surface such as records/schema/pages managers while preserving:
@@ -403,7 +403,19 @@ Do not create a broad multi-action super-tool or pseudo-transaction that obscure
 
 The existing public v1 operations remain the stable compatibility surface until a migration contract is explicitly designed and tested.
 
-The former P1 dependency is satisfied. Before P4 becomes autonomously ELIGIBLE, a separate roadmap decision must define its finite evaluation exit criteria and committed next work without silently changing the public v1 contract.
+Exit criteria:
+
+- the exact current v1 operation set is inventoried by category, capability and risk semantics, including read/write/destructive and partial/ambiguous-write behavior where material;
+- plausible compaction patterns are evaluated against per-operation MCP risk metadata, stable bounded intent, authorization capability boundaries, partial-success/replay semantics, progressive discovery and compatibility/data-minimization constraints;
+- one explicit decision is recorded: **KEEP** the current narrow v1 surface, or **MIGRATE** toward a precisely bounded alternative;
+- the evaluation itself changes no runtime behavior, public tool schema, OAuth scope or compatibility contract;
+- if the decision is MIGRATE, no implementation becomes eligible until a separate reviewed roadmap slice defines the exact migration/deprecation contract and tests; if the decision is KEEP, no speculative compaction work remains.
+
+Committed next P4 slices:
+
+1. **P4-E1 — bounded compact-surface evaluation** — document the exact current 23-operation surface, evaluate concrete grouping alternatives, and record a KEEP/MIGRATE decision with rationale. Documentation/evaluation only; no public tool or runtime change.
+
+No P4 implementation slice is committed by this setup decision.
 
 ### P5 — attachments
 
@@ -541,7 +553,7 @@ Normal maximum active development:
 Preferred steady state after P1 completion:
 
 ```text
-Worker A: next explicitly committed product tranche when finite and eligible
+Worker A: P4-E1 bounded compact-surface evaluation
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration, review/dependency control, human gates, S0/S1/C7/C8 coordination
 ```
@@ -553,9 +565,9 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress independent C4 operational evidence when the required intended environment/operator support is available;
-3. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
-4. define a finite P4 evaluation tranche through an explicit roadmap decision before any compact-surface implementation is attempted;
+2. progress P4-E1's bounded evaluation-only slice without changing the public v1 contract;
+3. progress independent C4 operational evidence when the required intended environment/operator support is available;
+4. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
 5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
