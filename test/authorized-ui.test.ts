@@ -231,7 +231,13 @@ test("widget creation resolves tableRef internally and returns the re-read widge
       type: "record",
       title: "Source",
       options: {},
-      sortColRefs: []
+      sortColRefs: [],
+      gridOptions: {
+        verticalGridlines: true,
+        horizontalGridlines: true,
+        zebraStripes: false,
+        rowNumbers: "number"
+      }
     }
   });
 });
@@ -297,7 +303,13 @@ test("widget title, description and same-table direct select-by are re-read and 
       description: "Résumé affiché",
       options: {},
       sortColRefs: [],
-      selectBy: { sourceSectionId: 11 }
+      selectBy: { sourceSectionId: 11 },
+      gridOptions: {
+        verticalGridlines: true,
+        horizontalGridlines: true,
+        zebraStripes: false,
+        rowNumbers: "number"
+      }
     }
   });
 });

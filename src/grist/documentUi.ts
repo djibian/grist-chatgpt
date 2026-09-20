@@ -3,6 +3,10 @@ import {
   type NormalizedCustomWidgetSettings
 } from "./customWidgetSettings.js";
 import {
+  normalizeGridOptions,
+  type NormalizedGridOptions
+} from "./gridOptions.js";
+import {
   directSelectByValidator,
   discoverColumnSelectByOptions,
   type ColumnSelectByInput
@@ -48,6 +52,8 @@ export interface GristPageWidget {
   selectByNormalizationIncomplete?: boolean;
   customWidgetSettings?: NormalizedCustomWidgetSettings;
   customWidgetSettingsNormalizationIncomplete?: true;
+  gridOptions?: NormalizedGridOptions;
+  gridOptionsNormalizationIncomplete?: true;
 }
 
 export interface GristPage {
@@ -193,6 +199,8 @@ export class DocumentUiService {
       if (normalizedCustomWidgetSettings) {
         Object.assign(widget, normalizedCustomWidgetSettings);
       }
+      const normalizedGridOptions = normalizeGridOptions(widget);
+      if (normalizedGridOptions) Object.assign(widget, normalizedGridOptions);
 
       const widgets = widgetsByPage.get(pageId) ?? [];
       widgets.push(widget);

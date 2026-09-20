@@ -7,6 +7,7 @@ import {
   MAX_CUSTOM_WIDGET_MAPPED_COLUMNS,
   MAX_CUSTOM_WIDGET_MAPPING_KEYS
 } from "../grist/customWidgetSettings.js";
+import { GRID_ROW_NUMBER_MODES } from "../grist/gridOptions.js";
 import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
@@ -75,6 +76,23 @@ const customWidgetSettingsUpdateSchema = z
   .refine(
     (value) => value.access !== undefined || value.columnsMapping !== undefined,
     "At least one of access or columnsMapping must be supplied."
+  );
+
+const gridOptionsUpdateSchema = z
+  .object({
+    verticalGridlines: z.boolean().optional(),
+    horizontalGridlines: z.boolean().optional(),
+    zebraStripes: z.boolean().optional(),
+    rowNumbers: z.enum(GRID_ROW_NUMBER_MODES).optional()
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.verticalGridlines !== undefined ||
+      value.horizontalGridlines !== undefined ||
+      value.zebraStripes !== undefined ||
+      value.rowNumbers !== undefined,
+    "At least one grid display option must be supplied."
   );
 
 export function registerUiTools(server: McpServer, grist: UiOperations): void {
@@ -169,7 +187,8 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           .strict()
           .nullable()
           .optional(),
-        customWidgetSettings: customWidgetSettingsUpdateSchema.optional()
+        customWidgetSettings: customWidgetSettingsUpdateSchema.optional(),
+        gridOptions: gridOptionsUpdateSchema.optional()
       }),
       outputSchema: widgetMutationOutputSchema
     },
@@ -182,7 +201,8 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
       chartType,
       sort,
       selectBy,
-      customWidgetSettings
+      customWidgetSettings,
+      gridOptions
     }) => {
       try {
         if (
@@ -191,10 +211,11 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           chartType === undefined &&
           sort === undefined &&
           selectBy === undefined &&
-          customWidgetSettings === undefined
+          customWidgetSettings === undefined &&
+          gridOptions === undefined
         ) {
           throw new Error(
-            "At least one of title, description, chartType, sort, selectBy or customWidgetSettings must be supplied."
+            "At least one of title, description, chartType, sort, selectBy, customWidgetSettings or gridOptions must be supplied."
           );
         }
         const normalizedCustomWidgetSettings =
@@ -208,6 +229,23 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
                   ? { columnsMapping: customWidgetSettings.columnsMapping }
                   : {})
               };
+        const normalizedGridOptions =
+          gridOptions === undefined
+            ? undefined
+            : {
+                ...(gridOptions.verticalGridlines !== undefined
+                  ? { verticalGridlines: gridOptions.verticalGridlines }
+                  : {}),
+                ...(gridOptions.horizontalGridlines !== undefined
+                  ? { horizontalGridlines: gridOptions.horizontalGridlines }
+                  : {}),
+                ...(gridOptions.zebraStripes !== undefined
+                  ? { zebraStripes: gridOptions.zebraStripes }
+                  : {}),
+                ...(gridOptions.rowNumbers !== undefined
+                  ? { rowNumbers: gridOptions.rowNumbers }
+                  : {})
+              };
         const update: PageWidgetUpdateInput = {
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
@@ -216,6 +254,9 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
           ...(selectBy !== undefined ? { selectBy } : {}),
           ...(normalizedCustomWidgetSettings !== undefined
             ? { customWidgetSettings: normalizedCustomWidgetSettings }
+            : {}),
+          ...(normalizedGridOptions !== undefined
+            ? { gridOptions: normalizedGridOptions }
             : {})
         };
         const output = widgetMutationOutputSchema.parse(
