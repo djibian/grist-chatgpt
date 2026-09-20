@@ -185,6 +185,7 @@ The bounded UI layer now includes:
 
 - normalized page/widget inspection;
 - bounded normalized page-layout inspection through stable current widget IDs, with collapsed/unplaced IDs and explicit incompleteness instead of guessed state;
+- bounded page-layout mutation through an exact placed/collapsed partition of stable current widget IDs, bounded size/depth/count semantics and exact normalized post-write verification;
 - empty page creation;
 - supported native widget creation;
 - page rename;
@@ -200,7 +201,7 @@ The bounded UI layer now includes:
 
 Discovery/mutation enforce bounded layout/option/candidate/schema limits, reject unsupported, ambiguous or incomplete state before safety-sensitive writes, and never expose arbitrary metadata-table writes, custom-option payloads or arbitrary UserActions.
 
-The remaining committed P1 slice is bounded page-layout mutation. It is not part of `main` until its review/integration gate passes; broader destructive UI surfaces remain outside the current integrated contract.
+P1 document-UI parity has passed its integrated completion review on exact `main` `bc44d1f03d30db2e0e3951c96a06cc7ae113548e`. Broader destructive UI surfaces remain outside the integrated contract and human-gated where documented by the roadmap.
 
 ### Semantic document context
 
@@ -308,7 +309,7 @@ The bridge excludes generic HTTP forwarding, raw SQL, arbitrary `/apply`/UserAct
 4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto/ProConnect OAuth path with repeatable deployment/rotation/outage evidence.
 5. **C5 BLOCKED by C4 + human persistence/encryption decisions:** secure per-user Grist credential lifecycle.
 6. **C6 preparation integrated; finalization blocked by C4/C5:** rate limits, operational metrics/alerts, rotation and controlled release evidence.
-7. **P1 ELIGIBLE:** only its committed bounded page-layout mutation slice remains; **P2 and P3 are DONE** and P4 waits for P1's integrated completion review.
+7. **P1 / P2 / P3 DONE:** bounded document UI, formula/schema safety and semantic context/discovery have passed their integrated completion reviews. P4's former dependency chain is satisfied, but P4 remains blocked until a separate finite evaluation contract is explicitly defined.
 8. S0 public-directory eligibility remains a separate human/institutional distribution gate.
 
 ## Architectural invariant
