@@ -6,7 +6,7 @@ Purpose: satisfy the bounded S1 review of the current model-visible operation ou
 
 ## Scope
 
-The audit covers the 22 operations in the normative operation registry and the common MCP error mapper:
+The audit covers the 22 operations in the normative operation registry at its recorded audit baseline and the common MCP error mapper:
 
 - discovery: `list_documents`, `list_tables`, `list_columns`;
 - data: `query_records`, `create_records`, `update_records`, `delete_records`;
@@ -16,7 +16,7 @@ The audit covers the 22 operations in the normative operation registry and the c
 - utility: `grist_help`;
 - failure responses produced by `errorResult`.
 
-This is a current-surface audit. Deferred operations and hypothetical P4/P5/P6 surfaces are out of scope.
+This is a current-surface audit for that exact historical baseline. Deferred operations and hypothetical P4/P5/P6 surfaces were out of scope of the audit itself. `update_page_layout` was added later under the same bounded normalized-UI/minimization rules and is included in the subsequent P4-E1 surface evaluation.
 
 ## Results by surface
 
@@ -65,10 +65,16 @@ Finding **S1-OUT-1 — accepted compatibility debt**:
 
 - do not remove these fields inside S1 because the repository explicitly documents them as v1 compatibility state and silent removal would be a breaking public-contract change;
 - do not add new product behavior that depends on the raw compatibility fields when a normalized stable-ID equivalent exists;
-- treat removal/deprecation of these fields as part of the explicit P4 compact-surface/migration contract, where compatibility can be versioned and tested deliberately;
 - new UI capabilities should extend the normalized bounded view rather than add new arbitrary raw option payloads.
 
-Disposition: **explicitly dispositioned; no S1 runtime patch**.
+P4-E1 follow-up, evaluated against exact `main` `d6375dc56179258218792740f1fb37ab1cffd1e3`:
+
+- P4-E1 selects **KEEP** for the current 23-operation narrow v1 execution surface;
+- that decision does not silently remove or rewrite the raw v1 compatibility fields identified here;
+- `S1-OUT-1` therefore remains accepted v1 compatibility debt rather than an implicit P4 implementation task;
+- any future removal/deprecation of those fields requires a separate explicit versioned output migration/deprecation contract and tests.
+
+Disposition: **explicitly dispositioned; no S1 or P4-E1 runtime patch**.
 
 ### Progressive help
 
@@ -84,6 +90,6 @@ Disposition: **pass for the current mapper**. Future error types must preserve t
 
 ## Audit conclusion
 
-The current public surface satisfies the S1 minimization audit with one concrete compatibility finding, `S1-OUT-1`, explicitly dispositioned to the future P4 migration contract. No current success/error output was found to expose Grist API keys, OAuth credentials, raw arbitrary upstream success bodies or indiscriminately loaded user rows.
+The recorded public surface satisfies the S1 minimization audit with one concrete compatibility finding, `S1-OUT-1`. P4-E1 subsequently evaluates the now-23-operation execution surface and selects KEEP; the finding remains deliberately retained for v1 and is not converted into a silent breaking change. No current success/error output was found to expose Grist API keys, OAuth credentials, raw arbitrary upstream success bodies or indiscriminately loaded user rows.
 
-No runtime change is required by this audit. The remaining S1 evidence item is external: prove and record `email` with `email_verified: true` on the final reviewer-compatible UserInfo path.
+No runtime change is required by this audit or by P4-E1. The remaining S1 evidence item is external: prove and record `email` with `email_verified: true` on the final reviewer-compatible UserInfo path.
