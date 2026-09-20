@@ -2,7 +2,7 @@
 
 **Status:** current submission-readiness audit  
 **Audit date:** 2026-09-20  
-**Audit baseline:** `main` at `2e2a9a6457a709fce630d7c1e21a0e12eb5a58d8` plus the 2026-09-20 OpenAI draft/support evidence recorded in issue #58  
+**Audit baseline:** `main` at `91e2e95d40ca47144f7a4770ad353e36d538f27f` plus the 2026-09-20 OpenAI draft/support evidence recorded in issue #58  
 **Official requirements rechecked:** OpenAI plugin guidelines, remote MCP submission, authentication and submission errors on 2026-09-19.
 
 This document is an assessment. It does not select credential persistence/encryption, add scopes, claim authorization from Grist Labs/DINUM, or create an institutional commitment.
