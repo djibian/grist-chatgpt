@@ -281,6 +281,18 @@ export const OPERATION_REGISTRY: readonly OperationDefinition[] = [
       "Rename exactly one existing Grist page and verify the requested name by re-reading the document UI."
   },
   {
+    name: "update_page_layout",
+    category: "ui",
+    capability: "doc.schema:write",
+    readOnly: false,
+    destructive: true,
+    openWorld: false,
+    title: "Update a page layout",
+    summary: "Rearrange one page using stable current widget IDs.",
+    description:
+      "Replace only the layout of one explicitly identified Grist page using the bounded normalized layout tree returned by page inspection. Every current widget must be accounted for exactly once as placed or collapsed; unknown, duplicate, omitted or unbounded layout nodes are rejected. The bridge converts stable widget IDs to Grist's private layout representation and verifies the exact normalized layout after re-read."
+  },
+  {
     name: "update_page_widget",
     category: "ui",
     capability: "doc.schema:write",
