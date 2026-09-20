@@ -114,6 +114,27 @@ After opening or updating such a PR, that Controller may continue with genuinely
 
 A fresh Controller execution should treat review-ready open PRs as high-priority existing work after the startup coherence pass. It reconstructs the exact head, reads the normative documents, inspects the complete diff plus relevant surrounding code/tests, and performs an adversarial review.
 
+### Review gate versus Controller execution gate
+
+A review gate is a **PR transition gate**, not a Controller execution gate.
+
+When the current Controller has materially authored or modified a review-required PR head, that PR becomes **frozen for independent review for the remainder of the current execution**. The Controller must not issue `PASS` for that head and must not merge it.
+
+This condition **must never by itself cause the Controller execution to stop**.
+
+After freezing such a PR, the Controller MUST:
+
+1. leave the PR unchanged unless a newly discovered correctness or safety issue requires repair;
+2. immediately reconstruct the remaining eligible work from the current exact GitHub state and `docs/ROADMAP.md`;
+3. select the highest-value useful non-overlapping work according to the normal eligibility and priority rules;
+4. continue implementation, recovery, documentation or other eligible work until either:
+   - a documented human gate or required external/operator action blocks the remaining useful work; or
+   - no useful eligible non-overlapping work remains.
+
+The inability to merge one PR during the current execution does not justify stopping while another independent useful tranche remains eligible.
+
+If repairing the frozen PR becomes necessary, the Controller may do so, but the resulting new head remains review-required and frozen for independent review in that execution. A Controller should therefore normally leave one or more independently reviewable PRs behind rather than stop immediately after creating the first review-required PR.
+
 ### Review scope
 
 The Reviewer should actively look for, where relevant:
@@ -265,7 +286,7 @@ When several items are eligible, the Controller should choose without asking the
 6. smaller bounded slices over speculative broad rewrites;
 7. low-risk preparation while a higher-priority item is externally blocked.
 
-A Controller that has authored a review-required head may skip its merge and continue other independent work; the existence of that pending review does not force the execution to stop when useful non-overlapping work remains.
+After reaching a local review gate on a PR authored or materially modified by the current execution, the Controller MUST immediately resume work selection from the remaining eligible roadmap. Pending independent review is never an execution stop condition unless no other useful eligible non-overlapping work remains.
 
 Do not select a lower-value task merely because it is easier to automate.
 
@@ -363,14 +384,14 @@ The Controller should:
 7. choose and assign the best eligible work itself using the roadmap and selection rules above;
 8. prefer finishing existing/recoverable work before spawning unnecessary new branches;
 9. keep normally at most two independent Worker slots active, selecting different roadmap axes when that improves throughput and does not create races;
-10. when this execution authors a review-required PR head, do not merge it; use remaining execution time for genuinely independent work when useful;
+10. when this execution authors a review-required PR head, freeze that PR for independent review and immediately return to selection of useful independent work; do not merge it in this execution;
 11. use CI wait time to review eligible prior-execution work or progress genuinely independent work;
 12. after every durable transition, resolve `main` again and rebuild the relevant mutable state;
 13. require a PR itself to update any public contract/configuration, security/architecture invariant, human gate or roadmap status/dependency that changes because of that PR, but do not require a global documentation reconciliation after every merge;
 14. never let a known stale roadmap status/dependency or stale review/CI evidence drive subsequent work;
 15. require a fresh integrated tranche review before declaring a major tranche DONE or unlocking a dependent tranche as described above;
-16. continue while a useful eligible action exists;
-17. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful/pending independent review with no other useful work available.
+16. continue while a useful eligible action exists, including after reaching a local review gate on another PR;
+17. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful/pending independent review with no other useful eligible non-overlapping work available.
 
 The Controller must never infer project state from another chat's narrative when GitHub can provide the current fact.
 
