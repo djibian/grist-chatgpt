@@ -20,6 +20,10 @@ import {
   type CustomWidgetSettingsUpdateInput
 } from "./customWidgetSettingsUpdate.js";
 import {
+  resolveGridOptionsUpdate,
+  type GridOptionsUpdateInput
+} from "./gridOptions.js";
+import {
   assertDirectSelectByAllowed,
   resolveColumnSelectByAllowed,
   type ColumnSelectByInput
@@ -49,6 +53,7 @@ export interface PageWidgetUpdateInput {
   sort?: readonly WidgetSortInput[] | null;
   selectBy?: ColumnSelectByInput | null;
   customWidgetSettings?: CustomWidgetSettingsUpdateInput;
+  gridOptions?: GridOptionsUpdateInput;
 }
 
 function sameSortSpec(
@@ -290,7 +295,8 @@ export class AuthorizedGristService {
       update.chartType === undefined &&
       update.sort === undefined &&
       update.selectBy === undefined &&
-      update.customWidgetSettings === undefined
+      update.customWidgetSettings === undefined &&
+      update.gridOptions === undefined
     ) {
       throw new Error("At least one widget UI field must be updated.");
     }
@@ -342,7 +348,7 @@ export class AuthorizedGristService {
         adapterUpdate.sortColRefs = expectedSortColRefs;
       }
 
-      const expectedOptions =
+      let expectedOptions =
         update.customWidgetSettings !== undefined
           ? resolveCustomWidgetSettingsUpdate(
               target,
@@ -350,6 +356,14 @@ export class AuthorizedGristService {
               update.customWidgetSettings
             )
           : undefined;
+      if (update.gridOptions !== undefined) {
+        expectedOptions = resolveGridOptionsUpdate(
+          expectedOptions !== undefined
+            ? { ...target, options: expectedOptions.options }
+            : target,
+          update.gridOptions
+        );
+      }
       if (expectedOptions !== undefined) {
         adapterUpdate.optionsJson = expectedOptions.optionsJson;
       }
@@ -396,7 +410,7 @@ export class AuthorizedGristService {
       await this.uiActions.updatePageWidget(id, widgetId, adapterUpdate);
       try {
         const afterTableResponse =
-          expectedOptions !== undefined
+          update.customWidgetSettings !== undefined
             ? await this.inner.listTables(id, { expandColumns: true })
             : undefined;
         const after = await this.loadDocumentUi(id, afterTableResponse);
