@@ -179,6 +179,27 @@ export class GristUiActionsAdapter {
     ]);
   }
 
+  async updatePageLayout(
+    documentId: string,
+    pageId: number,
+    layoutSpecJson: string
+  ): Promise<void> {
+    assertPositiveId(pageId, "Grist page ID");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(layoutSpecJson) as unknown;
+    } catch {
+      throw new Error("Trusted page layout payload must be valid JSON.");
+    }
+    if (!record(parsed)) {
+      throw new Error("Trusted page layout payload must encode a JSON object.");
+    }
+
+    await this.client.applyUserActions(documentId, [
+      ["UpdateRecord", "_grist_Views", pageId, { layoutSpec: layoutSpecJson }]
+    ]);
+  }
+
   async updatePageWidget(
     documentId: string,
     widgetId: number,
