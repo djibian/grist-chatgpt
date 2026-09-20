@@ -2,70 +2,57 @@
 
 This file is the operational contract for autonomous work on `djibian/grist-chatgpt`.
 
-## Authority
+## Core invariants
+
+These invariants have priority over procedural convenience.
+
+### G1 — GitHub/main is project state
 
 - `main` is the only durable source of truth for integrated project state.
-- At the start of every execution, resolve the exact SHA of `main` and read this file, `docs/PRODUCT_VISION.md` and `docs/ROADMAP.md` from that exact SHA.
-- Reconstruct mutable GitHub facts instead of trusting remembered state: open PRs, exact PR heads, Draft/Ready state, CI, reviews, issues, dependencies, all remote branches and current `main`.
-- The state of one agent/chat/controller execution is never project state.
+- At the start of every execution, resolve the exact SHA of `main` and read `AGENTS.md`, `docs/PRODUCT_VISION.md` and `docs/ROADMAP.md` from that exact SHA.
+- Reconstruct mutable GitHub facts instead of trusting remembered state: open PRs, exact PR heads, Draft/Ready state, exact-head CI, reviews/comments, issues, dependencies, all remote branches and current `main`.
+- A chat, agent memory or previous Controller narrative is never project state.
+- Evidence attached to an older PR head is not evidence for the current head.
 
-## Single-entry controller mode
+### G2 — One stable Controller entry point
 
-The normal user-facing entry point is one stable Controller invocation, not a succession of task-specific Worker prompts.
-
-A sufficient invocation is:
+The normal user-facing entry point is:
 
 ```text
 You are the Controller of djibian/grist-chatgpt. Execute AGENTS.md from the current GitHub state and continue useful eligible work from docs/ROADMAP.md until a human gate is reached or no useful eligible work remains.
 ```
 
-The Controller must derive the current work plan from GitHub plus the authoritative repository documents. The user should not need to choose a tranche, branch or Worker prompt when those choices are already determined by the roadmap and current state.
+The Controller derives tranche choice, Worker mandates, review scheduling and integration from GitHub plus the authoritative repository documents. The user should not have to provide task-specific Worker/Reviewer prompts when the repository already determines the next action.
 
-The Controller owns Worker assignment. When independent work exists, it should select the most useful eligible tranches, define bounded Worker mandates, and coordinate their PRs. A Worker mandate is ephemeral execution context, not project state, and should be generated from the current exact `main` rather than copied from an old chat.
+If parallel agents are unavailable, preserve the same logical boundaries sequentially. Do not create a hidden orchestration database or state machine.
 
-If the execution environment cannot actually spawn parallel agents, the Controller should preserve the same logical Worker boundaries while progressing the selected tranches sequentially. Do not invent a separate orchestration database or hidden state machine: GitHub, this file and `docs/ROADMAP.md` remain the coordination system.
-
-A human should be interrupted only when a documented human gate is reached, when external/operator action is genuinely required, or when the authoritative documents are insufficient to make a safe decision. In that case, return the smallest concrete decision/action package needed to resume.
-
-## Roles
-
-The normal operating model is:
-
-- one **Controller** conversation responsible for global state, eligibility, dependency ordering, Worker assignment, review and integration;
-- normally two active **Workers**, with a third only when the work is demonstrably independent;
-- Workers implement one bounded chantier each and open/update PRs; they do not merge their own work;
-- the Controller may code when useful, but should prefer coordination when independent worker work exists.
-
-Agents must not spend effort discovering whether other chats/agents exist. GitHub state is the coordination medium.
-
-## Branch and PR discipline
+### G3 — PRs are the unit of integration
 
 - Never implement directly on `main`.
 - Use short-lived branches with one clear purpose.
-- A PR is the unit of integration.
-- Prefer small reviewable PRs over long stacked branches.
-- Do not build a long dependency chain of unmerged PRs when a ready dependency can be integrated first.
-- Close before open: if a PR is safely integrable and leaving it open has no useful purpose, integrate it before opening dependent work.
-- Keep dependencies explicit in the PR body when they exist.
+- Prefer small reviewable PRs to long dependency chains.
+- Finish/integrate existing eligible work before creating overlapping work.
+- Keep dependencies explicit in the PR body.
+- A PR body must state `Review gate: REQUIRED` or `Review gate: NOT REQUIRED` with a short reason. The Controller must independently verify that classification.
 
-## Optimistic concurrency
+### G4 — Durable actions use optimistic concurrency
 
-Before every durable transition that depends on repository state — push/update, Ready/Draft transition, merge, rebase-equivalent branch movement or dependency decision — re-check the relevant exact SHAs.
+Before every durable transition that depends on repository state — push/update, Ready/Draft transition, merge, rebase-equivalent movement, review decision or dependency decision — re-check the relevant exact SHAs.
 
-If `main` or a depended-on PR head moved from the value on which the action was based:
+If `main` or a depended-on PR head moved:
 
-1. stop the transition;
+1. stop that transition;
 2. reconstruct the relevant state;
-3. determine whether the work is still valid;
-4. adapt explicitly rather than force through a stale assumption.
+3. determine whether the work/evidence remains valid;
+4. adapt explicitly.
 
 Never use blind force updates to resolve semantic races.
 
-## CI gate
+### G5 — Exact-head CI is mandatory
 
-The repository CI is the integration gate. A PR is not eligible to merge unless the current exact PR head has a successful required CI run and no unresolved blocking review or known correctness issue.
+A PR is not eligible to merge unless the current exact head has successful required CI and no unresolved blocking review, thread or known correctness issue.
 
-Current baseline checks include:
+Baseline CI includes:
 
 - `npm ci`;
 - production dependency audit;
@@ -73,27 +60,112 @@ Current baseline checks include:
 - tests;
 - build.
 
-A stale green run on an older SHA is not evidence for the current head.
+A green run on an older SHA is stale.
 
-## Startup repository coherence gate
+### G6 — Significant changes require independent exact-head review
 
-Every Controller execution begins with one global repository-coherence pass **before selecting or spawning new roadmap work**. This startup gate is the recovery mechanism for interrupted or prematurely ended previous executions; correctness must not depend on a previous Controller reaching a clean shutdown step.
+CI verifies automated invariants; it does not provide independent reasoning about implementation and tests.
 
-The Controller must first reconstruct the current integrated and mutable state, then verify that the repository tells one materially consistent story.
+Independent review is **REQUIRED** for PRs that materially change:
 
-### Mutable-state reconstruction
+- runtime/business logic;
+- Grist read/write semantics or mutation behavior;
+- authorization, OAuth, credentials, principal isolation, security boundaries or secret handling;
+- the public MCP/GPT Actions/tool contract, operation registry or risk annotations;
+- normalization, stable-ID translation, partial/ambiguous-write handling or retry semantics;
+- non-trivial cross-module refactors;
+- deployment/runtime behavior whose failure could affect security or data integrity;
+- substantive P1/P2/P3 or equivalent product-capability slices;
+- this governance contract in a way that changes autonomous execution semantics.
 
-Inventory every remote branch, not only open PR heads. Classify each non-`main` branch as far as the available evidence permits, for example:
+Independent review is normally **NOT REQUIRED** for bounded low-risk non-behavioral changes such as typo/link fixes, straightforward current-state documentation synchronization, or mechanical repository hygiene.
+
+When uncertain, require review. Splitting a substantive change into small PRs does not remove the review requirement.
+
+A Controller execution that materially authored or modified a review-required exact head must not independently `PASS` or merge that head. A same-context self-review never satisfies the gate.
+
+Independence normally comes from a later fresh Controller execution. A genuinely isolated Reviewer subagent that did not participate in authoring the head may also satisfy the gate. GitHub identity may be the same; independence is about execution context, not account identity.
+
+### G7 — A PR review gate is not a Controller execution gate
+
+When the current execution materially authors or modifies a review-required PR head, that PR is frozen for independent review for the remainder of the execution.
+
+This condition **must never by itself stop the Controller**.
+
+After freezing such a PR, the Controller MUST return to current GitHub/roadmap state and continue the highest-value useful non-overlapping eligible work. It stops only when:
+
+- a documented human gate or required external/operator action blocks the remaining useful work; or
+- no useful eligible non-overlapping work remains.
+
+If the frozen PR must be repaired, the resulting new head remains review-required and frozen in that execution.
+
+### G8 — Human gates protect product/security decisions, not routine implementation
+
+Autonomous execution is encouraged for implementation within agreed architecture, tests, refactors, documentation, CI, bounded fixes and independent review.
+
+Do not decide autonomously unless already explicit in authoritative project documentation:
+
+- OAuth/identity-provider selection;
+- credential persistence/encryption/key-management architecture;
+- adding/removing public authorization scopes;
+- changing the per-user Grist credential model;
+- exposing a new generic or destructive capability;
+- weakening deployment/resource authorization;
+- changes creating new institutional obligations for DINUM;
+- public branding/publisher claims.
+
+When a human gate is reached, return the smallest concrete decision/action package needed to resume.
+
+## Roles and concurrency
+
+Normal operating model:
+
+- one **Controller** owns global state, eligibility, dependency ordering, Worker assignment, review scheduling and integration;
+- normally at most two active **Workers**, with a third only for demonstrably independent work;
+- Workers implement one bounded chantier and open/update PRs; they do not merge their own review-required work;
+- a **Reviewer** challenges an exact PR head that it did not materially author;
+- the Controller may code, but should prefer coordination while useful independent Worker work exists.
+
+Agents must not spend effort discovering whether other chats/agents exist. GitHub is the coordination medium.
+
+## Startup recovery and repository coherence
+
+Every Controller execution begins with one global recovery/coherence pass before new roadmap work.
+
+### 1. Reconstruct mutable state
+
+Inventory every remote branch and classify each non-`main` branch as far as evidence permits:
 
 - head of an open PR;
-- work ahead of `main` with no open PR;
-- branch associated with a closed/unmerged PR;
-- stale pointer whose work is already integrated;
+- ahead of `main` without an open PR;
+- associated with a closed/unmerged PR;
+- fully contained in `main`;
 - ambiguous residue requiring inspection.
 
-A branch ahead of `main` without an open PR is potential unfinished work. Do not overwrite it, duplicate it or assume it is abandoned. Inspect its delta and provenance before choosing overlapping work; promote, preserve, close or clean it only when the evidence supports that action.
+For each open PR reconstruct:
 
-### Coherence chain
+- exact head SHA;
+- review requirement;
+- current exact-head PASS/CHANGES REQUIRED evidence;
+- unresolved findings/threads;
+- exact-head CI;
+- dependencies and mergeability.
+
+A branch ahead of `main` without an open PR is potential unfinished work. Inspect it before choosing overlapping work.
+
+### 2. Clean only provably dead branch residue
+
+Branch cleanup is part of recovery, not a separate project.
+
+A non-`main` branch may be deleted autonomously only when all of the following are established from current GitHub state:
+
+- it is not the head of an open PR;
+- it has no commits ahead of current `main` (`ahead_by = 0` or equivalent proof);
+- no active dependency or current authoritative document names it as required state.
+
+If branch deletion is unavailable in the current execution environment, record no new project state merely to remember cleanup; leave the branch and continue. Any branch with unique commits remains protected until inspected.
+
+### 3. Check semantic coherence
 
 Check material consistency in this direction:
 
@@ -106,168 +178,217 @@ code / tests / runtime configuration
         -> README.md
 ```
 
-The checks are semantic, not merely textual. Examples of material drift include:
+Historical milestone/evidence documents may remain historically accurate; do not rewrite history merely to match current state.
 
-- a capability implemented on `main` but still documented as future or unavailable;
-- a resolved human gate still presented as blocking;
-- a current security/identity description that contradicts the runtime path;
-- a current-state audit whose conclusions depend on an obsolete baseline;
-- a public README that materially understates or misstates the integrated product;
-- stale branch/PR state that could cause duplicate autonomous work.
+Classify drift into two levels:
 
-Historical milestone/evidence documents may retain the state that was true when they were produced. Do not rewrite history merely to make old evidence look current. Instead, distinguish clearly between historical evidence and documents that claim to describe current state.
+- **selection/security-critical drift** — can change autonomous task selection, dependency/eligibility decisions, security interpretation, public contract interpretation or safe integration. Repair it in one bounded coherence PR before new overlapping feature work.
+- **projection-only drift** — README or secondary descriptive text is slightly stale but cannot change safe autonomous decisions. Treat it as useful cleanup, not a global execution blocker.
 
-### Repair before expansion
+Do not manufacture documentation churn for harmless wording differences.
 
-If the startup pass finds a material inconsistency that can affect autonomous selection, user understanding, security interpretation or public product description, repair it in one bounded coherence PR before starting new feature work. Re-run the normal CI and integration gates on that PR.
+### Documentation during a feature PR
 
-Do not manufacture documentation churn for harmless wording differences. The objective is material coherence, not identical phrasing across files.
-
-### Documentation during the execution
-
-A normal feature PR should update documentation in that same PR only when the feature itself changes facts that must be durable immediately, especially:
+A feature PR should update documentation in the same PR when the feature changes a fact that must be durable immediately, especially:
 
 - a public tool/API contract or required configuration;
-- a security or architecture invariant;
-- a human gate or product decision;
-- a roadmap tranche status, dependency or eligibility fact that the Controller may use later in the same execution.
+- a security/architecture invariant;
+- a human gate/product decision;
+- a roadmap status, dependency, exit criterion or eligibility fact that later work may rely on.
 
-Do **not** perform a global README/architecture/security/audit synchronization after every integrated PR merely because some descriptive detail could be refreshed. The next Controller startup pass is responsible for global semantic reconciliation.
+Do not require a global README/architecture/security sweep after every merge. The next startup coherence pass performs global reconciliation.
 
-An end-of-execution coherence check is optional and useful when cheap, but it is never the sole mechanism that guarantees repository coherence.
+## Eligibility, priority and finite roadmap execution
 
-## Eligibility, priority and dependencies
+Treat these separately:
 
-Treat these as separate concepts:
+- **priority** — business/product importance;
+- **dependency** — another result required first;
+- **eligibility** — safe and useful work executable now.
 
-- **priority**: business/product importance;
-- **dependency**: another result required first;
-- **eligibility**: safe and useful work that can be executed now.
+A high-priority blocked item does not block useful independent work. A merely possible item is not automatically useful.
 
-A high-priority blocked item does not prevent useful independent work. Conversely, an item being possible does not make it useful.
+`docs/ROADMAP.md` is the authoritative dependency map. If code reality and roadmap state materially diverge, repair the mismatch before stale roadmap facts drive new work.
 
-`docs/ROADMAP.md` is the authoritative dependency map. When code reality and roadmap text diverge, do not silently guess; the startup coherence gate must repair the mismatch before stale roadmap text drives new work.
+### Finite tranche rule
 
-When several items are eligible, the Controller should choose without asking the user unless a human gate applies. Prefer, in order:
+Autonomous roadmap expansion must terminate.
 
-1. finishing or integrating already-open eligible work;
-2. finishing or recovering valid unintegrated work already present on a branch before duplicating it;
-3. work that unlocks another blocked tranche;
-4. the highest-priority independent work from different roadmap axes so useful parallelism is preserved;
-5. smaller bounded slices over speculative broad rewrites;
-6. low-risk preparation while a higher-priority item is externally blocked.
+For each active/eligible major tranche, the roadmap must define:
 
-Do not select a lower-value task merely because it is easier to automate.
+- a goal;
+- explicit exit criteria;
+- a finite set of currently committed next slices, or an explicit statement that no additional slice is currently committed;
+- named blockers/human gates where relevant.
+
+Candidate ideas, inspirations and possible future enrichments are **not eligible work merely because they are mentioned**. They remain deferred until an authoritative roadmap change explicitly promotes them into the finite committed set.
+
+When the committed set is empty and the exit criteria appear satisfied, do not invent another improvement. Trigger the tranche-completion review. If that review passes, mark the tranche DONE (or stabilized when the roadmap explicitly uses that state) and unlock dependents.
+
+A new committed slice may be added autonomously only when it is necessary to satisfy an already-defined exit criterion and does not introduce a new product/security decision. Broader scope expansion requires an explicit roadmap decision.
+
+### Selection order
+
+When several actions are eligible, prefer:
+
+1. independently review and, when eligible, integrate already-open review-required PRs authored by previous executions;
+2. finish/integrate other already-open eligible work;
+3. recover valid unintegrated branch work before duplicating it;
+4. work that unlocks another blocked tranche;
+5. highest-priority independent committed slices across different roadmap axes;
+6. smaller bounded slices over speculative rewrites;
+7. low-risk preparation while higher-priority work is externally blocked.
+
+Do not choose lower-value work merely because it is easier to automate.
+
+## Independent review protocol
+
+### Scope
+
+Review the submitted exact head, not adjacent redesign opportunities. Look for, where relevant:
+
+- correctness defects and hidden assumptions;
+- missing edge cases/inadequate tests;
+- Grist semantic mismatches or unstable identifiers;
+- authorization/security/privacy regressions;
+- cross-principal leakage or credential exposure;
+- partial-write, ambiguity, replay or retry hazards;
+- missing bounds, output minimization or input validation;
+- divergence between code, registry/contracts and required documentation;
+- scope creep/product-invariant conflicts;
+- reference/licensing mistakes.
+
+### Durable evidence
+
+Record the result in the PR conversation (or equivalent durable GitHub review record) with the exact full head SHA:
+
+```text
+AUTONOMOUS REVIEW
+Head: <exact full SHA>
+Result: PASS
+```
+
+or:
+
+```text
+AUTONOMOUS REVIEW
+Head: <exact full SHA>
+Result: CHANGES REQUIRED
+
+- <concrete blocking finding>
+```
+
+A PASS applies only to that SHA. A subsequent commit makes it stale automatically.
+
+### Outcomes
+
+- **PASS** — if exact-head CI is green, the head is unchanged and no blocking finding/thread remains, the same independent Reviewer/Controller execution may merge it. No third execution is needed for the mechanical merge.
+- **CHANGES REQUIRED** — repair may occur in that execution, but after materially changing the head the execution becomes an author of the new head and must leave it for later independent review.
+- **insufficient evidence** — treat as CHANGES REQUIRED or request the smallest external/human evidence needed; never convert uncertainty into PASS.
+
+Do not create no-op commits merely to transfer review ownership.
+
+## Tranche-completion review
+
+Per-PR review checks changes in isolation. Before a major tranche is declared DONE or used to unlock a dependent tranche, perform one integrated tranche review against an exact `main` SHA.
+
+This applies at meaningful boundaries such as P1/P2/P3 stabilization before P4 or a platform/security tranche unlocking the next one.
+
+The tranche review must be performed by a fresh execution that **did not materially author the tranche's latest substantive code change**. Merely having independently reviewed and mechanically merged that change does not destroy review independence.
+
+Review the integrated system for:
+
+- interactions among slices;
+- duplicated/inconsistent abstractions or limits;
+- coherent failure/retry/security semantics;
+- contract/documentation consistency;
+- missing end-to-end/cross-feature tests;
+- satisfaction of the tranche exit criteria;
+- absence of hidden remaining committed work.
+
+If the review passes, that same execution may create and merge a documentation-only roadmap/status PR recording the reviewed exact `main` SHA and PASS conclusion. If substantive repairs are required, the tranche remains non-DONE and normal PR review rules apply.
+
+Do not perform tranche reviews after every small PR.
 
 ## External-reference protocol
 
-The product roadmap records external projects as design provenance. Use that provenance operationally instead of re-inventing known Grist/MCP behavior from memory.
+When `docs/ROADMAP.md` names a relevant reference, or an accessible upstream implementation is clearly likely to reduce uncertainty for a committed slice, perform a bounded reference-first review.
 
-Before implementing a product slice when `docs/ROADMAP.md` names a relevant reference, or when a clearly relevant upstream implementation already exists, perform a bounded **reference-first** review when the source is accessible and likely to reduce uncertainty or duplicated work.
+Inspect only what matters to the slice: public semantics, stable identifiers, edge cases/failure behavior, useful tests/fixtures, relevant known limitations and licensing constraints.
 
-Inspect only the parts relevant to the current slice and, where useful, identify:
+Classify the result:
 
-- public contract / user-visible semantics;
-- implementation approach and stable identifiers;
-- edge cases and failure semantics;
-- tests or fixtures that capture behavior;
-- known limitations/issues relevant to the slice;
-- license and attribution constraints before any code reuse.
+- **REUSE** — compatible licensed code/tests fit directly;
+- **ADAPT** — compatible licensed implementation can be adapted with required notices;
+- **REIMPLEMENT** — behavior/ideas/tests are useful but implementation should be independent;
+- **REJECT** — conflicts with project invariants or does not improve the slice.
 
-Classify the result explicitly as one of:
+Public source is not automatically licensed for copying. Grist official behavior/documentation remains the preferred functional oracle where available. External implementations never override this repository's security invariants or human gates.
 
-- **REUSE** — code or tests can be reused under a compatible license and fit the architecture;
-- **ADAPT** — a licensed implementation can be adapted, while preserving required notices/attribution;
-- **REIMPLEMENT** — behavior/ideas/tests are useful but code should be independently implemented, including when no compatible reuse license is established;
-- **REJECT** — the reference conflicts with this repository's product/security invariants or does not improve the slice.
-
-Publicly readable source code is not automatically licensed for copying. Do not copy implementation code unless a compatible reuse license is verified. When direct reuse is not justified, it is still valid to study public contracts, behavior, tests and edge cases and then implement independently.
-
-Grist's official behavior/documentation remains the preferred functional oracle where available. External implementations never override this repository's security invariants, human gates, bounded-operation model or authoritative product decisions.
-
-Do not turn reference review into open-ended research. If no external reference materially helps the bounded slice, state that briefly and proceed from the repository's own contracts/tests.
-
-For a product PR informed by an external implementation, the PR body should record the relevant reference(s) and the `REUSE` / `ADAPT` / `REIMPLEMENT` / `REJECT` decision, including any licensing implication. This provenance is evidence, not a new dependency on the external repository.
+For an informed product PR, record references plus REUSE/ADAPT/REIMPLEMENT/REJECT and licensing implications in the PR body. Do not turn reference review into open-ended research.
 
 ## Security invariants
 
-These invariants must not be weakened incidentally:
+These must not be weakened incidentally:
 
 - MCP is the long-term primary product contract; GPT Actions/OpenAPI are compatibility/development adapters.
-- The production target is multi-user access to one configured Grist Community DINUM instance.
+- Production targets multi-user access to one configured Grist Community DINUM instance.
 - Every authenticated production user executes upstream Grist operations with that user's own Grist API key.
-- Grist remains authoritative for upstream ACLs; bridge policy may reduce authority but must not elevate it.
-- Grist API keys, OAuth tokens, bearer tokens, encryption keys and session secrets are never model-visible tool inputs/outputs, logs, audit payloads or committed files.
-- No generic HTTP forwarding, raw SQL or arbitrary Grist `/apply`/UserAction escape hatch may be exposed to the model.
-- Destructive operations must remain named, bounded and explicitly targeted.
-- Partial/non-atomic writes and ambiguous post-write states must not be blindly replayed.
-- User-derived Grist clients, discovery results and caches must never cross principal boundaries.
+- Grist remains authoritative for upstream ACLs; bridge policy may reduce but never elevate authority.
+- Grist API keys, OAuth/bearer tokens, encryption keys and session secrets are never model-visible inputs/outputs, logs, audit payloads or committed files.
+- No generic HTTP forwarding, raw SQL or arbitrary Grist `/apply`/UserAction escape hatch is model-visible.
+- Destructive operations are named, bounded and explicitly targeted.
+- Partial/non-atomic writes and ambiguous post-write states are never blindly replayed.
+- User-derived Grist clients, discovery results and caches never cross principal boundaries.
 
-## Human gates
-
-Autonomous execution is encouraged for implementation within agreed architecture, tests, refactors, documentation, CI and bounded fixes.
-
-Do not make the following product/security decisions autonomously unless the decision is already explicit in authoritative project documentation:
-
-- OAuth/identity-provider selection;
-- credential encryption or persistence architecture;
-- adding/removing public authorization scopes;
-- changing the per-user Grist credential model;
-- exposing a new generic or destructive capability;
-- weakening deployment/resource authorization;
-- changes that create new institutional obligations for DINUM;
-- public branding/publisher claims.
-
-When such a decision is required, prepare the smallest concrete decision package and surface it to the user instead of embedding an irreversible choice in code.
-
-## Worker execution protocol
+## Worker protocol
 
 A Worker should:
 
-1. resolve exact `main` SHA;
-2. read `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md` at that SHA;
-3. reconstruct GitHub facts relevant to its chantier;
-4. verify the chantier is eligible and its dependencies are satisfied;
-5. run the bounded external-reference protocol above when relevant and capture its decision for the PR;
-6. create/use one short branch;
-7. implement the smallest coherent slice with tests and documentation required by that slice's contract/configuration/security/roadmap-state changes;
-8. run/observe CI on the exact head;
-9. open or update a PR with scope, evidence, dependencies, reference provenance when relevant and deferred work;
-10. stop at a human gate or when no useful eligible action remains.
+1. resolve exact `main` and read the three normative documents;
+2. reconstruct GitHub facts relevant to its bounded chantier;
+3. verify eligibility/dependencies and that the slice is in the roadmap's committed set;
+4. run the bounded external-reference protocol when useful;
+5. use one short branch;
+6. implement the smallest coherent slice with required tests and immediate contract/security/roadmap documentation;
+7. run/observe exact-head CI;
+8. open/update a PR with scope, evidence, dependencies, reference provenance, deferred work and review-gate classification;
+9. leave review-required authored heads unmerged for independent review;
+10. stop at a human gate or when no useful eligible action remains in its mandate.
 
-Workers must not silently expand scope merely because adjacent improvements are visible. Workers are not responsible for a repository-wide documentation sweep after their bounded PR; global reconciliation belongs to the next Controller startup pass.
+Workers must not silently expand scope because adjacent improvements are visible.
 
-A Controller-generated Worker mandate should normally contain only what is not already durable in the repository: the assigned tranche/slice, expected branch purpose, relevant dependency/head facts, and explicit stop conditions. It should not duplicate the full product vision, roadmap or security doctrine.
+Controller-generated Worker mandates should contain only execution-specific facts not already durable in the repository: assigned slice, branch purpose, relevant dependency/head facts, review expectation and stop conditions.
 
-## Controller execution protocol
+## Controller protocol
 
 The Controller should:
 
-1. resolve exact `main` SHA and reload the three normative documents;
-2. reconstruct all relevant mutable GitHub state, including every remote branch and its relationship to `main`/PRs where determinable;
-3. execute the startup repository coherence gate and integrate any required coherence repair before selecting new roadmap work;
-4. identify ready-to-integrate PRs, recoverable unintegrated branch work, blocked work and independent eligible work;
-5. choose and assign the best eligible work itself using the roadmap and selection rules above;
-6. prefer finishing eligible existing/recoverable work before spawning unnecessary new branches;
-7. keep normally at most two independent Worker slots active, selecting different roadmap axes when that improves throughput and does not create races;
-8. use CI wait time to review or progress genuinely independent work;
-9. after every durable transition, resolve `main` again and rebuild the relevant mutable state;
-10. require a PR itself to update any public contract/configuration, security/architecture invariant, human gate or roadmap status/dependency that changes because of that PR, but do not require a global documentation reconciliation after every merge;
-11. never let a known stale roadmap status/dependency drive subsequent work in the same execution;
-12. continue while a useful eligible action exists;
-13. stop only at a human gate, a required external/operator action, or when remaining work is blocked/non-useful.
-
-The Controller must never infer project state from another chat's narrative when GitHub can provide the current fact.
-
-The Controller must not ask the user to supply task-specific Worker prompts when it can derive those prompts from the repository. If parallel Worker execution is available, the Controller should generate those mandates itself. If it is unavailable, execute the same bounded work sequentially rather than offloading orchestration back to the user.
+1. resolve exact `main` and reload `AGENTS.md`, `docs/PRODUCT_VISION.md`, `docs/ROADMAP.md`;
+2. reconstruct all relevant mutable GitHub state, including every remote branch, exact-head CI and exact-head review evidence;
+3. execute startup recovery/coherence and perform provably safe branch cleanup when supported;
+4. repair selection/security-critical coherence drift before overlapping new feature work;
+5. independently review eligible prior-execution heads first;
+6. recover valid unintegrated branch work before duplicating it;
+7. select only useful eligible work from the roadmap's finite committed set;
+8. keep normally at most two independent Worker slots active;
+9. when this execution authors a review-required head, freeze that PR and immediately resume independent work selection;
+10. use CI wait time for eligible prior-execution review or genuinely independent work;
+11. after every durable transition, resolve current `main` and rebuild affected mutable state;
+12. never let stale roadmap, CI or review evidence drive work;
+13. trigger integrated tranche review when committed work is exhausted and exit criteria appear satisfied;
+14. continue while any useful eligible non-overlapping action exists;
+15. stop only at a human gate, required external/operator action, or when remaining work is blocked/non-useful/pending independent review with no other useful eligible work.
 
 ## Documentation authority
 
+- `AGENTS.md`: autonomous execution contract.
 - `docs/PRODUCT_VISION.md`: durable product purpose, target architecture and non-goals.
-- `docs/ROADMAP.md`: current dependency graph, tranche status and eligible next work.
+- `docs/ROADMAP.md`: current dependency graph, finite committed work, tranche exit criteria and eligibility.
 - `docs/ARCHITECTURE.md` and `docs/SECURITY.md`: current implementation architecture and security doctrine.
-- current-state specialized docs such as `docs/MCP-CONTRACT.md`, `docs/GPT-ACTIONS.md`, `docs/PLUGIN-READY-AUDIT.md` and `docs/OPENAI-SUBMISSION.md`: detailed current contracts/readiness where they explicitly claim current status.
-- `README.md`: public high-level projection of current integrated product state, not the authority for hidden implementation decisions.
+- current-state specialized docs such as `docs/MCP-CONTRACT.md`, `docs/GPT-ACTIONS.md`, `docs/PLUGIN-READY-AUDIT.md` and `docs/OPENAI-SUBMISSION.md`: detailed current contracts/readiness when they explicitly claim current status.
+- `README.md`: public high-level projection of integrated product state.
 - milestone/POC/result documents: historical evidence unless they explicitly declare themselves current operating documents.
+- PR comments/reviews: durable exact-head evidence, never substitutes for normative repository documents.
 
-If current-state documents conflict, `AGENTS.md` governs execution, while product/security contradictions must be resolved explicitly rather than chosen opportunistically. Historical evidence should remain historically accurate even when current-state documents evolve.
+If current-state documents conflict, `AGENTS.md` governs execution. Product/security contradictions must be resolved explicitly rather than chosen opportunistically.
