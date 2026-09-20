@@ -421,7 +421,8 @@ Completed:
 - table/column discovery now projects only stable functional schema metadata while keeping Grist engine references and arbitrary upstream extension fields server-side for internal bridge use;
 - fixed internal `RenameColumn` / `RemoveTable` operations now discard raw Grist `/apply` engine responses and return only bounded semantic acknowledgements with stable target identifiers;
 - success-only record/schema update and delete operations discard upstream success bodies and return bounded acknowledgements containing only the exact requested stable targets; create operations project successful upstream results to functional table/column/record IDs and mark successful but unexpectedly shaped responses with `resultNormalizationIncomplete: true` instead of forwarding arbitrary engine fields;
-- safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected.
+- safe optional `/.well-known/openai-apps-challenge` deployment path: absent by default, exact plain-text token response only when `OPENAI_APPS_CHALLENGE_TOKEN` is explicitly supplied, with ambiguous whitespace/newline values rejected;
+- bounded current-surface public-output minimization audit recorded in `docs/PUBLIC-OUTPUT-MINIMIZATION-AUDIT.md`; its only concrete finding, `S1-OUT-1`, explicitly dispositions raw UI v1 compatibility fields to the future P4 migration contract rather than silently breaking the public contract.
 
 Exit criteria:
 
@@ -431,8 +432,7 @@ Exit criteria:
 
 Committed remaining S1 work:
 
-1. prove and record UserInfo `email` with `email_verified: true` on the final reviewer-compatible path;
-2. perform one bounded current-surface output-minimization audit and integrate/disposition concrete findings.
+1. prove and record UserInfo `email` with `email_verified: true` on the final reviewer-compatible path.
 
 The production OpenAI domain token does not yet exist. Activating the already-prepared challenge endpoint with that future exact token is an external-triggered C8/submission action, not recurring S1 work.
 
