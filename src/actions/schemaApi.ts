@@ -2,6 +2,12 @@ import type { Express, Response } from "express";
 import * as z from "zod/v4";
 
 import type { GristService } from "../grist/service.js";
+import {
+  columnMutationFieldsOpenApiSchema,
+  columnMutationFieldsSchema,
+  tableMutationFieldsOpenApiSchema,
+  tableMutationFieldsSchema
+} from "../operations/schemaMutationContract.js";
 
 export type GristSchemaOperations = Pick<
   GristService,
@@ -15,18 +21,17 @@ export type GristSchemaOperations = Pick<
   | "deleteColumns"
 >;
 
-const fieldsSchema = z.record(z.string(), z.unknown());
 const columnSpecSchema = z.object({
   id: z.string().min(1),
-  fields: fieldsSchema.optional()
+  fields: columnMutationFieldsSchema.optional()
 });
 const columnUpdateSchema = z.object({
   id: z.string().min(1),
-  fields: fieldsSchema
+  fields: columnMutationFieldsSchema
 });
 const tableUpdateSchema = z.object({
   id: z.string().min(1),
-  fields: fieldsSchema
+  fields: tableMutationFieldsSchema
 });
 
 function boundedArray<T extends z.ZodType>(schema: T, max: number) {
@@ -60,13 +65,6 @@ const tableParameter = {
   schema: { type: "string" }
 };
 
-const fieldMetadataSchema = {
-  type: "object",
-  additionalProperties: true,
-  description:
-    "Grist metadata fields. For columns this may include label, type, formula, isFormula, visibleCol and widgetOptions. widgetOptions is the JSON string format expected by Grist."
-};
-
 export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, unknown> {
   const errorResponses = {
     "400": { description: "Invalid schema request or configured guardrail exceeded" },
@@ -81,7 +79,7 @@ export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, 
     required: ["id"],
     properties: {
       id: { type: "string", minLength: 1 },
-      fields: fieldMetadataSchema
+      fields: columnMutationFieldsOpenApiSchema
     }
   };
   const columnUpdate = {
@@ -90,7 +88,7 @@ export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, 
     required: ["id", "fields"],
     properties: {
       id: { type: "string", minLength: 1 },
-      fields: fieldMetadataSchema
+      fields: columnMutationFieldsOpenApiSchema
     }
   };
   const columnArray = {
@@ -166,7 +164,7 @@ export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, 
         operationId: "updateGristTables",
         summary: "Update Grist table metadata, including table ID and on-demand mode",
         description:
-          "Consequential schema write. fields may include tableId to rename a table or onDemand to change loading mode.",
+          "Consequential schema write. fields supports only tableId to rename a table and onDemand to change loading mode.",
         "x-openai-isConsequential": true,
         parameters: [documentParameter],
         requestBody: {
@@ -188,7 +186,7 @@ export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, 
                       required: ["id", "fields"],
                       properties: {
                         id: { type: "string", minLength: 1 },
-                        fields: fieldMetadataSchema
+                        fields: tableMutationFieldsOpenApiSchema
                       }
                     }
                   }
@@ -229,7 +227,7 @@ export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, 
         operationId: "createGristColumns",
         summary: "Create columns in a Grist table",
         description:
-          "Consequential schema write. Column fields may set label, type, formula, isFormula, visibleCol, widgetOptions and other metadata accepted by Grist.",
+          "Consequential schema write. Column fields support only label, type, formula, isFormula, description and widgetOptions.",
         "x-openai-isConsequential": true,
         parameters: [documentParameter, tableParameter],
         requestBody: {
@@ -253,7 +251,7 @@ export function buildSchemaOpenApiPaths(maxSchemaItems: number): Record<string, 
         operationId: "updateGristColumns",
         summary: "Update Grist column metadata",
         description:
-          "Consequential schema write. Supports types, formulas, labels, widgetOptions and other fields accepted by Grist. Use renameGristColumn to change a column ID.",
+          "Consequential schema write. Supports only label, type, formula, isFormula, description and widgetOptions. Use renameGristColumn to change a column ID.",
         "x-openai-isConsequential": true,
         parameters: [documentParameter, tableParameter],
         requestBody: {
