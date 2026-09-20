@@ -153,11 +153,13 @@ Bounded UI operations require `doc.schema:write` and currently include:
 - native chart-type configuration for chart widgets;
 - saved sort configuration through stable current column IDs;
 - direct same-table select-by configuration;
-- bounded Ref/RefList column select-by configuration using advertised stable widget/column IDs.
+- bounded Ref/RefList column select-by configuration using advertised stable widget/column IDs;
+- bounded custom-widget access and column-mapping updates for an explicitly identified existing custom widget, using stable current column IDs and preserving URL/plugin/widget identity plus unrelated options;
+- bounded table/grid display updates for vertical/horizontal gridlines, zebra stripes and row-number mode while preserving unrelated widget options.
 
-The model never receives raw Grist metadata-table write access. Writes are followed by normalized re-read verification; ambiguous post-write state must not trigger blind replay.
+The model never receives raw Grist metadata-table write access, arbitrary custom-widget option payloads or internal numeric column refs as write inputs. Safety-sensitive UI mutations fail closed when the current bounded metadata snapshot or required normalized state is incomplete. Writes are followed by exact normalized or complete expected-state re-read verification; ambiguous post-write state must not trigger blind replay.
 
-New page/widget deletion or broader destructive UI surfaces remain human-gated.
+Bounded page-layout mutation is the remaining committed P1 slice and is not part of `main` until its review/integration gate passes. New page/widget deletion or broader destructive UI surfaces remain human-gated.
 
 ### Low-level Grist actions
 
@@ -173,7 +175,9 @@ Current advisory context includes:
 - bounded local `$Column` diagnostics;
 - bounded one-hop `$Ref.Field` / `$RefList.Field` diagnostics against already-loaded schema;
 - normalized relationships and verified reverse relationships;
+- bounded normalized page layout through stable current widget IDs, with explicit incompleteness for unsupported/stale state;
 - normalized page/widget sort and select-by state where exact resolution is possible;
+- normalized existing custom-widget access/identity/column mappings and table/grid display state where exact resolution is possible;
 - explicit incompleteness markers instead of guessed metadata.
 
 Formula inspection never executes Python/formulas and does not add a code-execution surface.
