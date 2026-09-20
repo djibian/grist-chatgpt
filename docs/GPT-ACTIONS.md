@@ -123,7 +123,10 @@ The compatibility adapter exposes the same bounded document-UI business layer as
 - `createGristPage`;
 - `addGristPageWidget`;
 - `renameGristPage`;
+- `updateGristPageLayout`;
 - `updateGristPageWidget`.
+
+`updateGristPageLayout` accepts only a normalized bounded page-layout tree expressed with exact current stable widget IDs. Every current widget must be accounted for exactly once, either as a placed tree leaf or in `collapsedWidgetIds`; unknown, duplicate, omitted or malformed widget state is rejected before write. Tree depth, node count and collapsed-ID count are bounded, and the normalized layout is re-read and compared exactly after the fixed internal metadata update. The public contract does not accept arbitrary Grist layout JSON or numeric metadata refs supplied by the model.
 
 `updateGristPageWidget` currently supports bounded:
 
@@ -174,7 +177,7 @@ Use a synthetic allowed document for destructive/schema/UI validation. A represe
 3. `inspectGristDocument`;
 4. create temporary schema;
 5. create/update/delete synthetic records;
-6. inspect/create/configure page/widgets;
+6. inspect/create/configure page/widgets and bounded page layout;
 7. re-read exact targets after each bounded mutation;
 8. remove only explicitly identified temporary schema objects.
 
