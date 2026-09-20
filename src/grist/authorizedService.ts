@@ -56,6 +56,10 @@ export interface PageWidgetUpdateInput {
   gridOptions?: GridOptionsUpdateInput;
 }
 
+type CompletenessAwareDocumentUiContext = DocumentUiContext & {
+  metadataSnapshotIncomplete?: true;
+};
+
 function sameSortSpec(
   actual: unknown,
   expected: readonly ResolvedWidgetSortSpec[]
@@ -86,6 +90,31 @@ function assertPublicTableUpdates(tables: readonly GristTableUpdate[]): void {
       assertPublicTableId(renamedTableId);
     }
   }
+}
+
+function metadataResponseReachedLimit(value: unknown, limit: number): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const source = (value as Record<string, unknown>).records;
+  return Array.isArray(source) && source.length >= limit;
+}
+
+function assertCompleteUiSnapshot(context: CompletenessAwareDocumentUiContext): void {
+  if (!context.metadataSnapshotIncomplete) return;
+  throw new Error(
+    "Grist UI metadata snapshot reached the configured read limit and may be incomplete; refusing a UI mutation that requires the complete page/widget graph."
+  );
+}
+
+function exposeUiSnapshotCompleteness(
+  value: unknown,
+  context: CompletenessAwareDocumentUiContext
+): unknown {
+  if (!context.metadataSnapshotIncomplete) return value;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  return {
+    ...(value as Record<string, unknown>),
+    metadataSnapshotIncomplete: true
+  };
 }
 
 export class AuthorizedGristService {
@@ -167,7 +196,7 @@ export class AuthorizedGristService {
   async getPages(documentIdOrUrl: string): Promise<unknown> {
     return this.execute("get_pages", documentIdOrUrl, undefined, async (id) => {
       const ui = await this.loadDocumentUi(id);
-      return this.documentUi.listPages(ui);
+      return exposeUiSnapshotCompleteness(this.documentUi.listPages(ui), ui);
     });
   }
 
@@ -178,7 +207,10 @@ export class AuthorizedGristService {
     return this.execute("get_page_widgets", documentIdOrUrl, undefined, async (id) => {
       const tableResponse = await this.inner.listTables(id, { expandColumns: true });
       const ui = await this.loadDocumentUi(id, tableResponse);
-      return this.documentUi.getPageWidgets(ui, pageId, tableResponse);
+      return exposeUiSnapshotCompleteness(
+        this.documentUi.getPageWidgets(ui, pageId, tableResponse),
+        ui
+      );
     });
   }
 
@@ -189,9 +221,12 @@ export class AuthorizedGristService {
   ): Promise<unknown> {
     return this.execute("create_page", documentIdOrUrl, 1, async (id) => {
       await this.resolveTableRef(id, tableId);
+      const before = await this.loadDocumentUi(id);
+      assertCompleteUiSnapshot(before);
       const created = await this.uiActions.createEmptyPage(id, tableId, name);
       try {
         const ui = await this.loadDocumentUi(id);
+        assertCompleteUiSnapshot(ui);
         const page = ui.pages.find((candidate) => candidate.id === created.pageId);
         if (!page) {
           throw new Error(`Created page ${created.pageId} was not found on re-read.`);
@@ -226,6 +261,7 @@ export class AuthorizedGristService {
     }
     return this.execute("add_page_widget", documentIdOrUrl, 1, async (id) => {
       const before = await this.loadDocumentUi(id);
+      assertCompleteUiSnapshot(before);
       if (!before.pages.some((page) => page.id === pageId)) {
         throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
       }
@@ -238,6 +274,7 @@ export class AuthorizedGristService {
       );
       try {
         const after = await this.loadDocumentUi(id);
+        assertCompleteUiSnapshot(after);
         const page = after.pages.find((candidate) => candidate.id === pageId);
         const widget = page?.widgets.find(
           (candidate) => candidate.id === created.widgetId
@@ -269,6 +306,7 @@ export class AuthorizedGristService {
 
     return this.execute("rename_page", documentIdOrUrl, 1, async (id) => {
       const before = await this.loadDocumentUi(id);
+      assertCompleteUiSnapshot(before);
       if (!before.pages.some((page) => page.id === pageId)) {
         throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
       }
@@ -276,6 +314,7 @@ export class AuthorizedGristService {
       await this.uiActions.renamePage(id, pageId, pageName);
       try {
         const after = await this.loadDocumentUi(id);
+        assertCompleteUiSnapshot(after);
         const page = after.pages.find((candidate) => candidate.id === pageId);
         if (!page || page.name !== pageName) {
           throw new Error(`Renamed page ${pageId} did not match the requested name on re-read.`);
@@ -335,6 +374,7 @@ export class AuthorizedGristService {
           update.customWidgetSettings !== undefined
       });
       const before = await this.loadDocumentUi(id, tableResponse);
+      assertCompleteUiSnapshot(before);
       const page = before.pages.find((candidate) => candidate.id === pageId);
       if (!page) {
         throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
@@ -435,6 +475,7 @@ export class AuthorizedGristService {
             ? await this.inner.listTables(id, { expandColumns: true })
             : undefined;
         const after = await this.loadDocumentUi(id, afterTableResponse);
+        assertCompleteUiSnapshot(after);
         const updatedPage = after.pages.find((candidate) => candidate.id === pageId);
         const widget = updatedPage?.widgets.find((candidate) => candidate.id === widgetId);
         if (!widget) {
@@ -660,7 +701,7 @@ export class AuthorizedGristService {
   private async loadDocumentUi(
     documentId: string,
     tableResponse?: unknown
-  ): Promise<DocumentUiContext> {
+  ): Promise<CompletenessAwareDocumentUiContext> {
     const metadataLimit = this.inner.maxReadRecords > 0
       ? this.inner.maxReadRecords
       : 5000;
@@ -679,7 +720,21 @@ export class AuthorizedGristService {
         hidden: true
       })
     ]);
-    return this.documentUi.build(documentId, tables, pages, views, sections);
+    const context: CompletenessAwareDocumentUiContext = this.documentUi.build(
+      documentId,
+      tables,
+      pages,
+      views,
+      sections
+    );
+    if (
+      metadataResponseReachedLimit(pages, metadataLimit) ||
+      metadataResponseReachedLimit(views, metadataLimit) ||
+      metadataResponseReachedLimit(sections, metadataLimit)
+    ) {
+      context.metadataSnapshotIncomplete = true;
+    }
+    return context;
   }
 
   private async execute(
