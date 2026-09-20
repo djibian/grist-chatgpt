@@ -129,6 +129,7 @@ Normal operating model:
 - the Controller may code, but should prefer coordination while useful independent Worker work exists.
 
 Agents must not spend effort discovering whether other chats/agents exist. GitHub is the coordination medium.
+
 ## Startup recovery and repository coherence
 
 Every Controller execution begins with one global recovery/coherence pass before new roadmap work.
@@ -258,6 +259,7 @@ Review the submitted exact head, not adjacent redesign opportunities. Look for, 
 - divergence between code, registry/contracts and required documentation;
 - scope creep/product-invariant conflicts;
 - reference/licensing mistakes.
+
 ### Durable evidence
 
 Record the result in the PR conversation (or equivalent durable GitHub review record) with the exact full head SHA:
