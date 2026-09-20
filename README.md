@@ -42,6 +42,7 @@ Integrated milestones include:
 - **v0.4 release:** realistic data/schema operations, explicit deletion, batching and hardened partial-failure reporting.
 - **v0.5 release:** principals, Grist-aligned capabilities, policy-aware authorization, structured audit, operation registry and semantic document inspection.
 - **V0.6 roadmap milestone DONE:** bounded document-UI inspection and mutation. This milestone has been integrated after the v0.5.0 release; the package/release version remains `0.5.0` until a separate release decision.
+- **Q0 DONE:** retrospective quality/architecture cleanup has passed its integrated completion review.
 - **C1 DONE:** credential abstraction with `GristCredentialProvider`, `StaticApiKeyCredentialProvider` and `GristClientFactory`.
 - **C2 DONE:** MCP contract v1 with registry-driven product metadata, annotation checks, structured UI successes and typed error direction.
 - **C3 DONE:** principal-aware Grist contexts with isolated client/discovery/cache/access-policy/service state.
@@ -49,6 +50,9 @@ Integrated milestones include:
 - **C4 ELIGIBLE:** productionize the already-proven OAuth design; the identity-provider decision is no longer a blocker.
 - **C5 BLOCKED:** secure per-user Grist credential onboarding still requires C4 productionization plus explicit persistence/encryption decisions.
 - **C6 preparation integrated:** timeouts, release/rollback documentation, OAuth deployment preflight/smoke design, metrics vocabulary and audit contract review are present; finalization still depends on C4/C5.
+- **P1 ELIGIBLE:** its only committed remaining product slice is bounded page-layout mutation; it is not integrated until its review gate passes.
+- **P2 DONE / P3 DONE:** formula/schema safety and semantic document context/progressive discovery have passed their integrated reviews.
+- **P4 BLOCKED by P1 completion:** compact-surface evaluation waits for the P1 integrated review.
 - **S1 partially completed:** submission annotations/artifact, the canonical 5-positive/3-negative reviewer specification, the optional domain-challenge endpoint and several output-minimization slices are integrated.
 
 Historical milestone/evidence documents under `docs/M1-*`, `docs/M2-*`, `docs/M3-*` and the Logto/ProConnect POC files describe the implementation/evidence at the time they were recorded. `docs/ROADMAP.md` is authoritative for current tranche status.
@@ -158,7 +162,7 @@ Fixed public capability vocabulary:
 | inspect page widgets | `getGristPageWidgets` | `get_page_widgets` |
 | operation/capability help | `getGristHelp` | `grist_help` |
 
-`inspect_document` reads structure without reading user-table rows. Current context includes formulas, bounded local and one-hop Ref/RefList field diagnostics, normalized relationships including verified reverse references, and normalized page/widget sort/select-by context where exact resolution is possible.
+`inspect_document` reads structure without reading user-table rows. Current context includes formulas, bounded local and one-hop Ref/RefList field diagnostics, normalized relationships including verified reverse references, and normalized page/widget layout, sort, select-by, custom-widget settings and grid-display context where exact resolution is possible. Unsupported or stale metadata is marked incomplete rather than guessed.
 
 `grist_help` can return the full operation catalog, filter by category, report compact category counts and optionally expose registry-derived non-executing workflow descriptions.
 
@@ -198,7 +202,11 @@ Raw Grist `/apply` is never model-accessible. Where low-level actions are requir
 | rename page | `renameGristPage` | `rename_page` |
 | update bounded widget configuration | `updateGristPageWidget` | `update_page_widget` |
 
-`update_page_widget` supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, a conservative Ref/RefList column select-by subset, and bounded access/column-mapping updates for an explicitly identified existing custom widget. Custom-widget mappings use only stable current column IDs; URLs, plugin/widget identity and arbitrary widget-owned options are not writable model inputs. The bridge preserves every untargeted existing widget option and verifies the complete expected options object after write. All UI writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
+Page/widget inspection exposes bounded normalized page layout through stable widget IDs plus normalized sort/select-by state, custom-widget settings and table/grid display state where exact resolution is possible.
+
+`update_page_widget` supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, a conservative Ref/RefList column select-by subset, bounded access/column-mapping updates for an explicitly identified existing custom widget, and bounded table/grid display updates for gridlines, zebra stripes and row-number mode. Custom-widget mappings use only stable current column IDs; URLs, plugin/widget identity and arbitrary widget-owned options are not writable model inputs. Grid/custom updates preserve every untargeted existing option. All UI writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
+
+Bounded page-layout mutation is the remaining committed P1 slice and is not part of `main` until its independent review/integration gate passes.
 
 ## Operation registry and audit
 
@@ -292,6 +300,7 @@ The bridge does **not** expose arbitrary HTTP forwarding, raw SQL, arbitrary Gri
 
 ```text
 V0.6 bounded document UI       DONE roadmap milestone
+Q0 retrospective quality      DONE
 C1 Credential abstraction      DONE
 C2 MCP contract v1             DONE
 C3 User-aware Grist context    DONE
@@ -299,6 +308,10 @@ C4-P0 OAuth interoperability   DONE
 C4 Production OAuth            ELIGIBLE
 C5 Secure Grist onboarding     BLOCKED by C4 + human persistence/encryption decisions
 C6 Production hardening        BLOCKED for finalization by C4/C5
+P1 Document UI parity          ELIGIBLE; bounded layout mutation remains
+P2 Formula/schema safety       DONE
+P3 Semantic context/discovery  DONE
+P4 Compact MCP surface         BLOCKED until P1 integrated review passes
 S0 Public-plugin eligibility   BLOCKED / human-institutional gate
 S1 Submission preparation      ELIGIBLE / partially completed
 C7 Reviewer environment        BLOCKED by identity/credential readiness + S0
