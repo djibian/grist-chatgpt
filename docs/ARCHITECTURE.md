@@ -309,7 +309,7 @@ The bridge excludes generic HTTP forwarding, raw SQL, arbitrary `/apply`/UserAct
 4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto/ProConnect OAuth path with repeatable deployment/rotation/outage evidence.
 5. **C5 BLOCKED by C4 + human persistence/encryption decisions:** secure per-user Grist credential lifecycle.
 6. **C6 preparation integrated; finalization blocked by C4/C5:** rate limits, operational metrics/alerts, rotation and controlled release evidence.
-7. **P1 / P2 / P3 DONE:** bounded document UI, formula/schema safety and semantic context/discovery have passed their integrated completion reviews. P4's former dependency chain is satisfied, but P4 remains blocked until a separate finite evaluation contract is explicitly defined.
+7. **P1 / P2 / P3 DONE; P4-E1 ELIGIBLE:** bounded document UI, formula/schema safety and semantic context/discovery have passed their integrated completion reviews. P4-E1 is evaluation-only and may decide KEEP or MIGRATE without changing the public v1 contract itself.
 8. S0 public-directory eligibility remains a separate human/institutional distribution gate.
 
 ## Architectural invariant
