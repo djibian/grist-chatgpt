@@ -1,26 +1,31 @@
 # Plugin-ready audit — Grist Community / DINUM
 
 **Status:** current submission-readiness audit  
-**Audit date:** 2026-09-19  
-**Audit baseline:** `main` at `7fe3f67739461fa7bd977b3923cb19d4afcf20ed`  
-**Official requirements rechecked:** OpenAI plugin guidelines, remote MCP submission, authentication and submission errors on 2026-09-19.
+**Audit date:** 2026-09-20  
+**Audit baseline:** `main` at `d6375dc56179258218792740f1fb37ab1cffd1e3`  
+**Official requirements baseline:** repository guidance rechecked on 2026-09-19; issue #58 records the 2026-09-20 pre-review clarification attempt.
 
-This document is an assessment. It does not select credential persistence/encryption, add scopes, claim authorization from Grist Labs/DINUM, or create an institutional commitment.
+This document is an assessment. It does not select credential persistence/encryption, add scopes, claim authorization from Grist Labs/DINUM/OpenAI, or create an institutional commitment.
 
 ## Executive conclusion
 
-The repository now demonstrates a substantially complete **technical interoperability POC** for ChatGPT <-> OAuth <-> `grist-chatgpt` <-> Grist Community, but it is not yet production multi-user or public-directory ready.
+The repository demonstrates a substantially complete **technical interoperability POC** for ChatGPT <-> OAuth <-> `grist-chatgpt` <-> Grist Community, but it is not yet production multi-user or ready for final public review.
 
 C4 provider selection is no longer a blocker: ProConnect is the upstream identity source, Logto OSS is the reference MCP-facing authorization server, and the bridge remains a provider-neutral JWT/JWKS resource server. C4-P0 has passed with a real ChatGPT Developer Mode connection, dynamic principals, scope/resource enforcement, real bounded Grist reads/writes and grant-removal/expiry evidence.
 
-The two main non-product blockers are now:
+Issue #58 now records an important publication-gate clarification: a real MCP-only draft was created, the `grist-chatgpt.loeildumaitre.fr` domain was verified, and the portal Tool Scan completed successfully. OpenAI AI-assisted support did **not** pre-approve eligibility and stated that final classification is determined during the actual app/plugin review. It described the bounded architecture as materially different from a generic relay/proxy while noting that reviewers can still apply the guideline's primary-function test. This is not an approval.
 
-1. **S0 public-plugin eligibility / third-party authorization:** OpenAI's current guidelines require authorized third-party API access and state that plugins whose primary function is acting as unofficial connectors to third-party services cannot be approved. This project remains explicitly independent/non-official, so public eligibility must be clarified durably before assuming directory approval.
-2. **C5 per-user Grist credential lifecycle:** the current personal/development deployment still uses one server-side Grist API key. Production multi-user use requires the separate secure onboarding/storage/retrieval/disconnect design after explicit persistence/encryption decisions.
+The operational consequence is that there is no separate pre-review approval mechanism to wait for. Reviewer-environment and submission-package preparation may proceed when their technical/human dependencies are satisfied; actual OpenAI review is the point that resolves final public eligibility.
 
-Useful private product/platform work may continue independently of S0.
+The main engineering/human blockers before final review are therefore:
 
-Official references rechecked:
+1. **C5 per-user Grist credential lifecycle:** the current personal/development deployment still uses one server-side Grist API key. Production multi-user use requires the separate secure onboarding/storage/retrieval/disconnect design after explicit persistence/encryption decisions.
+2. **C4/C6 production evidence and controls:** controlled release/rollback, issuer/JWKS rotation/outage evidence and remaining production hardening are not complete.
+3. **C7 reviewer environment:** the reviewer identity, synthetic fixture and final reviewer-compatible UserInfo evidence remain incomplete.
+
+Public approval remains an external review risk, not a completed prerequisite.
+
+Official references to re-check immediately before submission:
 
 - https://developers.openai.com/plugins/app-guidelines
 - https://developers.openai.com/plugins/deploy/submission
@@ -34,7 +39,7 @@ Official references rechecked:
 | Bounded Grist business surface | PASS | Records, schema, discovery and bounded document-UI operations are integrated. |
 | MCP-first contract | PASS | Registry-driven tools, user-oriented metadata, typed error direction and stable UI structured results are integrated. |
 | Tool risk annotations | PASS | Every public operation has explicit `readOnlyHint`, `destructiveHint`, `openWorldHint` derived from the normative registry. |
-| Annotation justifications | PASS for draft/submission artifact | Generated from the same registry and tracked in `chatgpt-app-submission.json`; final deployed Tool Scan remains pending. |
+| Annotation justifications | PASS for draft/submission artifact | Generated from the same registry and tracked in `chatgpt-app-submission.json`; final submission must remain aligned with the deployed contract. |
 | Credential abstraction | PASS | `GristCredentialProvider` / `GristClientFactory` seam integrated. |
 | Principal/cache isolation | PASS | Fresh per-principal Grist contexts and cross-principal isolation tests are integrated. |
 | OAuth MCP resource server | PASS for POC/runtime | JWT/JWKS, issuer/audience/expiry, RFC 9728 challenge/metadata, dynamic principal and scope enforcement are implemented and exercised. |
@@ -48,10 +53,10 @@ Official references rechecked:
 | Reviewer authentication | BLOCKING | Final review needs demo credentials without MFA/SMS/email confirmation/private-network dependency. ProConnect cannot be assumed to satisfy that reviewer path by itself. |
 | Synthetic reviewer Grist fixture | MISSING | Canonical fixture requirements are specified but no isolated reviewer account/document is claimed provisioned. |
 | Exactly 5 positive + 3 negative tests | PASS for specification/package | Canonical scenarios are documented in `OPENAI-REVIEWER-TESTS.md`, represented in `chatgpt-app-submission.json` and locked by repository tests; live reviewer-fixture execution remains pending. |
-| Domain verification route | PASS for implementation / external activation pending | Optional exact-token `/.well-known/openai-apps-challenge` route is implemented and absent when unset; real portal token must only be configured/verified when issued. |
-| Tool scan | PENDING PORTAL | Must run against the final production MCP endpoint and resolve current findings. |
+| Domain verification | PASS for current draft | Issue #58 records successful verification of `grist-chatgpt.loeildumaitre.fr` through a real MCP-only portal draft. Re-verify only if the final portal/deployment requires it. |
+| Tool Scan | PASS for current draft | Issue #58 records a successful portal Tool Scan. A final scan must reflect the contract actually submitted if it changes. |
 | Public website/support/privacy/terms | MISSING | Final HTTPS URLs must match the verified publisher identity. |
-| Output/data minimization | PARTIAL / materially advanced | Public table/column metadata and success-only update/delete/apply results are projected to bounded functional data. Creation results still intentionally preserve functional created IDs; final create-result normalization/outputSchema review remains useful. |
+| Output/data minimization | PARTIAL / materially advanced | Public table/column metadata and success-only update/delete/apply results are projected to bounded functional data. Historical raw UI compatibility fields remain explicit v1 debt rather than secret data. |
 | Developer/business identity verification | HUMAN / UNKNOWN | Must be completed in the OpenAI Platform organization used for submission. |
 | App-management submission permission | HUMAN / UNKNOWN | Submitter needs App Management Write. |
 | Listing metadata | MISSING | Final display name/copy/logo/category/capabilities/starter prompts/countries/release notes remain portal-time work. |
@@ -59,7 +64,7 @@ Official references rechecked:
 | Skills | N/A initially | Initial product remains MCP-only. |
 | Rate limiting / metrics / alerting | PARTIAL / C6 | Timeouts, metrics vocabulary and audit contract are documented; per-principal rate limiting and production alerting/export remain. |
 | Deployment/rollback/smoke | PARTIAL | Runbook, offline preflight and non-secret public smoke checks exist; controlled production evidence and authenticated synthetic smoke remain. |
-| Public-plugin third-party eligibility | BLOCKING HUMAN GATE | S0 issue #58 requires durable OpenAI clarification and any additional Grist Labs/DINUM authorization basis OpenAI says is necessary. |
+| Public-plugin third-party eligibility | EXTERNAL REVIEW RISK | Issue #58 records that no pre-review approval is available; final classification occurs in actual OpenAI review. The project must remain independent/non-official and describe its bounded product/workflow value accurately. |
 
 ## Submission requirements already structurally satisfied
 
@@ -94,17 +99,24 @@ This proves interoperability, not production C4/C5 completion.
 
 `docs/OPENAI-REVIEWER-TESTS.md` is the canonical human-readable specification for exactly five positive and three negative cases. Repository tests lock the tracked submission artifact to that shape. The fixture is deliberately synthetic and still needs provisioning/execution for C7.
 
-### Domain challenge implementation
+### Domain challenge implementation and current draft verification
 
 `OPENAI_APPS_CHALLENGE_TOKEN` is optional. When unset, no challenge route is exposed; when set to a valid exact single-line value, the well-known route returns only that token as plain text. A real token must never be invented or committed.
 
+Issue #58 records that the real portal draft successfully verified the current domain. This external evidence does not change the rule that challenge tokens remain secret and deployment-only.
+
 ## Current OpenAI requirements that remain important
 
-### Third-party authorization / unofficial connector gate
+### Third-party authorization / primary-function review
 
-OpenAI's current plugin guidelines require authorized third-party integration and say plugins whose primary function is to act as unofficial connectors to third-party services cannot be approved. The project adds substantial identity, authorization, semantic, retry-safety and bounded-operation behavior, but that does not itself settle OpenAI's classification.
+OpenAI's published plugin guidelines remain relevant to third-party integrations and unofficial connectors. Issue #58 records that AI-assisted support could not pre-classify this product and that final classification occurs during actual review.
 
-Issue #58 contains the exact clarification package. Do not claim an official Grist Labs, DINUM or OpenAI relationship without durable evidence.
+The same issue records two useful but non-dispositive facts from that clarification attempt:
+
+- the bounded architecture was described as materially different from a generic relay/proxy or usual pass-through intermediary;
+- the final reviewer may still apply the primary-function test because the product connects ChatGPT to Grist.
+
+Explicit Grist Labs/DINUM permission or rights evidence may reduce policy/branding risk if obtained, but no such evidence should be invented and it does not guarantee OpenAI approval. Preserve the independent/non-official positioning and describe the product as its concrete bounded workflows and safety layer rather than a generic connector.
 
 ### OAuth workspace-domain support
 
@@ -116,10 +128,10 @@ Final reviewers need a ready-to-use demo login that does not depend on inaccessi
 
 ### Final review package
 
-Current OpenAI submission documentation requires the final remote-MCP package to include, among other portal fields:
+The final remote-MCP package includes, among other portal fields:
 
 - production MCP endpoint;
-- successful Tool Scan;
+- current successful Tool Scan;
 - domain verification;
 - exact tool metadata/annotations and justifications;
 - exactly five positive and three negative cases with expected behavior;
@@ -133,7 +145,7 @@ Current OpenAI submission documentation requires the final remote-MCP package to
 
 ### S0 — public-plugin eligibility
 
-**BLOCKED / human-institutional gate.** Obtain durable OpenAI clarification of eligibility; if OpenAI requires additional third-party authorization, obtain the relevant Grist Labs/DINUM basis without overstating any relationship.
+**ACTIVE external review risk; no separate pre-review blocker.** Issue #58 records that no durable pre-approval mechanism is available and that actual OpenAI review is the classification point. Keep the submission independent/non-official, bounded and factually described. S0 is resolved only by the actual review outcome or a later explicit product decision after that outcome.
 
 ### C4 — production OAuth
 
@@ -149,29 +161,31 @@ Finish per-principal rate limits, operational metrics/alerts, audit export if re
 
 ### S1 — low-risk submission preparation
 
-Already integrated:
+Already integrated/prepared:
 
 - annotation semantics/justifications and tracked submission artifact;
 - canonical 5+3 reviewer specification/tests;
 - exact-token domain-challenge implementation;
-- multiple public-output minimization slices.
+- multiple public-output minimization slices;
+- a real MCP-only portal draft with successful domain verification and Tool Scan recorded in issue #58.
 
-Remaining independently useful work includes final-client UserInfo proof, continued output minimization/contract normalization where functional value remains, and keeping submission artifacts aligned with the public tool contract.
+Remaining independently useful work is the final-client UserInfo proof plus keeping submission artifacts aligned with the public contract.
 
 ### C7/C8 — reviewer environment and final submission
 
-Provision the reviewer identity and synthetic Grist fixture only when identity/credential readiness and S0 make final review viable. Then execute the canonical scenarios, record the demo, complete Tool Scan/domain verification/listing/legal/support requirements and submit.
+C7 no longer waits for a separate S0 pre-approval. Provision the reviewer identity and synthetic Grist fixture once C4/C5 make the reviewer path technically safe. Complete C6 and the reviewer evidence, then finalize C8 and submit. The actual OpenAI review is what resolves the remaining S0 eligibility risk.
 
 ## Go / no-go
 
-Do **not** treat public-directory approval as technically inevitable while S0 is unresolved.
+Do **not** treat public-directory approval as technically inevitable. The pre-review clarification did not approve the product.
 
-Proceed to final public submission only when:
+Proceed to actual public review when:
 
-1. public-plugin eligibility / required third-party authorization is resolved;
-2. each authenticated user is isolated and upstream Grist calls use only that user's credential;
+1. each authenticated user is isolated and upstream Grist calls use only that user's credential;
+2. production OAuth and required C6 controls/evidence are complete enough for the real endpoint;
 3. the reviewer can authenticate without prohibited secondary verification and uses synthetic data;
-4. final production OAuth/UserInfo/domain verification pass;
-5. exact review artifacts and live Tool Scan are complete;
-6. public branding, privacy and support responsibilities are accurate and non-misleading;
-7. C6 production controls/evidence are complete enough for a real production endpoint.
+4. final UserInfo requirements pass;
+5. exact review artifacts and the current Tool Scan/domain state are coherent with the submitted endpoint;
+6. public branding, privacy, support and third-party relationship claims are accurate and non-misleading.
+
+The actual OpenAI review then decides final public eligibility under the current guidelines; a rejection or request for changes becomes new external evidence for a human/product roadmap decision.
