@@ -59,7 +59,7 @@ Public-directory eligibility is a distribution gate. It does not block private C
 
 ### Q0 — retrospective code assurance
 
-**Status: ELIGIBLE**  
+**Status: ACTIVE**  
 **Priority: highest stabilization priority before further runtime product expansion**
 
 Goal: subject the complete integrated runtime inherited from the project's pre-review phases to one finite retrospective assurance pass under the repository's current correctness, security, contract and review standards, then establish a trusted post-Q0 baseline without an open-ended cleanup rewrite.
@@ -72,7 +72,7 @@ Initial runtime audit baseline:
 
 That exact `main` includes the independently reviewed P2 repair from PR #106 and the bounded grid-display work from PR #102. The Q0 setup documentation itself does not alter that runtime baseline.
 
-Audit method and evidence rules are defined in `docs/RETROSPECTIVE-CODE-ASSURANCE.md`. The first pass is read-only for runtime behavior and covers a fixed set of domains: identity/isolation, Grist effects, public contracts, semantic document behavior, and cross-cutting tests/architecture/error/observability boundaries. Historical age or lack of old review is a prioritization signal, never a defect by itself.
+Audit method and evidence rules are defined in `docs/RETROSPECTIVE-CODE-ASSURANCE.md`. The fixed read-only inventory is complete against runtime baseline `2f811ee34cbeb32c9c945aeb217de34fba5065f2`. It found exactly three current BLOCKING findings and no separate REQUIRED finding: an incomplete model-facing `_grist_*` metadata-table boundary, open-ended schema metadata mutation dictionaries that violate the stable bounded public contract, and silently truncated document-UI metadata snapshots that can weaken safety-sensitive graph validation. The detailed evidence and explicit deferred non-findings are recorded in the assurance document.
 
 Exit criteria:
 
@@ -84,11 +84,14 @@ Exit criteria:
 - remaining cosmetic/style/speculative-refactor/tooling debt is explicitly **DEFERRED** rather than used to keep Q0 open;
 - a fresh integrated Q0 tranche review records `PASS` against an exact post-repair `main` SHA.
 
-Committed next Q0 slice:
+Committed Q0 repair slices, in conflict-minimizing order:
 
-1. **read-only retrospective risk inventory** — audit the five fixed domains against exact runtime baseline `2f811ee34cbeb32c9c945aeb217de34fba5065f2`, extend `docs/RETROSPECTIVE-CODE-ASSURANCE.md` with evidence/findings, and convert only concrete BLOCKING/REQUIRED findings into an explicit finite repair list in this roadmap.
+1. **Q0-F1 — internal metadata table boundary** — centralize and test rejection of model-facing `_grist_*` record/schema/table identifiers, including create/rename targets, while preserving trusted bridge-internal metadata access.
+2. **Q0-F2 — bounded schema mutation fields** — replace arbitrary table/column metadata mutation dictionaries with one finite stable semantic allowlist shared materially across MCP and GPT Actions/OpenAPI, and add accepted/unknown/unstable-field contract tests.
+3. **Q0-F3 — fail-closed UI metadata completeness** — mark potentially truncated bounded page/view/section metadata snapshots explicitly and reject UI mutations whose safety validation or exact verification requires a complete snapshot.
+4. **integrated Q0 completion review** — after F1–F3 are independently reviewed and integrated, perform the required fresh exact-`main` tranche review and record PASS or a concrete bounded finding.
 
-After the inventory, new Q0 repair slices may be promoted autonomously only when a concrete finding is necessary to satisfy the exit criteria above. Do not create generic cleanup, style-only, broad rewrite, blanket coverage, lint, complexity or mutation-testing work unless the inventory demonstrates a specific assurance benefit.
+Do not create generic cleanup, style-only, broad rewrite, blanket coverage, lint, complexity or mutation-testing work unless one of these repairs or the final integrated review demonstrates a specific missing invariant. A new Q0 repair slice may be promoted only from concrete BLOCKING/REQUIRED evidence.
 
 Q0 gates:
 
