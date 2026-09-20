@@ -67,6 +67,27 @@ function sameSortSpec(
   );
 }
 
+function assertPublicTableId(tableId: string): void {
+  if (!tableId.trim()) {
+    throw new Error("Table ID must not be empty.");
+  }
+  if (tableId.startsWith("_grist_")) {
+    throw new Error(
+      "Grist metadata tables are internal to the bridge; use the semantic document/page/widget inspection operations instead."
+    );
+  }
+}
+
+function assertPublicTableUpdates(tables: readonly GristTableUpdate[]): void {
+  for (const table of tables) {
+    assertPublicTableId(table.id);
+    const renamedTableId = table.fields.tableId;
+    if (typeof renamedTableId === "string") {
+      assertPublicTableId(renamedTableId);
+    }
+  }
+}
+
 export class AuthorizedGristService {
   private readonly documentContext = new DocumentContextService();
   private readonly documentUi = new DocumentUiService();
@@ -485,9 +506,10 @@ export class AuthorizedGristService {
     tableId: string,
     options: { hidden?: boolean } = {}
   ): Promise<unknown> {
-    return this.execute("list_columns", documentIdOrUrl, undefined, async (id) =>
-      projectPublicColumns(await this.inner.listColumns(id, tableId, options))
-    );
+    return this.execute("list_columns", documentIdOrUrl, undefined, async (id) => {
+      assertPublicTableId(tableId);
+      return projectPublicColumns(await this.inner.listColumns(id, tableId, options));
+    });
   }
 
   async queryRecords(
@@ -496,11 +518,7 @@ export class AuthorizedGristService {
     options: QueryRecordsOptions = {}
   ): Promise<unknown> {
     return this.execute("query_records", documentIdOrUrl, undefined, (id) => {
-      if (tableId.startsWith("_grist_")) {
-        throw new Error(
-          "Grist metadata tables are internal to the bridge; use the semantic document/page/widget inspection operations instead."
-        );
-      }
+      assertPublicTableId(tableId);
       return this.inner.queryRecords(id, tableId, options);
     });
   }
@@ -510,9 +528,10 @@ export class AuthorizedGristService {
     tableId: string,
     records: NewGristRecord[]
   ): Promise<unknown> {
-    return this.execute("create_records", documentIdOrUrl, records.length, (id) =>
-      this.inner.createRecords(id, tableId, records)
-    );
+    return this.execute("create_records", documentIdOrUrl, records.length, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.createRecords(id, tableId, records);
+    });
   }
 
   async updateRecords(
@@ -520,9 +539,10 @@ export class AuthorizedGristService {
     tableId: string,
     records: UpdateGristRecord[]
   ): Promise<unknown> {
-    return this.execute("update_records", documentIdOrUrl, records.length, (id) =>
-      this.inner.updateRecords(id, tableId, records)
-    );
+    return this.execute("update_records", documentIdOrUrl, records.length, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.updateRecords(id, tableId, records);
+    });
   }
 
   async deleteRecords(
@@ -530,9 +550,10 @@ export class AuthorizedGristService {
     tableId: string,
     recordIds: number[]
   ): Promise<unknown> {
-    return this.execute("delete_records", documentIdOrUrl, recordIds.length, (id) =>
-      this.inner.deleteRecords(id, tableId, recordIds)
-    );
+    return this.execute("delete_records", documentIdOrUrl, recordIds.length, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.deleteRecords(id, tableId, recordIds);
+    });
   }
 
   async createTables(
@@ -543,24 +564,29 @@ export class AuthorizedGristService {
       (count, table) => count + 1 + (table.columns?.length ?? 0),
       0
     );
-    return this.execute("create_tables", documentIdOrUrl, itemCount, (id) =>
-      this.inner.createTables(id, tables)
-    );
+    return this.execute("create_tables", documentIdOrUrl, itemCount, (id) => {
+      for (const table of tables) {
+        assertPublicTableId(table.id);
+      }
+      return this.inner.createTables(id, tables);
+    });
   }
 
   async updateTables(
     documentIdOrUrl: string,
     tables: GristTableUpdate[]
   ): Promise<unknown> {
-    return this.execute("update_tables", documentIdOrUrl, tables.length, (id) =>
-      this.inner.updateTables(id, tables)
-    );
+    return this.execute("update_tables", documentIdOrUrl, tables.length, (id) => {
+      assertPublicTableUpdates(tables);
+      return this.inner.updateTables(id, tables);
+    });
   }
 
   async deleteTable(documentIdOrUrl: string, tableId: string): Promise<unknown> {
-    return this.execute("delete_table", documentIdOrUrl, 1, (id) =>
-      this.inner.deleteTable(id, tableId)
-    );
+    return this.execute("delete_table", documentIdOrUrl, 1, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.deleteTable(id, tableId);
+    });
   }
 
   async createColumns(
@@ -568,9 +594,10 @@ export class AuthorizedGristService {
     tableId: string,
     columns: GristColumnSpec[]
   ): Promise<unknown> {
-    return this.execute("create_columns", documentIdOrUrl, columns.length, (id) =>
-      this.inner.createColumns(id, tableId, columns)
-    );
+    return this.execute("create_columns", documentIdOrUrl, columns.length, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.createColumns(id, tableId, columns);
+    });
   }
 
   async updateColumns(
@@ -578,9 +605,10 @@ export class AuthorizedGristService {
     tableId: string,
     columns: GristColumnUpdate[]
   ): Promise<unknown> {
-    return this.execute("update_columns", documentIdOrUrl, columns.length, (id) =>
-      this.inner.updateColumns(id, tableId, columns)
-    );
+    return this.execute("update_columns", documentIdOrUrl, columns.length, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.updateColumns(id, tableId, columns);
+    });
   }
 
   async renameColumn(
@@ -589,9 +617,10 @@ export class AuthorizedGristService {
     oldColumnId: string,
     newColumnId: string
   ): Promise<unknown> {
-    return this.execute("rename_column", documentIdOrUrl, 1, (id) =>
-      this.inner.renameColumn(id, tableId, oldColumnId, newColumnId)
-    );
+    return this.execute("rename_column", documentIdOrUrl, 1, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.renameColumn(id, tableId, oldColumnId, newColumnId);
+    });
   }
 
   async deleteColumns(
@@ -599,16 +628,14 @@ export class AuthorizedGristService {
     tableId: string,
     columnIds: string[]
   ): Promise<unknown> {
-    return this.execute("delete_columns", documentIdOrUrl, columnIds.length, (id) =>
-      this.inner.deleteColumns(id, tableId, columnIds)
-    );
+    return this.execute("delete_columns", documentIdOrUrl, columnIds.length, (id) => {
+      assertPublicTableId(tableId);
+      return this.inner.deleteColumns(id, tableId, columnIds);
+    });
   }
 
   private async resolveTableRef(documentId: string, tableId: string): Promise<number> {
-    if (!tableId.trim()) throw new Error("Table ID must not be empty.");
-    if (tableId.startsWith("_grist_")) {
-      throw new Error("Internal Grist metadata tables cannot be used as page widget sources.");
-    }
+    assertPublicTableId(tableId);
     const raw = await this.inner.listTables(documentId);
     const root = raw !== null && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
