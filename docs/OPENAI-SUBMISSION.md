@@ -141,7 +141,7 @@ Set/verify a real token only when the portal issues it.
 ### Already prepared
 
 - registry-derived MCP annotation values and justifications;
-- tracked `chatgpt-app-submission.json` with 22 tools;
+- tracked `chatgpt-app-submission.json` with 23 tools;
 - exact canonical 5-positive / 3-negative reviewer specification plus repository tests;
 - optional exact-token domain challenge endpoint;
 - multiple model-facing output-minimization slices;
@@ -201,7 +201,7 @@ Official references to re-check immediately before submission:
 
 ## Prepared import draft
 
-`chatgpt-app-submission.json` follows the current prepared import format and contains 22 tools, five positive scenarios and three negative non-invocation scenarios.
+`chatgpt-app-submission.json` follows the current prepared import format and contains 23 tools, five positive scenarios and three negative non-invocation scenarios.
 
 Remote MCP only; no distributed skills or Apps SDK UI. The production MCP URL is supplied in the portal rather than invented as a field in the tracked JSON.
 

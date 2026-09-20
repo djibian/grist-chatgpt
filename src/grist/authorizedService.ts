@@ -24,12 +24,16 @@ import {
   type GridOptionsUpdateInput
 } from "./gridOptions.js";
 import {
+  resolvePageLayoutUpdate,
+  type PageLayoutUpdateInput
+} from "./pageLayout.js";
+import {
   assertDirectSelectByAllowed,
   resolveColumnSelectByAllowed,
   type ColumnSelectByInput
 } from "./selectBy.js";
 import { DocumentContextService } from "./documentContext.js";
-import { DocumentUiService, type DocumentUiContext, type GristPageWidget } from "./documentUi.js";
+import { DocumentUiService, type DocumentUiContext } from "./documentUi.js";
 import {
   projectPublicColumns,
   projectPublicTables
@@ -332,6 +336,67 @@ export class AuthorizedGristService {
         throw new UiWriteVerificationError(
           "rename_page",
           error instanceof Error ? error.message : "Renamed page could not be verified."
+        );
+      }
+    });
+  }
+
+  async updatePageLayout(
+    documentIdOrUrl: string,
+    pageId: number,
+    layout: PageLayoutUpdateInput
+  ): Promise<unknown> {
+    if (!Number.isInteger(pageId) || pageId < 1) {
+      throw new Error("Grist page ID must be a positive integer.");
+    }
+
+    return this.execute("update_page_layout", documentIdOrUrl, 1, async (id) => {
+      const before = await this.loadDocumentUi(id);
+      assertCompleteUiSnapshot(before);
+      const page = before.pages.find((candidate) => candidate.id === pageId);
+      if (!page) {
+        throw new Error(`Grist page ${pageId} does not exist in document "${id}".`);
+      }
+      if (page.layoutNormalizationIncomplete) {
+        throw new Error(
+          `Grist page ${pageId} has incomplete or unsupported current layout metadata; refusing to overwrite it.`
+        );
+      }
+
+      const resolved = resolvePageLayoutUpdate(
+        layout,
+        page.widgets.map((widget) => widget.id)
+      );
+      await this.uiActions.updatePageLayout(id, pageId, resolved.layoutSpecJson);
+
+      try {
+        const after = await this.loadDocumentUi(id);
+        assertCompleteUiSnapshot(after);
+        const updatedPage = after.pages.find((candidate) => candidate.id === pageId);
+        if (!updatedPage) {
+          throw new Error(`Updated page ${pageId} was not found on re-read.`);
+        }
+        if (
+          updatedPage.layoutNormalizationIncomplete ||
+          !sameJsonValue(updatedPage.layoutNormalized, resolved.expectedLayout)
+        ) {
+          throw new Error(
+            `Updated page ${pageId} did not match the requested normalized layout on re-read.`
+          );
+        }
+        const { widgets, ...pageInfo } = updatedPage;
+        return {
+          documentId: id,
+          page: {
+            ...pageInfo,
+            widgetCount: widgets.length,
+            widgetIds: widgets.map((widget) => widget.id)
+          }
+        };
+      } catch (error) {
+        throw new UiWriteVerificationError(
+          "update_page_layout",
+          error instanceof Error ? error.message : "Updated page layout could not be verified."
         );
       }
     });

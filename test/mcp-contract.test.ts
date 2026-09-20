@@ -86,6 +86,7 @@ test("complete MCP surface is derived from the operation registry without annota
       "rename_column",
       "rename_page",
       "update_columns",
+      "update_page_layout",
       "update_page_widget",
       "update_records",
       "update_tables"
@@ -111,6 +112,7 @@ test("structured output schemas are limited to stable normalized UI contracts", 
     "get_page_widgets",
     "get_pages",
     "rename_page",
+    "update_page_layout",
     "update_page_widget"
   ]);
 });
@@ -156,6 +158,72 @@ test("stable page discovery returns reusable IDs in structuredContent", async ()
   );
 });
 
+test("bounded page layout is forwarded through the MCP update contract", async () => {
+  const registrations: Registration[] = [];
+  const observed: unknown[] = [];
+  const server = {
+    registerTool: (name: string, options: Registration["options"], callback: Registration["callback"]) => {
+      registrations.push({ name, options, callback });
+      return {};
+    }
+  } as unknown as McpServer;
+
+  registerUiTools(server, {
+    createPage: async () => ({}),
+    addPageWidget: async () => ({}),
+    renamePage: async () => ({}),
+    updatePageLayout: async (documentId, pageId, layout) => {
+      observed.push({ documentId, pageId, layout });
+      return {
+        documentId,
+        page: {
+          id: pageId,
+          pageRecordId: 70,
+          name: "Dashboard",
+          type: "raw_data",
+          indentation: 0,
+          widgetCount: 2,
+          widgetIds: [11, 12],
+          layoutNormalized: {
+            root: layout.root,
+            collapsedWidgetIds: [...(layout.collapsedWidgetIds ?? [])],
+            unplacedWidgetIds: []
+          }
+        }
+      };
+    },
+    updatePageWidget: async () => ({})
+  });
+
+  const updateLayout = registrations.find(
+    (entry) => entry.name === "update_page_layout"
+  );
+  assert.ok(updateLayout);
+  const layout = {
+    root: {
+      kind: "group" as const,
+      children: [
+        { kind: "widget" as const, widgetId: 11 },
+        { kind: "widget" as const, widgetId: 12 }
+      ]
+    },
+    collapsedWidgetIds: []
+  };
+  const result = await updateLayout.callback({
+    documentId: "doc-1",
+    pageId: 7,
+    layout
+  });
+
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(observed, [{ documentId: "doc-1", pageId: 7, layout }]);
+  assert.deepEqual(result.structuredContent.page.layoutNormalized, {
+    root: layout.root,
+    collapsedWidgetIds: [],
+    unplacedWidgetIds: []
+  });
+});
+
 test("widget description is forwarded through the MCP update contract", async () => {
   const registrations: Registration[] = [];
   const observed: unknown[] = [];
@@ -170,6 +238,7 @@ test("widget description is forwarded through the MCP update contract", async ()
     createPage: async () => ({}),
     addPageWidget: async () => ({}),
     renamePage: async () => ({}),
+    updatePageLayout: async () => ({}),
     updatePageWidget: async (documentId, pageId, widgetId, update) => {
       observed.push({ documentId, pageId, widgetId, update });
       return {

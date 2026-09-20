@@ -42,9 +42,12 @@ Stable `outputSchema` / `structuredContent` are already used where the bridge ha
 - `create_page`;
 - `add_page_widget`;
 - `rename_page`;
+- `update_page_layout`;
 - `update_page_widget`.
 
 These outputs expose reusable stable IDs without requiring prose parsing. Page inspection additionally exposes bounded `layoutNormalized` trees whose leaves are verified current widget IDs, plus collapsed/unplaced widget IDs and `layoutNormalizationIncomplete` when raw Grist layout state cannot be represented exactly. Raw `layoutSpec` remains available for v1 compatibility.
+
+`update_page_layout` mutates only that normalized bounded page layout. Public input uses exact current stable widget IDs: every current page widget must appear exactly once either as a placed tree leaf or in `collapsedWidgetIds`. Unknown, duplicate, omitted or malformed widgets are rejected before write; tree depth, total nodes and collapsed-ID count are bounded. The bridge constructs only the fixed internal `_grist_Views.layoutSpec` metadata update, then re-reads the page and requires exact normalized post-state equality. If current layout normalization is incomplete or post-write verification is ambiguous, the operation refuses or returns `write_verification_failed` rather than guessing or blindly replaying. Arbitrary raw BoxSpec/UserActions and model-supplied internal metadata refs are not public inputs.
 
 Widget inspection includes bounded normalized sort/select-by information and explicit incompleteness/truncation signals where exact normalization is not possible. Existing `type === "custom"` widgets additionally expose `customWidgetSettings` with normalized access level, optional stable gallery/bundled `widgetId`, and column mappings translated from Grist numeric column refs to stable current column IDs. This normalized settings view deliberately excludes custom-widget URLs, plugin identifiers and arbitrary widget-owned options; raw `options` remains available for v1 compatibility. Mapping resolution is bounded and exposes `customWidgetSettingsNormalizationIncomplete` rather than guessing unresolved or malformed entries.
 

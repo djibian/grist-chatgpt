@@ -50,7 +50,7 @@ Integrated milestones include:
 - **C4 ELIGIBLE:** productionize the already-proven OAuth design; the identity-provider decision is no longer a blocker.
 - **C5 BLOCKED:** secure per-user Grist credential onboarding still requires C4 productionization plus explicit persistence/encryption decisions.
 - **C6 preparation integrated:** timeouts, release/rollback documentation, OAuth deployment preflight/smoke design, metrics vocabulary and audit contract review are present; finalization still depends on C4/C5.
-- **P1 ELIGIBLE:** its only committed remaining product slice is bounded page-layout mutation; it is not integrated until its review gate passes.
+- **P1 ELIGIBLE:** its only committed remaining product slice is bounded page-layout mutation; P1 becomes DONE only after integration plus its independent completion review.
 - **P2 DONE / P3 DONE:** formula/schema safety and semantic document context/progressive discovery have passed their integrated reviews.
 - **P4 BLOCKED by P1 completion:** compact-surface evaluation waits for the P1 integrated review.
 - **S1 partially completed:** submission annotations/artifact, the canonical 5-positive/3-negative reviewer specification, the optional domain-challenge endpoint and several output-minimization slices are integrated.
@@ -200,13 +200,16 @@ Raw Grist `/apply` is never model-accessible. Where low-level actions are requir
 | create empty page | `createGristPage` | `create_page` |
 | add native page widget | `addGristPageWidget` | `add_page_widget` |
 | rename page | `renameGristPage` | `rename_page` |
+| update bounded page layout | `updateGristPageLayout` | `update_page_layout` |
 | update bounded widget configuration | `updateGristPageWidget` | `update_page_widget` |
 
 Page/widget inspection exposes bounded normalized page layout through stable widget IDs plus normalized sort/select-by state, custom-widget settings and table/grid display state where exact resolution is possible.
 
+`update_page_layout` accepts only a bounded normalized layout expressed with exact current widget IDs. Every current page widget must be accounted for exactly once as placed or collapsed; unknown, duplicate, omitted or malformed state is rejected before write. Tree depth/node count/collapsed-ID count are bounded, the bridge emits only the fixed internal page-layout metadata update, and the normalized page state is re-read and verified exactly. Arbitrary raw Grist BoxSpec/UserActions and model-supplied internal metadata refs are not public inputs.
+
 `update_page_widget` supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, a conservative Ref/RefList column select-by subset, bounded access/column-mapping updates for an explicitly identified existing custom widget, and bounded table/grid display updates for gridlines, zebra stripes and row-number mode. Custom-widget mappings use only stable current column IDs; URLs, plugin/widget identity and arbitrary widget-owned options are not writable model inputs. Grid/custom updates preserve every untargeted existing option. All UI writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
 
-Bounded page-layout mutation is the remaining committed P1 slice and is not part of `main` until its independent review/integration gate passes.
+Bounded page-layout mutation is the remaining committed P1 slice; P1 status changes only after its review/integration and independent completion review.
 
 ## Operation registry and audit
 
@@ -308,7 +311,7 @@ C4-P0 OAuth interoperability   DONE
 C4 Production OAuth            ELIGIBLE
 C5 Secure Grist onboarding     BLOCKED by C4 + human persistence/encryption decisions
 C6 Production hardening        BLOCKED for finalization by C4/C5
-P1 Document UI parity          ELIGIBLE; bounded layout mutation remains
+P1 Document UI parity          ELIGIBLE; bounded layout mutation remains pending integration/review
 P2 Formula/schema safety       DONE
 P3 Semantic context/discovery  DONE
 P4 Compact MCP surface         BLOCKED until P1 integrated review passes

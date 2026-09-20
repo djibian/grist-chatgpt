@@ -10,6 +10,7 @@ import {
 } from "./actions/api.js";
 import {
   buildUiOpenApiPaths,
+  buildUiOpenApiSchemas,
   registerUiActionApi
 } from "./actions/uiApi.js";
 import { AuditLogger } from "./audit/auditLogger.js";
@@ -180,6 +181,12 @@ function buildExtendedOpenApiDocument(baseUrl: string): Record<string, unknown> 
   });
   const paths = document.paths as Record<string, unknown>;
   Object.assign(paths, buildUiOpenApiPaths());
+  const components = document.components as Record<string, unknown>;
+  const schemas = (components.schemas ?? {}) as Record<string, unknown>;
+  components.schemas = {
+    ...schemas,
+    ...buildUiOpenApiSchemas()
+  };
   const documentIdParameter = {
     name: "documentId",
     in: "path",

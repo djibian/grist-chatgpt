@@ -9,6 +9,12 @@ import {
 } from "../grist/customWidgetSettings.js";
 import { GRID_ROW_NUMBER_MODES } from "../grist/gridOptions.js";
 import {
+  MAX_NORMALIZED_LAYOUT_NODES,
+  MAX_NORMALIZED_LAYOUT_WIDGET_IDS,
+  type NormalizedPageLayoutNode,
+  type PageLayoutUpdateInput
+} from "../grist/pageLayout.js";
+import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
@@ -32,6 +38,11 @@ interface UiOperations {
     type: NativeWidgetType
   ): Promise<unknown>;
   renamePage(documentId: string, pageId: number, name: string): Promise<unknown>;
+  updatePageLayout(
+    documentId: string,
+    pageId: number,
+    layout: PageLayoutUpdateInput
+  ): Promise<unknown>;
   updatePageWidget(
     documentId: string,
     pageId: number,
@@ -94,6 +105,38 @@ const gridOptionsUpdateSchema = z
       value.rowNumbers !== undefined,
     "At least one grid display option must be supplied."
   );
+
+const pageLayoutNodeSchema: z.ZodType<NormalizedPageLayoutNode> = z.lazy(() =>
+  z.union([
+    z
+      .object({
+        kind: z.literal("widget"),
+        widgetId: z.number().int().positive(),
+        size: z.number().nonnegative().optional()
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal("group"),
+        children: z
+          .array(pageLayoutNodeSchema)
+          .min(1)
+          .max(MAX_NORMALIZED_LAYOUT_NODES),
+        size: z.number().nonnegative().optional()
+      })
+      .strict()
+  ])
+);
+
+const pageLayoutUpdateSchema = z
+  .object({
+    root: pageLayoutNodeSchema,
+    collapsedWidgetIds: z
+      .array(z.number().int().positive())
+      .max(MAX_NORMALIZED_LAYOUT_WIDGET_IDS)
+      .optional()
+  })
+  .strict();
 
 export function registerUiTools(server: McpServer, grist: UiOperations): void {
   server.registerTool(
@@ -158,6 +201,29 @@ export function registerUiTools(server: McpServer, grist: UiOperations): void {
       try {
         const output = pageMutationOutputSchema.parse(
           await grist.renamePage(documentId, pageId, name)
+        );
+        return structuredResult(output);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_page_layout",
+    {
+      ...getMcpToolMetadata("update_page_layout"),
+      inputSchema: z.object({
+        documentId: z.string().min(1),
+        pageId: z.number().int().positive(),
+        layout: pageLayoutUpdateSchema
+      }),
+      outputSchema: pageMutationOutputSchema
+    },
+    async ({ documentId, pageId, layout }) => {
+      try {
+        const output = pageMutationOutputSchema.parse(
+          await grist.updatePageLayout(documentId, pageId, layout)
         );
         return structuredResult(output);
       } catch (error) {

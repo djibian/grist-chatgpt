@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   MAX_NORMALIZED_LAYOUT_DEPTH,
   MAX_NORMALIZED_LAYOUT_NODES,
-  normalizePageLayout
+  normalizePageLayout,
+  resolvePageLayoutUpdate
 } from "../src/grist/pageLayout.js";
 
 test("normalizes BoxSpec leaves to stable widget IDs", () => {
@@ -125,4 +126,118 @@ test("normalization is bounded by node count", () => {
     assert.equal(root.children.length, MAX_NORMALIZED_LAYOUT_NODES - 1);
   }
   assert.equal(result.layoutNormalized?.unplacedWidgetIds.length, 26);
+});
+
+test("resolves stable-ID layout input to the exact Grist BoxSpec", () => {
+  const resolved = resolvePageLayoutUpdate(
+    {
+      root: {
+        kind: "group",
+        children: [
+          { kind: "widget", widgetId: 201, size: 60 },
+          {
+            kind: "group",
+            children: [
+              { kind: "widget", widgetId: 202 },
+              { kind: "widget", widgetId: 203 }
+            ],
+            size: 40
+          }
+        ]
+      },
+      collapsedWidgetIds: [204]
+    },
+    [201, 202, 203, 204]
+  );
+
+  assert.deepEqual(resolved.layoutSpec, {
+    children: [
+      { leaf: 201, size: 60 },
+      {
+        children: [{ leaf: 202 }, { leaf: 203 }],
+        size: 40
+      }
+    ],
+    collapsed: [{ leaf: 204 }]
+  });
+  assert.equal(resolved.layoutSpecJson, JSON.stringify(resolved.layoutSpec));
+  assert.deepEqual(resolved.expectedLayout, {
+    root: {
+      kind: "group",
+      children: [
+        { kind: "widget", widgetId: 201, size: 60 },
+        {
+          kind: "group",
+          children: [
+            { kind: "widget", widgetId: 202 },
+            { kind: "widget", widgetId: 203 }
+          ],
+          size: 40
+        }
+      ]
+    },
+    collapsedWidgetIds: [204],
+    unplacedWidgetIds: []
+  });
+});
+
+test("layout mutation requires an exact partition of current widget IDs", () => {
+  assert.throws(
+    () =>
+      resolvePageLayoutUpdate(
+        { root: { kind: "widget", widgetId: 1 } },
+        [1, 2]
+      ),
+    /missing widget 2/
+  );
+  assert.throws(
+    () =>
+      resolvePageLayoutUpdate(
+        {
+          root: {
+            kind: "group",
+            children: [
+              { kind: "widget", widgetId: 1 },
+              { kind: "widget", widgetId: 1 }
+            ]
+          },
+          collapsedWidgetIds: [2]
+        },
+        [1, 2]
+      ),
+    /appears more than once/
+  );
+  assert.throws(
+    () =>
+      resolvePageLayoutUpdate(
+        {
+          root: { kind: "widget", widgetId: 1 },
+          collapsedWidgetIds: [1]
+        },
+        [1]
+      ),
+    /both placed and collapsed/
+  );
+  assert.throws(
+    () =>
+      resolvePageLayoutUpdate(
+        {
+          root: { kind: "widget", widgetId: 999 }
+        },
+        [1]
+      ),
+    /does not exist/
+  );
+});
+
+test("layout mutation enforces the same depth bound as normalization", () => {
+  let root: any = { kind: "widget", widgetId: 1 };
+  for (let index = 0; index <= MAX_NORMALIZED_LAYOUT_DEPTH; index += 1) {
+    root = { kind: "group", children: [root] };
+  }
+
+  assert.throws(
+    () => resolvePageLayoutUpdate({ root }, [1]),
+    /maximum depth/
+  );
 });
