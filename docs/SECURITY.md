@@ -149,6 +149,7 @@ Bounded UI operations require `doc.schema:write` and currently include:
 - page creation;
 - supported native widget creation;
 - page rename;
+- bounded page-layout mutation using stable current widget IDs with an exact placed/collapsed partition, fixed internal metadata write and exact normalized post-write verification;
 - widget title/description update and description clearing;
 - native chart-type configuration for chart widgets;
 - saved sort configuration through stable current column IDs;
@@ -159,7 +160,7 @@ Bounded UI operations require `doc.schema:write` and currently include:
 
 The model never receives raw Grist metadata-table write access, arbitrary custom-widget option payloads or internal numeric column refs as write inputs. Safety-sensitive UI mutations fail closed when the current bounded metadata snapshot or required normalized state is incomplete. Writes are followed by exact normalized or complete expected-state re-read verification; ambiguous post-write state must not trigger blind replay.
 
-Bounded page-layout mutation is the remaining committed P1 slice and is not part of `main` until its review/integration gate passes. New page/widget deletion or broader destructive UI surfaces remain human-gated.
+P1 document-UI parity has passed its integrated completion review on exact `main` `bc44d1f03d30db2e0e3951c96a06cc7ae113548e`. New page/widget deletion or broader destructive UI surfaces remain human-gated.
 
 ### Low-level Grist actions
 
