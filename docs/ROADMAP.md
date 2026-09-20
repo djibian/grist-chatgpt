@@ -35,12 +35,13 @@ C3 user-aware Grist context       DONE
 C4-P0 Logto/ProConnect MCP POC    DONE
 S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
+P1 document UI parity             DONE
 P2 formula/schema safety          DONE
 P3 semantic context/discovery     DONE
 Q0 retrospective code assurance  DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, bounded native chart-type configuration for explicitly identified chart widgets, and the completed Q0 repairs that enforce the internal metadata-table boundary, close schema-mutation metadata allowlists and fail closed on potentially truncated UI metadata snapshots.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a bounded document-UI surface. `main` contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection and mutation through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, bounded native chart-type configuration for explicitly identified chart widgets, and the completed Q0 repairs that enforce the internal metadata-table boundary, close schema-mutation metadata allowlists and fail closed on potentially truncated UI metadata snapshots.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
@@ -48,11 +49,11 @@ The project advances on three product/platform/distribution axes. Q0 remains rec
 
 ```text
 QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT CAPABILITIES       PUBLIC DISTRIBUTION
-Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3              S0 + S1
+Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 DONE         S0 + S1
                                                        -> P4                     -> C7 -> C8
 ```
 
-Q0 established the post-audit runtime trust baseline. New bounded product work may now proceed subject to its own dependencies and the normal review protocol.
+Q0 established the post-audit runtime trust baseline. New bounded product work may proceed only when its own finite roadmap tranche is explicitly defined and eligible.
 
 Public-directory eligibility is a distribution gate. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -98,8 +99,8 @@ No fourth cleanup slice is committed. Generic cleanup, style-only, broad rewrite
 
 Post-Q0 dependency state:
 
-- P1's remaining bounded layout-mutation slice is now eligible;
-- P4's Q0 prerequisite is satisfied, but P4 still waits for P1 to pass its required integrated review and be marked DONE; P2 and P3 are already DONE;
+- P1, P2 and P3 have passed their required integrated reviews and are DONE;
+- P4's former P1/Q0/P2/P3 dependency chain is satisfied, but P4 remains blocked until its evaluation tranche has an explicit finite completion path rather than being expanded implicitly;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -231,7 +232,7 @@ Remaining finalization after C4/C5:
 
 ## Axis B — product capabilities
 
-The product axis may advance now that Q0 is DONE when a slice preserves the existing identity, authorization and bounded-operation invariants. P2 and P3 are already stabilized; P1's remaining bounded layout-mutation slice is eligible.
+The product axis may advance now that Q0, P1, P2 and P3 are DONE only when a later tranche has an explicit finite roadmap contract and preserves the existing identity, authorization and bounded-operation invariants.
 
 Reference inspirations are design provenance, not dependencies:
 
@@ -260,8 +261,8 @@ Already integrated:
 
 ### P1 — document UI parity
 
-**Status: ELIGIBLE**  
-**Priority: highest product-expansion tranche**
+**Status: DONE**  
+**Priority: completed product-capability tranche**
 
 Goal: provide the useful bounded subset of Grist document-design semantics needed for realistic page/widget work without exposing arbitrary UserActions.
 
@@ -272,6 +273,7 @@ Current baseline:
 - `create_page`;
 - `add_page_widget`;
 - `rename_page`;
+- bounded `update_page_layout` using stable current widget IDs, an exact placed/collapsed partition of all current page widgets, bounded node/depth/collapsed-ID counts, fixed internal `_grist_Views.layoutSpec` mutation and exact normalized post-write verification;
 - bounded `update_page_widget` title/description/native chart-type/saved-sort/select-by/custom-widget-settings/table-grid-display behavior, including explicit description clearing, chart-only enforcement and normalized post-write verification;
 - bounded saved-sort configuration using at most 20 stable current column IDs with `asc`/`desc` plus optional `emptyLast`, Text-only `naturalSort` and Choice/ChoiceList-only `orderByChoice`; internal numeric `colRef` values are resolved server-side only, schema resolution is capped at 5,000 columns, and the exact encoded post-state is verified by re-read;
 - bounded `directSelectByOptions` discovery for supported same-page/same-table sources, with cycle checks and explicit truncation semantics;
@@ -285,14 +287,14 @@ Current baseline:
 
 Exit criteria:
 
-- the current bounded UI baseline plus the committed slices below are integrated with stable-ID inputs, bounded semantics and exact post-write verification for mutations;
+- the current bounded UI baseline plus the committed slices are integrated with stable-ID inputs, bounded semantics and exact post-write verification for mutations;
 - document-UI contracts, tests and current-state documentation are coherent;
 - no arbitrary UserAction, generic `/apply`, arbitrary custom-option payload or newly destructive UI surface is exposed;
 - no other non-destructive UI slice is required to satisfy the stated P1 goal.
 
-Committed next P1 slices:
+Integrated tranche review: **PASS** against exact `main` `bc44d1f03d30db2e0e3951c96a06cc7ae113548e`. The bounded page-layout mutation from PR #115 is integrated on that exact tree, its exact merge-commit CI passed, and the prior review finding on the service-level read → fixed write → re-read path was repaired with focused regression tests covering successful exact serialization/verification, pre-write refusal of incomplete current layout metadata and non-retryable `UiWriteVerificationError` on post-write divergence. The public MCP and GPT Actions/OpenAPI contracts use the same authorized service path, require `doc.schema:write`, accept only bounded stable current widget IDs, expose no arbitrary UserAction or raw layout metadata write surface, and preserve the existing fail-closed/ambiguous-write semantics. No committed P1 work remains.
 
-1. **bounded layout mutation** — add only layout changes that can be expressed with stable current widget IDs, validated against the current page, bounded in size/depth and exactly verified by re-read.
+Committed next P1 slices: **none**.
 
 Deferred P1 candidates — not autonomously eligible unless explicitly promoted:
 
@@ -388,7 +390,7 @@ Deferred P3 candidates — not autonomously eligible unless explicitly promoted:
 
 ### P4 — compact MCP surface
 
-**Status: BLOCKED until P1 passes its required integrated review and is marked DONE; Q0, P2 and P3 are already DONE**  
+**Status: BLOCKED pending an explicit finite P4 evaluation contract; Q0 and P1/P2/P3 prerequisites are satisfied**  
 **Priority: medium**
 
 Goal: evaluate whether the public surface should converge from many narrow tools toward a smaller user-intent surface such as records/schema/pages managers while preserving:
@@ -400,6 +402,8 @@ Goal: evaluate whether the public surface should converge from many narrow tools
 Do not create a broad multi-action super-tool or pseudo-transaction that obscures partial success and risk annotations.
 
 The existing public v1 operations remain the stable compatibility surface until a migration contract is explicitly designed and tested.
+
+The former P1 dependency is satisfied. Before P4 becomes autonomously ELIGIBLE, a separate roadmap decision must define its finite evaluation exit criteria and committed next work without silently changing the public v1 contract.
 
 ### P5 — attachments
 
@@ -464,7 +468,7 @@ Completed:
 
 - annotation semantics and per-tool justifications;
 - submission artifact generation;
-- draft `chatgpt-app-submission.json` with 22 tools, five positive and three negative routing scenarios;
+- draft `chatgpt-app-submission.json` with 23 tools, five positive and three negative routing scenarios;
 - canonical reviewer-test specification for exactly five positive and three negative submission cases, with explicit prompts, expected behavior/result structure and synthetic fixture requirements; repository tests lock the tracked artifact's 5+3 shape while live fixture execution remains a C7 concern;
 - real ChatGPT CIMD/OIDC connection proving `openid` / `email` compatibility after enabling the corresponding Dynamic app permissions;
 - document discovery now explicitly projects only the public org/workspace/document identifiers, names and access metadata needed by the bridge contract instead of forwarding arbitrary upstream extension fields;
@@ -510,24 +514,24 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-Preferred steady state after Q0:
+Preferred steady state after P1 completion:
 
 ```text
-Worker A: P1 bounded product work
+Worker A: next explicitly committed product tranche when finite and eligible
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration, review/dependency control, human gates, S0/S1 coordination
 ```
 
-P1's bounded layout-mutation slice is now eligible. Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
+Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
 ## Controller integration order
 
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress P1's committed bounded layout-mutation slice and then trigger its tranche-completion review when the committed set is exhausted;
-3. progress independent C4 operational evidence when the required intended environment/operator support is available;
-4. progress low-risk S1 evidence while S0 remains unresolved;
+2. progress independent C4 operational evidence when the required intended environment/operator support is available;
+3. progress low-risk S1 evidence while S0 remains unresolved and the required external identity evidence is available;
+4. define a finite P4 evaluation tranche through an explicit roadmap decision before any compact-surface implementation is attempted;
 5. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
