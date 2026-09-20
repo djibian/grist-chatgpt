@@ -255,7 +255,7 @@ The destructive candidates remain human-gated. Bounded adapters may internally e
 
 ### P2 — formula and schema safety
 
-**Status: ELIGIBLE — READY FOR TRANCHE REVIEW once no overlapping repair is pending**  
+**Status: ACTIVE — tranche review repair pending**  
 **Priority: high**
 
 Goal: provide a bounded non-executing `FormulaInspector`-style layer that detects likely schema/formula mistakes before mutation while leaving Grist authoritative for actual formula evaluation.
@@ -278,16 +278,22 @@ Exit criteria:
 - no Python interpreter, raw SQL or generic code-execution surface is introduced;
 - tests/documentation cover the integrated advisory behavior and no committed P2 slice remains.
 
-Committed next P2 slices: **none**.
+Integrated tranche review against exact `main` `9aa5cc42edcf1306c2d14b742a1deefa40dfdf43`: **CHANGES REQUIRED**. A one-hop `$Ref.Field` whose Ref target table metadata is unavailable is currently omitted from `dereferences` without an explicit incompleteness marker, so the second exit criterion is not yet satisfied.
 
-Further formula/schema ideas are deferred until an explicit roadmap decision demonstrates additional value and promotes a bounded slice. The Controller should therefore request/perform the integrated P2 tranche review rather than inventing more advisory functionality.
+Committed next P2 slices:
+
+1. **explicit unavailable-target dereference incompleteness** — when a one-hop source resolves to `Ref`/`RefList` but its target-table metadata is unavailable, expose bounded explicit incompleteness without inventing a missing-field warning or performing another upstream read.
+
+Further formula/schema ideas are deferred until an explicit roadmap decision demonstrates additional value and promotes a bounded slice. No additional P2 feature work is committed beyond the repair above.
 
 ### P3 — semantic document context and progressive discovery
 
-**Status: ELIGIBLE — READY FOR TRANCHE REVIEW once no overlapping repair is pending**  
+**Status: DONE**  
 **Priority: high**
 
 Goal: provide compact semantic document context and progressive discovery that expose useful stable relationships/UI state without indiscriminate row disclosure or guessed normalization.
+
+Integrated tranche review: **PASS** against exact `main` `9aa5cc42edcf1306c2d14b742a1deefa40dfdf43`. The integrated UI/relation normalizers fail closed with explicit incompleteness markers, progressive help derives operation metadata from the normative registry, `inspect_document` does not load user-table rows, and credential-derived contexts/caches remain principal-isolated. No committed P3 slice remains.
 
 Integrated normalized UI slice:
 
@@ -329,8 +335,6 @@ Deferred P3 candidates — not autonomously eligible unless explicitly promoted:
 - additional normalized UI/select-by context;
 - new cache/invalidation behavior;
 - optional MCP resource forms such as `grist://documents/{id}/context`.
-
-The Controller should therefore request/perform the integrated P3 tranche review rather than selecting a candidate by convenience.
 
 ### P4 — compact MCP surface
 
