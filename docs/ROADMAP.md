@@ -35,21 +35,67 @@ C3 user-aware Grist context       DONE
 C4-P0 Logto/ProConnect MCP POC    DONE
 S1 annotation semantics/package   DONE
 P0 product architecture baseline  DONE
+P2 formula/schema safety          DONE
+P3 semantic context/discovery     DONE
 ```
 
-The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
+The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a first bounded document-UI tranche. Since that baseline, `main` also contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, and bounded native chart-type configuration for explicitly identified chart widgets.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
-The project now advances on three parallel axes:
+The project advances on three product/platform/distribution axes plus one temporary cross-cutting assurance tranche:
 
 ```text
-PLATFORM / SECURITY      PRODUCT CAPABILITIES       PUBLIC DISTRIBUTION
-C4 -> C5 -> C6           P1 / P2 / P3              S0 + S1
-                              -> P4                     -> C7 -> C8
+QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT CAPABILITIES       PUBLIC DISTRIBUTION
+Q0                        C4 -> C5 -> C6           P1 / P2 / P3              S0 + S1
+                                                       -> P4                     -> C7 -> C8
 ```
 
-Public-directory eligibility is a distribution gate. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
+Q0 is a one-time retrospective trust-baseline tranche. While Q0 is active, do not start new runtime product-surface expansion in P1/P4 or declare C6 production hardening complete. Independent C4 operational evidence and low-risk S1 evidence may continue in parallel when they do not mutate the Q0 runtime baseline.
+
+Public-directory eligibility is a distribution gate. It does not block private ChatGPT Developer Mode use, Codex use, Q0 assurance work or production-quality platform engineering that is independently useful.
+
+## Cross-cutting quality assurance
+
+### Q0 — retrospective code assurance
+
+**Status: ELIGIBLE**  
+**Priority: highest stabilization priority before further runtime product expansion**
+
+Goal: subject the complete integrated runtime inherited from the project's pre-review phases to one finite retrospective assurance pass under the repository's current correctness, security, contract and review standards, then establish a trusted post-Q0 baseline without an open-ended cleanup rewrite.
+
+Initial runtime audit baseline:
+
+```text
+2f811ee34cbeb32c9c945aeb217de34fba5065f2
+```
+
+That exact `main` includes the independently reviewed P2 repair from PR #106 and the bounded grid-display work from PR #102. The Q0 setup documentation itself does not alter that runtime baseline.
+
+Audit method and evidence rules are defined in `docs/RETROSPECTIVE-CODE-ASSURANCE.md`. The first pass is read-only for runtime behavior and covers a fixed set of domains: identity/isolation, Grist effects, public contracts, semantic document behavior, and cross-cutting tests/architecture/error/observability boundaries. Historical age or lack of old review is a prioritization signal, never a defect by itself.
+
+Exit criteria:
+
+- every current runtime domain named in the Q0 protocol has been reviewed at least once against the current repository invariants and exact audited `main` is recorded;
+- no unresolved **BLOCKING** correctness, authorization/security, privacy, data-integrity, contract or replay/ambiguity finding remains;
+- every **REQUIRED** assurance finding has either been repaired through the normal exact-head CI/independent-review process or explicitly reclassified with durable evidence;
+- critical authorization, mutation, partial-failure, stable-ID/normalization and public-contract boundaries have adequate positive, negative and failure/ambiguity characterization where material;
+- operation registry, MCP surface, GPT Actions/OpenAPI compatibility surface, runtime semantics and current-state documentation tell one materially coherent story;
+- remaining cosmetic/style/speculative-refactor/tooling debt is explicitly **DEFERRED** rather than used to keep Q0 open;
+- a fresh integrated Q0 tranche review records `PASS` against an exact post-repair `main` SHA.
+
+Committed next Q0 slice:
+
+1. **read-only retrospective risk inventory** — audit the five fixed domains against exact runtime baseline `2f811ee34cbeb32c9c945aeb217de34fba5065f2`, extend `docs/RETROSPECTIVE-CODE-ASSURANCE.md` with evidence/findings, and convert only concrete BLOCKING/REQUIRED findings into an explicit finite repair list in this roadmap.
+
+After the inventory, new Q0 repair slices may be promoted autonomously only when a concrete finding is necessary to satisfy the exit criteria above. Do not create generic cleanup, style-only, broad rewrite, blanket coverage, lint, complexity or mutation-testing work unless the inventory demonstrates a specific assurance benefit.
+
+Q0 gates:
+
+- P1's remaining bounded layout-mutation slice waits for Q0 `DONE`;
+- P4 remains blocked by Q0 in addition to its product-tranche prerequisites;
+- C6 may continue preparatory work already committed elsewhere, but production-hardening completion waits for Q0 `DONE`;
+- C4 operational evidence and S1's remaining low-risk external evidence may proceed independently.
 
 ## Axis A — platform and security
 
@@ -154,7 +200,7 @@ it records required choices without selecting a persistence or encryption design
 
 ### C6 — production hardening
 
-**Status: BLOCKED by C4/C5 for remaining finalization**  
+**Status: BLOCKED by C4/C5 and Q0 for remaining finalization**  
 **Priority: high**
 
 Already integrated:
@@ -168,7 +214,7 @@ Already integrated:
 - bounded production metrics vocabulary with low-cardinality label rules;
 - review and documentation of the current structured audit event contract, including correlation/privacy boundaries.
 
-Remaining finalization after C4/C5:
+Remaining finalization after C4/C5/Q0:
 
 - per-principal rate limiting;
 - operational metrics and alerting;
@@ -179,7 +225,7 @@ Remaining finalization after C4/C5:
 
 ## Axis B — product capabilities
 
-The product axis may advance in parallel with C4/C5 when a slice preserves the existing identity, authorization and bounded-operation invariants.
+The product axis may advance after Q0 when a slice preserves the existing identity, authorization and bounded-operation invariants. P2 and P3 are already stabilized; P1's remaining runtime expansion waits for Q0.
 
 Reference inspirations are design provenance, not dependencies:
 
@@ -208,8 +254,8 @@ Already integrated:
 
 ### P1 — document UI parity
 
-**Status: ELIGIBLE**  
-**Priority: highest product-expansion tranche**
+**Status: BLOCKED by Q0 retrospective code assurance**  
+**Priority: highest product-expansion tranche after Q0**
 
 Goal: provide the useful bounded subset of Grist document-design semantics needed for realistic page/widget work without exposing arbitrary UserActions.
 
@@ -238,7 +284,7 @@ Exit criteria:
 - no arbitrary UserAction, generic `/apply`, arbitrary custom-option payload or newly destructive UI surface is exposed;
 - no other non-destructive UI slice is required to satisfy the stated P1 goal.
 
-Committed next P1 slices:
+Committed next P1 slices after Q0:
 
 1. **bounded layout mutation** — add only layout changes that can be expressed with stable current widget IDs, validated against the current page, bounded in size/depth and exactly verified by re-read.
 
@@ -255,7 +301,7 @@ The destructive candidates remain human-gated. Bounded adapters may internally e
 
 ### P2 — formula and schema safety
 
-**Status: ACTIVE — tranche review repair pending**  
+**Status: DONE**  
 **Priority: high**
 
 Goal: provide a bounded non-executing `FormulaInspector`-style layer that detects likely schema/formula mistakes before mutation while leaving Grist authoritative for actual formula evaluation.
@@ -268,8 +314,8 @@ Integrated advisory slices:
 - up to three deterministic close existing-column suggestions are surfaced without rewriting user intent;
 - matching/suggested Ref/RefList columns expose their target table;
 - when expanded document schema is already available, exact one-hop `$Ref.Field` and `$RefList.Field` lookups are checked against the referenced table with the same exact/case-mismatch/missing semantics and suggestions;
-- one-hop dereference inspection is independently capped at 100, ignores method-like/deeper-chain Python expressions and implicit `id`, performs no extra upstream read, and never invents a warning when target-table metadata is unavailable;
-- document context summarizes local formula references, checked dereferences, dereference warnings and aggregate formula warnings.
+- one-hop dereference inspection is independently capped at 100, ignores method-like/deeper-chain Python expressions and implicit `id`, performs no extra upstream read, never invents a warning when target-table metadata is unavailable, and now exposes `dereferencesIncomplete: true` when a current Ref/RefList source resolves but its target-table metadata is unavailable;
+- document context preserves the complete bounded `formulaAnalysis` object while summarizing local formula references, checked dereferences, dereference warnings and aggregate formula warnings.
 
 Exit criteria:
 
@@ -278,13 +324,11 @@ Exit criteria:
 - no Python interpreter, raw SQL or generic code-execution surface is introduced;
 - tests/documentation cover the integrated advisory behavior and no committed P2 slice remains.
 
-Integrated tranche review against exact `main` `9aa5cc42edcf1306c2d14b742a1deefa40dfdf43`: **CHANGES REQUIRED**. A one-hop `$Ref.Field` whose Ref target table metadata is unavailable is currently omitted from `dereferences` without an explicit incompleteness marker, so the second exit criterion is not yet satisfied.
+Integrated tranche review: **PASS** against exact `main` `2f811ee34cbeb32c9c945aeb217de34fba5065f2`. The prior review finding was repaired by independently reviewed PR #106: unavailable Ref/RefList target metadata now produces explicit bounded incompleteness without an extra upstream read or an invented missing-field diagnosis. `DocumentContextService` preserves that analysis in the returned column context, the repair has focused positive/negative tests, and no committed P2 work remains.
 
-Committed next P2 slices:
+Committed next P2 slices: **none**.
 
-1. **explicit unavailable-target dereference incompleteness** — when a one-hop source resolves to `Ref`/`RefList` but its target-table metadata is unavailable, expose bounded explicit incompleteness without inventing a missing-field warning or performing another upstream read.
-
-Further formula/schema ideas are deferred until an explicit roadmap decision demonstrates additional value and promotes a bounded slice. No additional P2 feature work is committed beyond the repair above.
+Further formula/schema ideas remain deferred until an explicit roadmap decision demonstrates additional value and promotes a bounded slice.
 
 ### P3 — semantic document context and progressive discovery
 
@@ -338,7 +382,7 @@ Deferred P3 candidates — not autonomously eligible unless explicitly promoted:
 
 ### P4 — compact MCP surface
 
-**Status: BLOCKED until P1, P2 and P3 each pass integrated tranche review and are marked DONE**  
+**Status: BLOCKED until Q0, P1, P2 and P3 each pass their required integrated review and are marked DONE**  
 **Priority: medium**
 
 Goal: evaluate whether the public surface should converge from many narrow tools toward a smaller user-intent surface such as records/schema/pages managers while preserving:
@@ -395,7 +439,7 @@ These are architectural boundaries, not deferred feature requests:
 **Status: BLOCKED / HUMAN-INSTITUTIONAL GATE**  
 **Priority: highest only for public OpenAI directory publication**
 
-S0 blocks public publication and publication-specific reviewer investment. It does **not** block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
+S0 blocks public publication and publication-specific reviewer investment. It does **not** block private ChatGPT Developer Mode use, Codex use, Q0 assurance work, product-capability development after Q0 or production-quality platform engineering that is independently useful.
 
 The unresolved question is whether OpenAI will accept this independent Grist Community integration under its current rule against plugins whose primary function is acting as unofficial connectors to third-party services.
 
@@ -460,24 +504,25 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-Preferred steady state now that C4-P0 is DONE:
+Preferred steady state while Q0 is active:
 
 ```text
-Worker A: platform/security (C4, then C5/C6 as eligible)
-Worker B: product capability (P1 first; P2/P3 tranche reviews when eligible)
-Controller: integration, dependency control, human gates, S0/S1 coordination
+Worker A: platform/security operational evidence (C4)
+Worker B: Q0 retrospective assurance inventory/repairs
+Controller: integration, review/dependency control, human gates, S0/S1 coordination
 ```
 
-Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
+Do not start the P1 layout-mutation slice until Q0 is DONE. Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
 ## Controller integration order
 
-When multiple PRs are open, prefer:
+When multiple actions are eligible, prefer:
 
-1. close a ready existing dependency;
-2. integrate small platform/security slices that keep the proven OAuth contract stable;
-3. integrate independent bounded product slices or required tranche reviews;
-4. progress low-risk S1 preparation while S0 remains unresolved;
-5. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
+1. close a ready existing dependency or prior-execution review-required PR;
+2. progress Q0's committed inventory/repair slices until the retrospective trust baseline is established;
+3. progress independent C4 operational evidence that does not mutate the Q0 runtime baseline;
+4. progress low-risk S1 evidence while S0 remains unresolved;
+5. after Q0 DONE, resume bounded P1 product expansion and its tranche-completion path;
+6. stop at human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
