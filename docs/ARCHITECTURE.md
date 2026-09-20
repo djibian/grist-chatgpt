@@ -184,6 +184,7 @@ Large record operations may use sequential non-atomic batches. Partial failure r
 The bounded UI layer now includes:
 
 - normalized page/widget inspection;
+- bounded normalized page-layout inspection through stable current widget IDs, with collapsed/unplaced IDs and explicit incompleteness instead of guessed state;
 - empty page creation;
 - supported native widget creation;
 - page rename;
@@ -193,9 +194,13 @@ The bounded UI layer now includes:
 - conservative direct same-table select-by linking;
 - bounded Ref/RefList column select-by linking through advertised stable widget/column IDs;
 - normalized saved-sort and select-by inspection;
-- post-write normalized re-read verification.
+- normalized existing custom-widget access/widget identity/column mappings, with bounded mutation limited to access and stable-ID column mappings while preserving untargeted options;
+- normalized table/grid display options for gridlines, zebra stripes and row-number mode, with bounded mutation that preserves unrelated widget options;
+- post-write normalized re-read verification for every current UI mutation.
 
-Discovery/mutation enforce bounded option/candidate/schema limits, reject unsupported/ambiguous links and cycles, and never expose arbitrary metadata-table writes or arbitrary UserActions.
+Discovery/mutation enforce bounded layout/option/candidate/schema limits, reject unsupported, ambiguous or incomplete state before safety-sensitive writes, and never expose arbitrary metadata-table writes, custom-option payloads or arbitrary UserActions.
+
+The remaining committed P1 slice is bounded page-layout mutation. It is not part of `main` until its review/integration gate passes; broader destructive UI surfaces remain outside the current integrated contract.
 
 ### Semantic document context
 
@@ -205,7 +210,7 @@ Discovery/mutation enforce bounded option/candidate/schema limits, reject unsupp
 - local `$Column` diagnostics;
 - bounded one-hop `$Ref.Field` / `$RefList.Field` diagnostics using already-loaded schema metadata;
 - forward Ref/RefList relationships plus verified reverse relationships when exact bidirectional metadata is available;
-- normalized page/widget context including sort and select-by stable IDs where exact resolution is possible;
+- normalized page/widget context including page layout, sort, select-by, custom-widget settings and grid display state where exact resolution is possible;
 - explicit incompleteness markers when raw metadata cannot be normalized safely.
 
 No formula execution, Python interpreter, raw SQL or indiscriminate row loading is introduced.
@@ -303,7 +308,7 @@ The bridge excludes generic HTTP forwarding, raw SQL, arbitrary `/apply`/UserAct
 4. **C4-P0 DONE; C4 ELIGIBLE:** productionize the proven Logto/ProConnect OAuth path with repeatable deployment/rotation/outage evidence.
 5. **C5 BLOCKED by C4 + human persistence/encryption decisions:** secure per-user Grist credential lifecycle.
 6. **C6 preparation integrated; finalization blocked by C4/C5:** rate limits, operational metrics/alerts, rotation and controlled release evidence.
-7. P1/P2/P3 bounded product work remains independently eligible where it preserves the architecture.
+7. **P1 ELIGIBLE:** only its committed bounded page-layout mutation slice remains; **P2 and P3 are DONE** and P4 waits for P1's integrated completion review.
 8. S0 public-directory eligibility remains a separate human/institutional distribution gate.
 
 ## Architectural invariant
