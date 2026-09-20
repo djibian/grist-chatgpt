@@ -145,9 +145,10 @@ test("checks one-hop Ref and RefList fields against referenced table metadata", 
     }
   ]);
   assert.equal(analysis.dereferencesTruncated, undefined);
+  assert.equal(analysis.dereferencesIncomplete, undefined);
 });
 
-test("does not invent dereference diagnostics when target metadata is unavailable", () => {
+test("marks dereference analysis incomplete when target metadata is unavailable without inventing diagnostics", () => {
   const analysis = new FormulaInspector().inspect(
     "$Enseignant.Nom",
     columns,
@@ -156,6 +157,15 @@ test("does not invent dereference diagnostics when target metadata is unavailabl
 
   assert.equal(analysis.references[0]?.status, "ok");
   assert.equal(analysis.dereferences, undefined);
+  assert.equal(analysis.dereferencesIncomplete, true);
+});
+
+test("does not mark unsupported non-reference member access as incomplete", () => {
+  const analysis = new FormulaInspector().inspect("$Nom.value", columns, []);
+
+  assert.equal(analysis.references[0]?.status, "ok");
+  assert.equal(analysis.dereferences, undefined);
+  assert.equal(analysis.dereferencesIncomplete, undefined);
 });
 
 test("bounds one-hop dereference analysis independently", () => {
@@ -171,4 +181,5 @@ test("bounds one-hop dereference analysis independently", () => {
   assert.equal(analysis.references.length, 1);
   assert.equal(analysis.dereferences?.length, 100);
   assert.equal(analysis.dereferencesTruncated, true);
+  assert.equal(analysis.dereferencesIncomplete, undefined);
 });
