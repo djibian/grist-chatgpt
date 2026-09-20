@@ -9,6 +9,12 @@ import {
 } from "../grist/customWidgetSettings.js";
 import { GRID_ROW_NUMBER_MODES } from "../grist/gridOptions.js";
 import {
+  MAX_NORMALIZED_LAYOUT_NODES,
+  MAX_NORMALIZED_LAYOUT_WIDGET_IDS,
+  type NormalizedPageLayoutNode,
+  type PageLayoutUpdateInput
+} from "../grist/pageLayout.js";
+import {
   NATIVE_WIDGET_TYPES,
   type NativeWidgetType
 } from "../grist/uiActionsAdapter.js";
@@ -26,6 +32,11 @@ export interface GristUiOperations {
     type: NativeWidgetType
   ): Promise<unknown>;
   renamePage(documentId: string, pageId: number, name: string): Promise<unknown>;
+  updatePageLayout(
+    documentId: string,
+    pageId: number,
+    layout: PageLayoutUpdateInput
+  ): Promise<unknown>;
   updatePageWidget(
     documentId: string,
     pageId: number,
@@ -47,6 +58,26 @@ const widgetParamsSchema = z.object({
 const createPageBodySchema = z.object({ tableId: z.string().min(1), name: z.string().trim().min(1) }).strict();
 const addWidgetBodySchema = z.object({ tableId: z.string().min(1), type: z.enum(NATIVE_WIDGET_TYPES) }).strict();
 const renamePageBodySchema = z.object({ name: z.string().trim().min(1) }).strict();
+
+const pageLayoutNodeSchema: z.ZodType<NormalizedPageLayoutNode> = z.lazy(() =>
+  z.union([
+    z.object({
+      kind: z.literal("widget"),
+      widgetId: z.number().int().positive(),
+      size: z.number().nonnegative().optional()
+    }).strict(),
+    z.object({
+      kind: z.literal("group"),
+      children: z.array(pageLayoutNodeSchema).min(1).max(MAX_NORMALIZED_LAYOUT_NODES),
+      size: z.number().nonnegative().optional()
+    }).strict()
+  ])
+);
+const pageLayoutUpdateSchema = z.object({
+  root: pageLayoutNodeSchema,
+  collapsedWidgetIds: z.array(z.number().int().positive())
+    .max(MAX_NORMALIZED_LAYOUT_WIDGET_IDS).optional()
+}).strict();
 
 const widgetSortBodySchema = z.array(z.object({
   columnId: z.string().trim().min(1),
@@ -101,6 +132,59 @@ const updateWidgetBodySchema = z.object({
   { message: "At least one bounded widget field must be supplied." }
 );
 
+export function buildUiOpenApiSchemas(): Record<string, unknown> {
+  return {
+    PageLayoutNode: {
+      oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind", "widgetId"],
+          properties: {
+            kind: { type: "string", enum: ["widget"] },
+            widgetId: {
+              type: "integer",
+              minimum: 1,
+              description: "Exact current stable widget ID returned by getGristPageWidgets."
+            },
+            size: { type: "number", minimum: 0 }
+          }
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind", "children"],
+          properties: {
+            kind: { type: "string", enum: ["group"] },
+            children: {
+              type: "array",
+              minItems: 1,
+              maxItems: MAX_NORMALIZED_LAYOUT_NODES,
+              items: { $ref: "#/components/schemas/PageLayoutNode" }
+            },
+            size: { type: "number", minimum: 0 }
+          }
+        }
+      ]
+    },
+    PageLayoutUpdate: {
+      type: "object",
+      additionalProperties: false,
+      required: ["root"],
+      properties: {
+        root: { $ref: "#/components/schemas/PageLayoutNode" },
+        collapsedWidgetIds: {
+          type: "array",
+          maxItems: MAX_NORMALIZED_LAYOUT_WIDGET_IDS,
+          uniqueItems: true,
+          items: { type: "integer", minimum: 1 },
+          description: "Current stable widget IDs to keep collapsed rather than placed in the root tree."
+        }
+      }
+    }
+  };
+}
+
 export function buildUiOpenApiPaths(): Record<string, unknown> {
   const documentIdParameter = { name: "documentId", in: "path", required: true,
     description: "Exact allowed Grist document ID supplied by the user or returned by listGristDocuments. Never invent, guess, shorten or substitute this identifier.",
@@ -135,6 +219,17 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
       requestBody: { required: true, content: { "application/json": { schema: {
         type: "object", additionalProperties: false, required: ["name"], properties: { name: { type: "string", minLength: 1 } }
       } } } }, responses: { "200": { description: "Renamed and re-read page" }, ...writeResponses }
+    } },
+    "/api/v1/documents/{documentId}/pages/{pageId}/layout": { patch: {
+      operationId: "updateGristPageLayout",
+      summary: "Update the bounded layout of one existing Grist page",
+      description: "Replaces only the page layout tree using exact current stable widget IDs. Every current page widget must be accounted for exactly once as placed in the root tree or listed in collapsedWidgetIds. Unknown, duplicate, omitted or malformed widget state is rejected before write; the normalized page layout is re-read and verified exactly after write.",
+      "x-openai-isConsequential": true,
+      parameters: [documentIdParameter, pageIdParameter],
+      requestBody: { required: true, content: { "application/json": { schema: {
+        $ref: "#/components/schemas/PageLayoutUpdate"
+      } } } },
+      responses: { "200": { description: "Updated and re-read page layout" }, ...writeResponses }
     } },
     "/api/v1/documents/{documentId}/pages/{pageId}/widgets": { post: {
       operationId: "addGristPageWidget", summary: "Add one native widget to an existing Grist page",
@@ -198,6 +293,19 @@ export function registerUiActionApi(app: Express, options: { grist: GristUiOpera
   app.patch("/api/v1/documents/:documentId/pages/:pageId", async (req, res) => {
     try { const { documentId, pageId } = pageParamsSchema.parse(req.params); const { name } = renamePageBodySchema.parse(req.body); res.json(await options.grist.renamePage(documentId, pageId, name)); }
     catch (error) { options.sendError(res, error); }
+  });
+  app.patch("/api/v1/documents/:documentId/pages/:pageId/layout", async (req, res) => {
+    try {
+      const { documentId, pageId } = pageParamsSchema.parse(req.params);
+      const parsed = pageLayoutUpdateSchema.parse(req.body);
+      const layout: PageLayoutUpdateInput = {
+        root: parsed.root,
+        ...(parsed.collapsedWidgetIds !== undefined
+          ? { collapsedWidgetIds: parsed.collapsedWidgetIds }
+          : {})
+      };
+      res.json(await options.grist.updatePageLayout(documentId, pageId, layout));
+    } catch (error) { options.sendError(res, error); }
   });
   app.post("/api/v1/documents/:documentId/pages/:pageId/widgets", async (req, res) => {
     try { const { documentId, pageId } = pageParamsSchema.parse(req.params); const { tableId, type } = addWidgetBodySchema.parse(req.body); res.json(await options.grist.addPageWidget(documentId, pageId, tableId, type)); }
