@@ -148,7 +148,7 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
     "/api/v1/documents/{documentId}/pages/{pageId}/widgets/{widgetId}": { patch: {
       operationId: "updateGristPageWidget",
       summary: "Update bounded metadata, grid/custom settings, saved sort or an explicit supported select-by link on one Grist widget",
-      description: "Updates only bounded widget metadata. gridOptions is accepted only for a Table widget (`record`) and changes only vertical/horizontal gridlines, zebra stripes and the row-number mode using the same values exposed by Grist's Grid Options panel. customWidgetSettings remains limited to access plus stable-ID column mappings. Existing untargeted options are preserved and the complete expected options object is verified after write.",
+      description: "Updates only bounded widget metadata. title and description are normalized by trimming surrounding whitespace; an empty description clears it. chartType accepts only the native Grist chart types and is allowed only when the target widget is a chart. sort accepts at most 20 stable column IDs with asc/desc and the bounded emptyLast/naturalSort/orderByChoice flags; null or [] clears the saved sort. Column IDs are resolved against current widget-table metadata before write. selectBy may use a direct sourceWidgetId from directSelectByOptions, or an exact sourceWidgetId/sourceColumnId/targetColumnId combination returned by columnSelectByOptions; null clears the link. customWidgetSettings is accepted only for an existing custom widget and may change only access plus bounded column mappings using stable current column IDs; URLs, plugin IDs, widget identity and arbitrary widget-owned options are never public write inputs. gridOptions is accepted only for a Table widget (`record`) and changes only vertical/horizontal gridlines, zebra stripes and row-number mode using Grist's bounded vocabulary. The complete existing options object is preserved and the complete expected options object is verified after write.",
       "x-openai-isConsequential": true, parameters: [documentIdParameter, pageIdParameter, widgetIdParameter],
       requestBody: { required: true, content: { "application/json": { schema: {
         type: "object", additionalProperties: false, minProperties: 1,
@@ -156,17 +156,26 @@ export function buildUiOpenApiPaths(): Record<string, unknown> {
           title: { type: "string" },
           description: { type: "string", description: "Widget description. Surrounding whitespace is trimmed; an empty string clears the description." },
           chartType: { type: "string", enum: [...GRIST_CHART_TYPES], description: "Native Grist chart type. Accepted only when the explicitly identified target widget is a chart." },
-          sort: { anyOf: [{ type: "array", maxItems: MAX_WIDGET_SORT_COLUMNS, items: { type: "object", additionalProperties: false, required: ["columnId", "direction"], properties: {
-            columnId: { type: "string", minLength: 1 }, direction: { type: "string", enum: [...WIDGET_SORT_DIRECTIONS] },
-            emptyLast: { type: "boolean" }, naturalSort: { type: "boolean" }, orderByChoice: { type: "boolean" }
-          } } }, { type: "null" }] },
+          sort: { anyOf: [{ type: "array", maxItems: MAX_WIDGET_SORT_COLUMNS,
+            description: "Saved widget sort in priority order. Use stable column IDs from the widget's table; [] clears the sort.",
+            items: { type: "object", additionalProperties: false, required: ["columnId", "direction"], properties: {
+              columnId: { type: "string", minLength: 1, description: "Exact existing column ID on the target widget's current table. Never invent a numeric Grist colRef." },
+              direction: { type: "string", enum: [...WIDGET_SORT_DIRECTIONS] },
+              emptyLast: { type: "boolean", description: "When true, place empty values after non-empty values." },
+              naturalSort: { type: "boolean", description: "Natural numeric-aware text ordering. Accepted only for Text columns." },
+              orderByChoice: { type: "boolean", description: "Use configured choice order. Accepted only for Choice/ChoiceList columns." }
+            } } }, { type: "null" }] },
           selectBy: { anyOf: [{ type: "object", additionalProperties: false, required: ["sourceWidgetId"], properties: {
-            sourceWidgetId: { type: "integer", minimum: 1 }, sourceColumnId: { type: "string", minLength: 1 }, targetColumnId: { type: "string", minLength: 1 }
+            sourceWidgetId: { type: "integer", minimum: 1, description: "Exact source widget ID returned by getGristPageWidgets for the same page. Never invent or guess it." },
+            sourceColumnId: { type: "string", minLength: 1, description: "Optional exact Ref/RefList source column ID from columnSelectByOptions. Omit for the source widget's own table." },
+            targetColumnId: { type: "string", minLength: 1, description: "Optional exact Ref/RefList target column ID from columnSelectByOptions. Omit for the target widget's own table." }
           } }, { type: "null" }] },
-          customWidgetSettings: { type: "object", additionalProperties: false, minProperties: 1, properties: {
+          customWidgetSettings: { type: "object", additionalProperties: false, minProperties: 1,
+            description: "Bounded settings for the explicitly identified existing custom widget. Only access and stable-ID column mappings are writable; all other current options are preserved.", properties: {
             access: { type: "string", enum: ["none", "read table", "full"] },
             columnsMapping: { anyOf: [{ type: "object", maxProperties: MAX_CUSTOM_WIDGET_MAPPING_KEYS,
-              additionalProperties: { anyOf: [{ type: "string", minLength: 1 }, { type: "array", maxItems: MAX_CUSTOM_WIDGET_MAPPED_COLUMNS, items: { type: "string", minLength: 1 } }, { type: "null" }] }
+              additionalProperties: { anyOf: [{ type: "string", minLength: 1 }, { type: "array", maxItems: MAX_CUSTOM_WIDGET_MAPPED_COLUMNS, items: { type: "string", minLength: 1 } }, { type: "null" }] },
+              description: "Widget mapping names to exact current stable column IDs, lists of IDs, or null. Numeric Grist colRefs are never accepted."
             }, { type: "null" }] }
           } },
           gridOptions: { type: "object", additionalProperties: false, minProperties: 1,
