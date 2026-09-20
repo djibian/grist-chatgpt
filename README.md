@@ -196,7 +196,10 @@ Raw Grist `/apply` is never model-accessible. Where low-level actions are requir
 | create empty page | `createGristPage` | `create_page` |
 | add native page widget | `addGristPageWidget` | `add_page_widget` |
 | rename page | `renameGristPage` | `rename_page` |
+| update bounded page layout | `updateGristPageLayout` | `update_page_layout` |
 | update bounded widget configuration | `updateGristPageWidget` | `update_page_widget` |
+
+`update_page_layout` accepts only a bounded normalized layout expressed with exact current widget IDs. Every current page widget must be accounted for exactly once as placed or collapsed; unknown, duplicate, omitted or malformed state is rejected before write. Tree depth/node count/collapsed-ID count are bounded, the bridge emits only the fixed internal page-layout metadata update, and the normalized page state is re-read and verified exactly. Arbitrary raw Grist BoxSpec/UserActions and model-supplied internal metadata refs are not public inputs.
 
 `update_page_widget` supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, a conservative Ref/RefList column select-by subset, and bounded access/column-mapping updates for an explicitly identified existing custom widget. Custom-widget mappings use only stable current column IDs; URLs, plugin/widget identity and arbitrary widget-owned options are not writable model inputs. The bridge preserves every untargeted existing widget option and verifies the complete expected options object after write. All UI writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
 
