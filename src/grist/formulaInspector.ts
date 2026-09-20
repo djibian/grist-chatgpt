@@ -65,6 +65,7 @@ export interface FormulaAnalysis {
   truncated: boolean;
   dereferences?: FormulaDereferenceFinding[];
   dereferencesTruncated?: boolean;
+  dereferencesIncomplete?: true;
 }
 
 const MAX_REFERENCES = 100;
@@ -335,7 +336,8 @@ function classifyDereference(
  * References inside Python comments and quoted string literals are deliberately ignored.
  * When document schema metadata is supplied, one-hop `$Ref.Field` / `$RefList.Field`
  * lookups are checked against the exact referenced table without attempting to interpret
- * arbitrary Python or deeper chains.
+ * arbitrary Python or deeper chains. If a referenced table's metadata is unavailable,
+ * the analysis reports explicit incompleteness rather than inventing a field diagnosis.
  */
 export class FormulaInspector {
   inspect(
@@ -350,6 +352,7 @@ export class FormulaInspector {
 
     const currentById = new Map(columns.map(column => [column.id, column] as const));
     const tableById = new Map(tables.map(table => [table.id, table] as const));
+    let dereferencesIncomplete = false;
     const dereferences = extracted.dereferences.flatMap(candidate => {
       const source = currentById.get(candidate.sourceReference);
       const target = source ? referenceTarget(source.type) : undefined;
@@ -360,7 +363,10 @@ export class FormulaInspector {
       if (candidate.member === "id") return [];
 
       const targetTable = tableById.get(target.tableId);
-      if (!targetTable) return [];
+      if (!targetTable) {
+        dereferencesIncomplete = true;
+        return [];
+      }
       return [
         classifyDereference(
           source.id,
@@ -375,7 +381,8 @@ export class FormulaInspector {
       references,
       truncated: extracted.truncated,
       ...(dereferences.length > 0 ? { dereferences } : {}),
-      ...(extracted.dereferencesTruncated ? { dereferencesTruncated: true } : {})
+      ...(extracted.dereferencesTruncated ? { dereferencesTruncated: true } : {}),
+      ...(dereferencesIncomplete ? { dereferencesIncomplete: true as const } : {})
     };
   }
 }
