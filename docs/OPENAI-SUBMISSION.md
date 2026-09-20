@@ -1,6 +1,6 @@
 # OpenAI plugin submission plan
 
-**Status:** current plan aligned with OpenAI documentation rechecked 2026-09-19.
+**Status:** current plan aligned with OpenAI documentation rechecked 2026-09-19 and pre-review support clarification obtained 2026-09-20.
 
 See also `docs/PLUGIN-READY-AUDIT.md` for the current readiness matrix and blocking gaps and `docs/OPENAI-REVIEWER-TESTS.md` for the canonical reviewer-test specification.
 
@@ -19,13 +19,19 @@ Initial service target   : one configured DINUM / La Suite numérique Grist Comm
 
 The plugin is not intended to duplicate Grist's official MCP/OAuth integration where that exists and is sufficient. It adds identity, authorization, per-user credential isolation, bounded semantic operations and safety controls for the Community deployment target.
 
-## Critical publication gate
+## Publication eligibility path
 
 OpenAI's current plugin guidelines require authorized third-party access and state that plugins whose primary function is acting as unofficial connectors to third-party services, including intermediary relay layers, cannot be approved.
 
-This repository remains explicitly independent/non-official. Therefore public directory submission must not assume eligibility until there is a durable basis, preferably written OpenAI clarification for this exact product architecture and, only if OpenAI says additional third-party authorization is required, the relevant Grist Labs/DINUM basis.
+A real MCP-only draft was created in the OpenAI portal on 2026-09-20. The current MCP hostname was successfully domain-verified and Tool Scan completed successfully. OpenAI AI-assisted support then declined to pre-confirm eligibility outside the actual review and stated that final classification is determined during review.
 
-Issue #58 contains the current clarification package. Do not claim an official Grist Labs, DINUM / La Suite numérique or OpenAI relationship unless one is explicitly established.
+After receiving the concrete architecture, support mapped the fixed single-instance design, finite Grist-specific semantic tools and lack of arbitrary HTTP/REST forwarding as **materially different from a generic relay/proxy or usual pass-through intermediary**. It also warned that reviewers may still apply the primary-function test and view the product as principally connecting ChatGPT to Grist. Explicit Grist/operator permission can reduce policy risk but does not by itself guarantee approval or override that primary-function test.
+
+Operational consequence: there is no separate pre-review `PASS` available for S0. The actual public review is the decision point. This is **not an approval** and must never be represented as one.
+
+Submission copy must therefore describe the distinct bounded product workflow accurately — inspecting, structuring and maintaining Grist documents with bounded semantic operations and server-side safety controls — rather than presenting the product as a generic “Grist connector”. The repository remains explicitly independent/non-official unless a durable authorization basis says otherwise.
+
+Issue #58 records the durable clarification. Any Grist Labs / DINUM / La Suite numérique or operator permission and branding basis must be factual, separately evidenced and no broader than what was actually granted.
 
 ## Product security model to preserve
 
@@ -125,16 +131,16 @@ Runtime security tests such as insufficient OAuth scope/resource access or inval
 
 The specification is complete; the reviewer account/document is not yet claimed provisioned and the eight cases have not yet been executed against a final C7 environment.
 
-## Domain verification — implementation complete, activation pending
+## Domain verification — current draft verified
 
-`OPENAI_APPS_CHALLENGE_TOKEN` is optional.
+`OPENAI_APPS_CHALLENGE_TOKEN` is optional runtime configuration.
 
 - when unset, the challenge route is absent;
 - when configured with the exact valid single-line portal token, `/.well-known/openai-apps-challenge` returns only that token as plain text;
 - surrounding whitespace/line breaks are rejected rather than silently normalized;
 - no token belongs in source control, tool data, `/healthz`, OpenAPI or logs.
 
-Set/verify a real token only when the portal issues it.
+On 2026-09-20 the real portal-issued token was configured only in the protected deployment environment, the current `grist-chatgpt.loeildumaitre.fr` hostname was successfully verified in the portal, and the token remained out of the repository. If the final production hostname changes, repeat domain verification for that final hostname instead of assuming this draft verification transfers.
 
 ## Submission-specific status
 
@@ -145,18 +151,24 @@ Set/verify a real token only when the portal issues it.
 - exact canonical 5-positive / 3-negative reviewer specification plus repository tests;
 - optional exact-token domain challenge endpoint;
 - multiple model-facing output-minimization slices;
-- real ChatGPT OAuth interoperability POC.
+- real ChatGPT OAuth interoperability POC;
+- real OpenAI MCP-only draft created;
+- current draft hostname successfully domain-verified;
+- current Tool Scan completed successfully;
+- formal `outputSchema` coverage remains incomplete for several non-UI tools and is tracked separately as contract-quality follow-up;
+- pre-review support clarification recorded in issue #58: no pre-approval is available, the architecture is materially different from a generic pass-through proxy, and the primary-function classification remains a review-time decision.
 
 ### Low-risk work that may proceed independently
 
 - prove the final Logto reviewer/client UserInfo path returns `email` + `email_verified: true`;
 - continue bounded public-output normalization where it materially reduces unnecessary upstream/internal fields while preserving functional IDs;
 - keep the tracked submission artifact aligned with the normative operation registry/public contract;
-- maintain reviewer-test documentation if the bounded public contract changes.
+- maintain reviewer-test documentation if the bounded public contract changes;
+- keep listing copy aligned with the actual bounded workflow and independent/non-official status;
+- document only the factual rights/permission/branding basis that exists for the intended target deployment.
 
 ### Must resolve before final review
 
-- S0 public-plugin eligibility / any required third-party authorization;
 - C4 production deployment/rotation/outage evidence;
 - C5 per-user Grist credential storage/retrieval/disconnect;
 - per-principal rate limiting and remaining C6 operational controls;
@@ -166,31 +178,35 @@ Set/verify a real token only when the portal issues it.
 - public website/support/privacy/terms;
 - publisher identity/app-management permission;
 - demo recording;
-- current Tool Scan;
-- real domain challenge verification.
+- current Tool Scan on the final endpoint;
+- final-host domain challenge verification if the production hostname differs;
+- a defensible factual permission/rights basis for operating against the intended Grist deployment and using any submitted branding, without implying affiliation.
+
+Final public eligibility itself cannot be resolved before review because OpenAI support states that the actual review performs that classification.
 
 ## Portal sequence
 
-Once S0 is viable and the production/reviewer environment is ready:
+A real draft already exists. Once the production/reviewer environment is ready:
 
-1. Open the OpenAI plugin submission portal.
-2. Create a plugin **With MCP**.
-3. Use the production universal MCP URL.
-4. Configure OAuth and provide reviewer demo credentials/instructions.
-5. Configure only the exact portal-issued domain challenge token, deploy it, verify the well-known response, then complete portal domain verification.
-6. Run Tool Scan and resolve blocking findings.
-7. Fill public listing metadata/policy URLs/availability/release notes/starter prompts.
-8. Add the canonical exact 5 positive and 3 negative tests with expected behavior and the demo recording URL.
-9. Submit for review.
-10. Remediate review findings without weakening security invariants.
-11. Publish only after approval and an explicit release decision.
+1. Update the existing OpenAI MCP-only draft rather than creating a parallel submission.
+2. Set the final production universal MCP URL.
+3. Configure OAuth and provide reviewer demo credentials/instructions.
+4. If the final hostname differs from the currently verified draft host, configure only the exact portal-issued challenge token for that host, deploy it and complete domain verification again.
+5. Run Tool Scan on the final endpoint and resolve blocking findings. Separately, add formal `outputSchema` only where the normalized result contract is intentionally stable; do not invent unstable schemas.
+6. Fill public listing metadata/policy URLs/availability/release notes/starter prompts using bounded-workflow positioning and accurate affiliation language.
+7. Add the canonical exact 5 positive and 3 negative tests with expected behavior and the demo recording URL.
+8. Submit for review. This review is the final S0 eligibility decision point.
+9. Record the review outcome durably. Remediate concrete findings without weakening security invariants or inventing an official relationship.
+10. Publish only after approval and an explicit release decision.
 
 ## Go / no-go
 
-Proceed to public submission only when both are true:
+Proceed to public review only when both are true:
 
-- **eligibility:** the independent Grist/DINUM integration has a defensible basis under OpenAI's current third-party integration rules;
-- **technical/reviewer:** production OAuth, per-user Grist credential lifecycle, reviewer identity/fixture, UserInfo, domain verification, Tool Scan, operational controls and exact review artifacts are complete.
+- **defensible submission basis:** the listing accurately describes the bounded workflow, fixed single-instance target and independent status; the factual rights/permission/branding basis is documented; no known policy fact is being hidden or overstated;
+- **technical/reviewer readiness:** production OAuth, per-user Grist credential lifecycle, reviewer identity/fixture, UserInfo, final-host domain verification, Tool Scan, operational controls and exact review artifacts are complete.
+
+Do **not** represent the OpenAI support exchange, successful draft creation, domain verification or Tool Scan as public-directory approval. Approval remains contingent on the actual review.
 
 Official references to re-check immediately before submission:
 
@@ -203,6 +219,8 @@ Official references to re-check immediately before submission:
 
 `chatgpt-app-submission.json` follows the current prepared import format and contains 23 tools, five positive scenarios and three negative non-invocation scenarios.
 
+Its listing copy now presents `grist-chatgpt` as a bounded document-design/maintenance workflow rather than a generic connector while retaining explicit independent/non-official language.
+
 Remote MCP only; no distributed skills or Apps SDK UI. The production MCP URL is supplied in the portal rather than invented as a field in the tracked JSON.
 
 ### Proposed synthetic fixture (not provisioned)
@@ -213,4 +231,4 @@ Start each run from the documented clean fixture and use an operator-managed res
 
 ## Output-schema follow-up
 
-Formal MCP `outputSchema` remains incomplete for several non-UI tools. Recent data-minimization work means many record/schema update/delete service results are already semantic bounded acknowledgements rather than raw upstream payloads, but formal schemas should be added only when the normalized result contract is intentionally stable. Creation tools must preserve the functional created identifiers needed for later calls while avoiding unnecessary engine-only data.
+Formal MCP `outputSchema` remains incomplete for several non-UI tools. The current portal Tool Scan succeeds. Separately, repository contract review shows that formal `outputSchema` coverage remains incomplete for several non-UI tools. Recent data-minimization work means many record/schema update/delete service results are already semantic bounded acknowledgements rather than raw upstream payloads, but formal schemas should be added only when the normalized result contract is intentionally stable. Creation tools must preserve the functional created identifiers needed for later calls while avoiding unnecessary engine-only data.
