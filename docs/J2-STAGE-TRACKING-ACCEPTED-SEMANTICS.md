@@ -10,7 +10,7 @@ The reference document is the existing Grist document named “suivi des stages 
 
 The teacher's follow-up trace belongs to the **existing Stage record**. Its current fields are `Type_de_contact` (choices `Appel` and `Visite`), `Date_du_contact` (date of the call or visit), `Implication`, `Ponctuel`, and `Commentaire`. The date is a contact date, distinct from the start/end dates of the placement. Existing rows may have no date; no historical date may be fabricated. A completed new follow-up records the contact date together with the relevant trace fields.
 
-The accepted behavior lets the currently assigned teacher complete, correct or clear authorized follow-up fields on the Stage. Clearing an erroneous entry does not delete the Stage. The current structure contains one editable set of follow-up fields per Stage; it does not establish a per-contact history or a separate author audit. Any requirement for multiple independent contacts or an audit of the actual editor requires a separate business decision.
+The accepted behavior lets the assigned teacher complete, correct or clear authorized follow-up fields on the Stage. **One editable contact trace per Stage is sufficient**, as confirmed by the document owner. A correction or replacement updates those fields on the same Stage; clearing an erroneous entry leaves the Stage intact. The application need not keep a separate record of earlier contact values. A future requirement to preserve multiple contacts or audit actual editors requires a separate business decision.
 
 No physical `Visit` table, row, relation or page is required for this reference case. In the generic product contract, “follow-up” is a logical capability that must be bound to the observed application representation.
 
@@ -28,13 +28,13 @@ The teacher receives a specific follow-up URL from the `Enseignants` table. Its 
 
 ## 4. Author attribution
 
-`Suivi_par` gives the attributed business author in this non-reassignment workflow. The observed Stage schema does not establish who actually entered or last edited a cell, and a teacher-specific LinkKey URL alone cannot prove the individual who used it. J2 must not add a separate author column as if that had been requested or claim a technical editor audit. Such an audit would need an explicit rule and verified implementation.
+`Suivi_par` gives the attributed business author in this non-reassignment workflow. The observed Stage schema does not establish who actually entered or last edited a cell. A teacher-specific LinkKey URL grants access to its holder under the observed ACLs; it does not prove that its intended recipient used it. J2 must not add a separate author column as if that had been requested or claim a technical editor audit. Such an audit would need an explicit rule and verified implementation.
 
 ## 5. J2 evidence and remaining gate
 
 The reference acceptance matrix must show, with controlled teacher identities and the supported LinkKey/browser path:
 
-- an assigned teacher can enter, correct and clear the authorized contact date and trace fields on the Stage;
+- an assigned teacher can enter, correct, replace and clear the single contact trace on the same Stage, including its date, without creating another Stage or a contact-history record;
 - another teacher cannot read or write protected follow-up data outside their assignment or change `Suivi_par` to acquire access;
 - contact entry, correction, clearing and J2 execution preserve the assigned `Suivi_par` teacher;
 - missing, invalid and revoked LinkKeys deny the protected path according to the observed policy;

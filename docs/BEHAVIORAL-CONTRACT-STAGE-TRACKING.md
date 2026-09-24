@@ -36,11 +36,11 @@ Actors: `ApplicationOwner`, `Teacher`, `AnonymousOrInvalidLinkVisitor`, and `Bui
 
 Existing logical entities: `Student`, `Stage`, `Teacher`, `Period`.
 
-The J2 follow-up trace is **part of Stage**, not a separate logical/physical Visit record. The trace has a contact type (call/visit), actual contact date, implication, punctuality and comments. The contact date is distinct from placement start/end dates. One Stage currently holds one editable set of follow-up values; no independent per-contact history is established.
+The J2 follow-up trace is **part of Stage**, not a separate logical/physical Visit record. The trace has a contact type (call/visit), actual contact date, implication, punctuality and comments. The contact date is distinct from placement start/end dates. One editable set of follow-up values per Stage is sufficient for the accepted workflow; no independent per-contact history is required.
 
 On the reference fixture the observed columns are `Stages.Type_de_contact`, `Stages.Date_du_contact`, `Stages.Implication`, `Stages.Ponctuel`, `Stages.Commentaire`. These IDs are binding facts only. The optionality of historical rows must be preserved; J2 must not invent dates.
 
-`Stages.Suivi_par` is the teacher **assigned** to conduct the call/visit and, in this workflow without reassignment, the attributed business author of the follow-up trace. This attribution does not prove who entered or last edited a cell. A technical author audit or multiple contacts require a distinct accepted decision.
+`Stages.Suivi_par` is the teacher **assigned** to conduct the call/visit and, in this workflow without reassignment, the attributed business author of the follow-up trace. This attribution does not prove who entered or last edited a cell. A technical author audit or a future requirement to preserve multiple contact events requires a distinct accepted decision.
 
 ## 4. Responsibility predicate
 
@@ -87,7 +87,7 @@ The Builder cannot downgrade criticality by itself.
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-A call or visit trace is recorded in the existing Stage row. Changing or clearing a trace must not orphan, delete or duplicate that Stage.
+Exactly one mutable call/visit trace is held in the existing Stage row. Entering, replacing, correcting or clearing its fields must not create a second Stage or a separate contact-history record, or orphan/delete the Stage. The previous values need not be retained as an application-level contact history.
 
 ### STAGE-B2 — responsible teacher can record a contact
 
@@ -101,7 +101,7 @@ For `responsible(T, S)`, the supported teacher-facing path must allow T to enter
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-A teacher not currently responsible for Stage S cannot read or edit S's protected follow-up data through the teacher-facing path. The exact protected fields and valid identity mapping are determined by the observed AccessModel, not by owner API calls.
+With teacher B's distinct valid LinkKey, B cannot read or edit protected follow-up data for Stage S assigned to A through any reachable teacher browser page or Raw Data view. The exact protected fields and link mapping are determined by the observed AccessModel, not by owner API calls. This tests isolation between links, not the real-world identity of whoever holds A's URL.
 
 ### STAGE-B4 — invalid LinkKey follows accepted denial
 
@@ -314,8 +314,8 @@ The exact fixture names are synthetic; tests must use controlled identities and 
 
 | Test | Context | Expected result |
 |---|---|---|
-| BROW-A | Teacher A valid link, Stage A assigned to A | A sees the Stage follow-up and can enter/correct/clear the authorized fields, including contact date |
-| BROW-B | Teacher B valid link, Stage A not assigned to B | B cannot read or edit A's protected Stage trace |
+| BROW-A | Teacher A valid link, Stage A assigned to A | A can enter, replace/correct and clear the authorized fields including contact date; the same Stage holds the single trace throughout |
+| BROW-B | Teacher B valid link, Stage A assigned to A | B cannot read or edit A's protected trace on the follow-up page, other reachable pages or Raw Data |
 | BROW-C | missing/invalid key | denied/limited according to policy; no protected data |
 | BROW-D | revoked key | previously granted protected access gone |
 | BROW-E | Teacher B attempts relation tampering | no access expansion |
@@ -349,7 +349,7 @@ A critical unknown outside the dependency closure of the J2 change does not auto
 
 ## 19. Resolved choices and outstanding observations
 
-Human-accepted choices: follow-up on the existing Stage row; `Suivi_par` is the assigned teacher and the attributed business author of that trace; there is no reassignment in this workflow; a call or visit trace has type, actual contact date, implication, punctuality and comments; correction/clearing is allowed. No separate Visit table or technical author-audit field is mandated.
+Human-accepted choices: exactly one modifiable follow-up trace on the existing Stage row is sufficient; `Suivi_par` is the assigned teacher and attributed business author of that trace; there is no reassignment in this workflow; the trace has type, actual contact date, implication, punctuality and comments; entry, replacement, correction and clearing are allowed. No separate Visit table, contact history or technical author-audit field is mandated.
 
 Observed binding: the named reference Grist document has `Stages.Suivi_par` (`Ref:Enseignants`), `Type_de_contact` (`Appel`/`Visite`), `Implication`, `Ponctuel`, `Commentaire`, and the newly added editable Date `Date_du_contact`. The “Suivi des stages” page uses widgets 31 and 37 on `Stages`; `Enseignants.Lien_Stages` links there with `LinkKey_Token`. The owner reports that the date is now in the sheet and teacher-specific links filter the displayed Stages through Grist ACLs; those effects still need controlled tests.
 
