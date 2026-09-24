@@ -47,13 +47,13 @@ Integrated milestones include:
 - **C2 DONE:** MCP contract v1 with registry-driven product metadata, annotation checks, structured UI successes and typed error direction.
 - **C3 DONE:** principal-aware Grist contexts with isolated client/discovery/cache/access-policy/service state.
 - **C4-P0 DONE:** real ChatGPT Developer Mode interoperability through Logto OSS federated with ProConnect, including PKCE, RFC 8707 resource binding, JWT/JWKS validation, dynamic principals, scope enforcement, positive/negative MCP authorization paths, refresh/grant-revocation behavior and real bounded Grist reads/writes.
-- **C4 ELIGIBLE:** productionize the already-proven OAuth design; the identity-provider decision is no longer a blocker.
+- **C4 ELIGIBLE:** productionize the already-proven OAuth design; the remaining committed work is operational evidence on the intended deployment, not identity-provider selection.
 - **C5 BLOCKED:** secure per-user Grist credential onboarding still requires C4 productionization plus explicit persistence/encryption decisions.
 - **C6 preparation integrated:** timeouts, release/rollback documentation, OAuth deployment preflight/smoke design, metrics vocabulary and audit contract review are present; finalization still depends on C4/C5.
-- **P1 ELIGIBLE:** its only committed remaining product slice is bounded page-layout mutation; P1 becomes DONE only after integration plus its independent completion review.
-- **P2 DONE / P3 DONE:** formula/schema safety and semantic document context/progressive discovery have passed their integrated reviews.
-- **P4 BLOCKED by P1 completion:** compact-surface evaluation waits for the P1 integrated review.
-- **S1 partially completed:** submission annotations/artifact, the canonical 5-positive/3-negative reviewer specification, the optional domain-challenge endpoint and several output-minimization slices are integrated.
+- **P1 / P2 / P3 / P4 DONE:** document-UI parity, formula/schema safety, semantic context/discovery and the compact-surface evaluation have passed their integrated reviews; P4 keeps the current narrow v1 surface.
+- **J0 ELIGIBLE:** engine stabilization is the current highest-priority product-runtime tranche. Uncertain/partial-write handling and contractual concurrency refusal are integrated; safe audit-target handling and the final integrated J0 review remain before J1 can start.
+- **S0 ACTIVE:** final public-plugin eligibility classification occurs during actual OpenAI review; there is no separate pre-review approval gate.
+- **S1 ELIGIBLE / partially completed:** the remaining committed evidence is reviewer-path UserInfo with `email_verified: true`.
 
 Historical milestone/evidence documents under `docs/M1-*`, `docs/M2-*`, `docs/M3-*` and the Logto/ProConnect POC files describe the implementation/evidence at the time they were recorded. `docs/ROADMAP.md` is authoritative for current tranche status.
 
@@ -209,13 +209,13 @@ Page/widget inspection exposes bounded normalized page layout through stable wid
 
 `update_page_widget` supports bounded title/description changes, explicit description clearing, native chart type, saved sort through stable column IDs, direct same-table select-by, a conservative Ref/RefList column select-by subset, bounded access/column-mapping updates for an explicitly identified existing custom widget, and bounded table/grid display updates for gridlines, zebra stripes and row-number mode. Custom-widget mappings use only stable current column IDs; URLs, plugin/widget identity and arbitrary widget-owned options are not writable model inputs. Grid/custom updates preserve every untargeted existing option. All UI writes are re-read and verified; ambiguous post-write results are non-retryable at whole-operation level.
 
-Bounded page-layout mutation is the remaining committed P1 slice; P1 status changes only after its review/integration and independent completion review.
+P1 has passed its integrated completion review; no committed P1 work remains.
 
 ## Operation registry and audit
 
 `src/operations/registry.ts` centralizes required capability, product metadata and risk annotations used by authorization, help, MCP contract checks and submission preparation.
 
-Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, target document, item count where meaningful, status and duration. Audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
+Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, target document when safely available, item count where meaningful, status and duration. Audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
 
 ## Credential boundary
 
@@ -299,27 +299,17 @@ The Node service intentionally binds to localhost. Use a reverse proxy for publi
 
 The bridge does **not** expose arbitrary HTTP forwarding, raw SQL, arbitrary Grist `/apply`/UserActions, unrestricted instance administration, user/ACL administration, model-visible credentials, bridge-managed recreation of Grist ACLs, or arbitrary routing across unrelated Grist instances.
 
-## Critical path to plugin-ready v1
+## Current roadmap axes
 
 ```text
-V0.6 bounded document UI       DONE roadmap milestone
-Q0 retrospective quality      DONE
-C1 Credential abstraction      DONE
-C2 MCP contract v1             DONE
-C3 User-aware Grist context    DONE
-C4-P0 OAuth interoperability   DONE
-C4 Production OAuth            ELIGIBLE
-C5 Secure Grist onboarding     BLOCKED by C4 + human persistence/encryption decisions
-C6 Production hardening        BLOCKED for finalization by C4/C5
-P1 Document UI parity          ELIGIBLE; bounded layout mutation remains pending integration/review
-P2 Formula/schema safety       DONE
-P3 Semantic context/discovery  DONE
-P4 Compact MCP surface         BLOCKED until P1 integrated review passes
-S0 Public-plugin eligibility   BLOCKED / human-institutional gate
-S1 Submission preparation      ELIGIBLE / partially completed
-C7 Reviewer environment        BLOCKED by identity/credential readiness + S0
-C8 Final submission            BLOCKED by C6/C7/S0
+QUALITY / BASELINE             PLATFORM / SECURITY                     PRODUCT / BUILDER                 PUBLIC DISTRIBUTION
+Q0                             DONE   C4 Production OAuth               ELIGIBLE   P1 / P2 / P3 / P4       DONE   S0 Public eligibility   ACTIVE
+C1 / C2 / C3 / C4-P0          DONE   C5 Secure Grist onboarding        BLOCKED    J0 Engine stabilization  ELIGIBLE   S1 Preparation         ELIGIBLE
+                                     C6 Production hardening           BLOCKED    J1 Contract execution    BLOCKED    C7 Reviewer env.        BLOCKED
+                                                                                  J2-J6                    BLOCKED    C8 Final submission     BLOCKED
 ```
+
+J0 is the finite next product-runtime tranche. J1 starts only after J0's exact-main integrated completion review passes. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
 
 The exact dependency map and currently eligible work live in `docs/ROADMAP.md`.
 
