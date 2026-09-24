@@ -1,10 +1,10 @@
 # Agentic Builder roadmap delta
 
-Status: **normative product-roadmap proposal accompanying the frozen vision**.
+Status: **integrated roadmap rationale; `docs/ROADMAP.md` is authoritative**.
 
-This file exists to make the required `docs/ROADMAP.md` reconciliation explicit and reviewable without silently rewriting historical roadmap evidence.
+This file records the reviewed product-roadmap proposal that led to the Agentic Builder reconciliation in `docs/ROADMAP.md`. It is retained as design rationale so the transition from the historical P0-P4 program to J0-J6 remains explicit without rewriting historical roadmap evidence.
 
-`docs/ROADMAP.md` remains the authoritative autonomous dependency map under `AGENTS.md`. Until this delta is integrated there, the Builder milestones below are product contracts/specifications, **not automatically eligible implementation work**.
+`docs/ROADMAP.md` remains the authoritative autonomous dependency map under `AGENTS.md`. Eligibility and current tranche status must be read from that file; this delta no longer independently controls implementation selection.
 
 ## 1. Preserve existing platform/security program
 
@@ -56,7 +56,7 @@ The public narrow v1 MCP operations remain a compatibility/execution substrate; 
 
 ## 3. J0 — engine stabilization
 
-**Proposed status after vision integration: ELIGIBLE**  
+**Integrated roadmap status: ELIGIBLE**  
 **Priority: highest product-runtime priority**
 
 Goal: make current mutation outcomes safe inputs for a future orchestrator by correcting the four reproduced audit fragilities without implementing the Builder itself.
@@ -78,7 +78,7 @@ J0 runtime changes require independent exact-head review.
 
 ## 4. J1 — first contractual transformation
 
-**Proposed status: BLOCKED by J0**  
+**Integrated roadmap status: BLOCKED by J0**  
 **Priority: high**
 
 Goal: prove one bounded synthetic multi-step transformation using immutable execution contracts, cumulative plan budgets, a durable write-ahead journal, multidimensional state, contextual evidence and recovery/suspension after injected failures.
@@ -100,7 +100,7 @@ No generalized Builder planner, ACL authoring, browser LinkKey suite or durable 
 
 ## 5. J2 — stage-tracking reference application
 
-**Proposed status: BLOCKED by J1 and unresolved J2 business/application bindings**
+**Integrated roadmap status: BLOCKED by J1 and unresolved J2 business/application bindings**
 
 Goal: demonstrate one realistic cross-cutting application transformation covering schema, access policy, UI, human-change preservation, concurrency and recovery.
 
@@ -112,7 +112,7 @@ Exit requires all impacted critical properties to be contextually `VERIFIED`, in
 
 ## 6. J3 — second independent reference application
 
-**Proposed status: BLOCKED by J2**
+**Integrated roadmap status: BLOCKED by J2**
 
 Goal: demonstrate that the architecture is not accidentally specialized for stage tracking.
 
@@ -130,7 +130,7 @@ The exact J3 BehavioralContract requires an explicit roadmap/specification decis
 
 ## 7. J4 — native Builder generalization
 
-**Proposed status: BLOCKED by J3**
+**Integrated roadmap status: BLOCKED by J3**
 
 Goal: generalize capabilities proven by reference scenarios into explicitly versioned `SUPPORTED` native-Builder capabilities.
 
@@ -140,7 +140,7 @@ J4 is not a mandate to expose 100% of the Grist REST API.
 
 ## 8. J5 — code and integrations
 
-**Proposed status: BLOCKED by J4 and any capability-specific security/product gates**
+**Integrated roadmap status: BLOCKED by J4 and any capability-specific security/product gates**
 
 Goal: add versioned custom-widget/GitHub/integration workflows under the same execution/evidence model.
 
@@ -150,7 +150,7 @@ Exit direction includes exact artifact/version identity, declared Grist permissi
 
 ## 9. J6 — durable lifecycle maintenance
 
-**Proposed status: BLOCKED by J5**
+**Integrated roadmap status: BLOCKED by J5**
 
 Goal: add persistent lifecycle operation rather than new basic mutation power.
 
@@ -191,15 +191,15 @@ J2 blocked by J1          C6 blocked as documented
 
 Do not use unfinished C5 multi-user credentials as a reason to block isolated J0/J1 engineering, and do not use isolated J0/J1 success as evidence that C5/C6 are complete.
 
-## 12. Required authoritative roadmap reconciliation
+## 12. Authoritative roadmap reconciliation
 
-When this product-decision PR is independently reviewed and integrated, `docs/ROADMAP.md` should be updated in one bounded coherence change to:
+The reviewed product-decision was reconciled into `docs/ROADMAP.md` as one bounded coherence change that:
 
-1. record the new frozen Product Vision;
-2. add J0-J6 with the dependency/status rules above;
-3. preserve C4/C5/C6 and existing public-distribution axes;
-4. replace the current statement that no product-capability tranche is committed with J0 as the finite committed next product tranche;
-5. update the Controller integration order so J0 implementation is selectable while independent C4/S1 work remains eligible under existing dependencies;
-6. keep historical P0-P4/Q0 evidence intact rather than rewriting it.
+1. records the frozen Product Vision;
+2. adds J0-J6 with the dependency/status rules above;
+3. preserves C4/C5/C6 and the existing public-distribution axes;
+4. makes J0 the finite committed next product-runtime tranche;
+5. updates Controller integration order so J0 is selectable while independent C4/S1 work remains eligible under existing dependencies;
+6. preserves historical P0-P4/Q0 evidence.
 
-Until that reconciliation is merged, no Controller should infer J0 implementation eligibility merely from this delta file.
+From that reconciliation onward, Controllers must use `docs/ROADMAP.md`, not this rationale file, to determine J0-J6 eligibility and current status.
