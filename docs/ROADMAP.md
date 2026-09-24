@@ -59,7 +59,7 @@ Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       
                                                                     -> J3 -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency but remains blocked on the explicitly unresolved business semantics and logical-to-Grist bindings in `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`; the Builder may not choose those bindings autonomously. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency. Its Stage follow-up business semantics are accepted, and a partial reference schema/page binding is recorded; critical LinkKey ACL and teacher-facing UI behavior remain unverified. J2 implementation is blocked on those observations and a controlled fixture, not on a choice to create a separate Visit entity. The Builder may not invent missing bindings. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -107,7 +107,7 @@ Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
 - P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
-- J0 and J1 have passed their required integrated reviews and are DONE; J2 is blocked on the explicit stage-tracking business/application binding gate;
+- J0 and J1 have passed their required integrated reviews and are DONE; J2 is blocked on the remaining stage-tracking access/UI binding gate;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -442,7 +442,7 @@ J0 engine stabilization       DONE
 J1 contractual execution      DONE
              |
              v
-J2 stage-tracking reference application  BLOCKED — human bindings
+J2 stage-tracking reference application  BLOCKED — LinkKey/UI binding and controlled fixture
              |
              v
 J3 second independent reference application
@@ -531,13 +531,13 @@ No generalized Builder planner, ACL authoring, browser LinkKey suite or durable 
 
 ### J2 — stage-tracking reference application
 
-**Status: BLOCKED by unresolved J2 business/application bindings**
+**Status: BLOCKED by unverified reference ACL/UI binding and controlled fixture**
 
 Goal: demonstrate one realistic cross-cutting application transformation covering schema, access policy, UI, human-change preservation, concurrency and recovery.
 
-Authoritative behavioral specification: `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`.
+Authoritative behavioral specification: `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`. Accepted business decisions: `docs/J2-STAGE-TRACKING-ACCEPTED-SEMANTICS.md`. Partial observed fixture binding: `docs/J2-STAGE-TRACKING-REFERENCE-BINDING.md`.
 
-Before J2 implementation, the explicitly listed `PROPOSED`/`UNKNOWN` business semantics and exact logical-to-Grist bindings that affect critical properties must be accepted/resolved. The Builder may not resolve them unilaterally.
+The teacher assigned in `Stages.Suivi_par` makes an `Appel` or `Visite` and leaves the contact date, implication, punctuality and comments on that Stage. `Suivi_par` is not an author audit. The reference document now has editable `Stages.Date_du_contact`, added through direct maintenance; this is not a J2 engine proof. J2 requires no new Visit table. Before effectful J2 implementation, verify the real LinkKey access rules, teacher-facing card/date visibility and edit permissions, dependency closure and a controlled synthetic fixture. The Builder cannot turn unobserved ACL/UI facts into accepted policy.
 
 Exit requires all impacted critical properties to be contextually `VERIFIED`, including real supported browser-path LinkKey tests where the policy depends on `user.LinkKey`.
 
@@ -735,12 +735,12 @@ Normal maximum active development:
 Preferred steady state after J1 completion:
 
 ```text
-Worker A: J2 only after the explicit business/application binding gate is accepted
+Worker A: J2 only after critical LinkKey/UI binding and a controlled fixture are verified
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration/review/dependency control plus S0/S1/C7/C8 coordination
 ```
 
-No autonomous Builder product slice is currently eligible while J2's binding gate remains unresolved. J1 isolated engineering is complete, and no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
+No autonomous J2 Builder runtime slice is currently eligible while the critical LinkKey/UI binding and controlled fixture remain unresolved. J1 isolated engineering is complete, and no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
@@ -749,7 +749,7 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress J2 only after the explicit business/application binding gate is accepted; do not invent those decisions autonomously;
+2. progress J2 only after the critical LinkKey/UI binding is verified in a controlled fixture; do not invent missing access decisions;
 3. progress independent C4 operational evidence when the required intended environment/operator support is available;
 4. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
 5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.

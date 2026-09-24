@@ -354,7 +354,7 @@ C4 -> C5 -> C6            P0-P4 DONE
 - C5 remains blocked by C4 plus human persistence/encryption/key-management decisions.
 - C6 remains blocked by C4/C5 for finalization.
 - J0 has passed its integrated completion review and is DONE.
-- J1 is the current finite ELIGIBLE product-runtime tranche; J2-J6 remain dependency-gated.
+- J1 has passed its integrated review and is DONE. J2 has accepted Stage follow-up semantics and a partial structural fixture binding, but remains blocked on LinkKey ACL, teacher-facing UI evidence and a controlled fixture. J3-J6 remain dependency-gated.
 - S0/S1/C7/C8 remain a separate public-distribution path.
 
 ## Architectural invariant
