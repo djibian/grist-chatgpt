@@ -42,13 +42,31 @@ The document owner reports that each teacher obtains a specific URL from the `En
 | `Acces_Stages_Actif` revokes a teacher link | Bool field observed, no ACL rule read | UNKNOWN; do not infer its effect from its name |
 | Builder can safely reproduce/maintain the result | J1 synthetic engine proof only | J2 execution on an isolated fixture UNKNOWN |
 
-## Required binding/evidence before J2 execution
+## Automated binding and evidence sequence
 
-1. Inspect the exact Grist access rules, public-sharing role and `user.LinkKey` attributes, including whether `Acces_Stages_Actif` participates in access and how invalid or revoked keys behave; owner/API access is insufficient.
-2. With authorized controlled browser sessions for teacher-specific links, confirm that `Date_du_contact` appears and is editable only for the assigned teacher; record the precise widget field mapping and any necessary layout reconciliation.
-3. Use synthetic Stage/teacher identities and their distinct LinkKey URLs to test assigned, non-assigned, invalid-key, revoked-key and relation-tampering cases, including entry/replacement/correction/clearing of the sole trace on the same Stage and verification that `Suivi_par` remains unchanged. Check other reachable pages and Raw Data for unintended disclosure, rather than equating a filtered sheet with authorization.
-4. Record the widget field mapping, exact `MANAGED`/`SHARED` regions, formulas, access dependencies and any custom integrations touched by the proposed change.
-5. In isolated synthetic fixtures, test both starting states: without the date, the Builder must add and expose it while preserving access and existing rows; with the date already present, it must reconcile human layout and rerun without duplication. Execute needed effects through J1, including interruption and concurrency. A constructed pre-date fixture is representative evidence, not a claim to have reproduced the exact historical live state. Do not treat the direct live schema edit as a Builder proof.
+The J2-A/B/C/D dependency order and eligibility are fixed in [the roadmap](ROADMAP.md). Manual ACL transcription or hands-on test execution is not a prerequisite for implementing the bounded observation and test adapters.
+
+1. **Observe access with owner authority (J2-A).** Read only the relevant ACL resources/rules, defaults, sharing and user-attribute dependencies through a dedicated internal adapter. Establish which constructs are visible on the tested Grist version. Interpret `Acces_Stages_Actif` only when a rule actually depends on it. Mark unsupported or inaccessible policy as `UNKNOWN`; do not publish raw formulas, literal secrets, LinkKeys or a generic `_grist_*` reader. An owner/API observation alone does not verify teacher behavior.
+2. **Construct the independent fixture (J2-B).** Use fictional Stage/teacher identities and synthetic LinkKeys, never copies of real rows. Prepare both states: without `Date_du_contact` for the Builder to add, and with the date plus a human-modified layout for reconciliation. The accepted BehavioralContract determines expected outcomes independently of the observed ACLs. Bind the fixture's relevant normalized AccessModel, sharing, link-generation and UI dependencies to the reference; a mismatch remains `UNKNOWN`.
+3. **Verify effective behavior (J2-C).** Use separate non-owner browser sessions for assigned teacher A, other teacher B, missing/invalid and revoked links. Check reading and writing through the supported teacher page, other reachable pages and Raw Data. Enter, replace, correct and clear the single trace on the same Stage, and verify that `Suivi_par` never changes. Include deliberate denied read/write and relation-tampering controls. Record the widget field mapping and required layout reconciliation. A passing synthetic scenario does not by itself verify the live DINUM teacher link.
+4. **Transform through J1 (J2-D).** Record the exact `MANAGED`/`SHARED` regions, formulas, access dependencies and integrations in the accepted plan. On isolated fixtures only, add and expose the date in the absent state, reconcile the already present date and human layout in the other state, and verify existing rows, interruption, concurrency and rerun. Add an ACL write only if the observed policy actually requires it; that write needs its own bounded authorization and recovery design. A constructed pre-date fixture does not claim to reproduce the historical live state. The direct live schema edit is not Builder proof.
+
+For each property, the fixture manifest must name its accepted contract version, role and scenario, expected result, setup/cleanup, checked UI/data surface, denial/control case, and evidence dependencies. A run records the fixture/document identity, tested revision or fingerprint, Grist version where observable, actual result, exact method and `VERIFIED`/`FAILED`/`UNKNOWN` verdict. Dependency changes invalidate affected evidence. Keep synthetic LinkKeys, full URLs and session secrets inside the verifier, including on failures and in logs; only bounded outcomes enter model-visible evidence.
+
+## Property-to-proof checklist
+
+This table specifies which proof must be produced, without asserting that any case already passed.
+
+| Accepted properties | Required scenario and independently expected outcome | Admissible evidence |
+|---|---|---|
+| `STAGE-B1/B2/B10`, `STAGE-U1` | A enters, corrects and clears one trace on A's Stage; the same Stage survives, `Suivi_par` stays fixed, and the teacher sees the contact date. | Non-owner controlled browser plus stable Stage identity and bounded before/after assertions. |
+| `STAGE-B3/B4/B5/B6`, `STAGE-A1/A3/A4` | B, missing/invalid key and revoked key cannot read/write A's protected Stage; neither an alternate page/Raw Data nor relation tampering grants access. | Separate browser sessions, positive A control and denied read/write controls; never substitute owner/API results. |
+| `STAGE-A2`, `STAGE-B7/B8`, `STAGE-U3` | A date-absent fixture gains exactly one date field and UI placement without disclosure, loss or duplication; rerun converges. | J1 effect journal, pre/post schema/UI and stable-record assertions, browser checks around any access-relevant intermediate state. |
+| `STAGE-U2`, `STAGE-H1/H2/H3`, `STAGE-C1` | Existing date and independent human layout/business/managed changes are reconciled or cause a safe suspension; no outside-scope overwrite. | Second fixture, injected concurrent edit, conflict classification and bounded before/after assertions. |
+| `STAGE-R1/R2/R3/R4/R5` | Lost responses, partial effects and restart preserve known identifiers, avoid blind replay, and suspend if ambiguity remains. | Fault injection and durable journal replay through J1 on the isolated fixture. |
+| `STAGE-B9` | Creating a new period does not duplicate Stages if period generation is in the actual impact graph. | Impact decision plus a fixture regression when impacted; document the excluded dependency when not impacted. |
+
+A row passes only if every applicable property and its negative/control scenario has current evidence. A single green fixture run does not establish parity with the live document. Authorized observation must confirm the reference's relevant ACL/sharing, link-generation and UI binding; if actual live teacher-browser behavior remains inaccessible, record that production-specific claim as `UNKNOWN` and name the minimum access needed to resolve it.
 
 ## Evidence standard for the future test run
 

@@ -173,6 +173,12 @@ A browser test proving LinkKey isolation on a particular document revision and G
 
 Unknown areas unrelated to the current change do not automatically block the whole application. They block only guarantees whose dependency graph reaches them.
 
+## Automated behavioral evidence
+
+An accepted BehavioralContract supplies the expected result of each test independently of the observed implementation. The verifier binds each property to a scenario, expected and observed outcome, acting role, exact fixture/document and relevant version or revision; inconclusive and stale evidence remain explicit. A passing API or owner read does not establish a browser-only LinkKey policy. AccessModel observation and controlled browser verification are distinct, bounded adapters; neither exposes raw internal Grist tables, arbitrary browser control, credentials or LinkKeys to the model.
+
+Prefer isolated synthetic fixtures for destructive, negative, recovery and rerun scenarios. A synthetic pass establishes behavior for the tested fixture and version; a reference-application claim additionally needs an authorized comparison of relevant access/UI dependencies and, when required by the accepted contract, controlled evidence on the actual teacher browser path. Missing product instrumentation is an eligible implementation slice, not a standing request for manual test execution. Ask for human action only when authority, environment access or a product/security decision cannot be derived from the accepted mandate.
+
 ## Contract authority
 
 Accepted contracts have identifiable authority and immutable versions.
