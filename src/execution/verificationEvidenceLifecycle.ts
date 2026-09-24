@@ -1,8 +1,10 @@
 import {
   ExecutionJournalNotFoundError,
+  ExecutionJournalRevisionError,
   type ExecutionJournal,
   type ExecutionJournalMutableState,
   type ExecutionJournalRecord,
+  type ExecutionStepState,
   type VerificationEvidenceRecord,
   type VerificationVerdict
 } from "./executionJournal.js";
@@ -89,14 +91,32 @@ function sameObservation(
   );
 }
 
+function existingReplay(
+  record: ExecutionJournalRecord,
+  step: ExecutionStepState,
+  observation: VerificationObservation
+): ExecutionJournalRecord | null {
+  const existing = record.verificationEvidence.find(
+    (candidate) => candidate.evidenceId === observation.evidenceId
+  );
+  if (!existing) return null;
+
+  const linkedToStep = step.verificationEvidenceIds.includes(observation.evidenceId);
+  if (linkedToStep && sameObservation(existing, observation)) return record;
+  throw new VerificationEvidenceConflictError(
+    record.definition.identity.executionId,
+    observation.evidenceId
+  );
+}
+
 /**
  * Executable J1 boundary for durable contextual verification evidence.
  *
  * Evidence is append-only: a later observation receives a new evidenceId rather
  * than mutating an earlier verdict. Replaying the same evidenceId with the same
- * contextual observation is idempotent, which makes a retry after an uncertain
- * caller response safe. Reusing an evidenceId for different content fails
- * closed.
+ * contextual observation is idempotent, including a concurrent retry that
+ * loses the journal CAS after another caller persisted the same observation.
+ * Reusing an evidenceId for different content fails closed.
  *
  * This slice deliberately does not turn one evidence record into a global
  * success flag and does not mark a step VERIFIED. The immutable plan currently
@@ -125,6 +145,16 @@ export class VerificationEvidenceLifecycle {
     if (stepIndex < 0) throw new VerificationStepNotFoundError(executionId, stepId);
 
     const step = current.steps[stepIndex]!;
+    const property = current.definition.criticalProperties.find(
+      (candidate) => candidate.propertyId === observation.propertyId
+    );
+    if (!property) {
+      throw new VerificationPropertyNotFoundError(executionId, observation.propertyId);
+    }
+
+    const replay = existingReplay(current, step, observation);
+    if (replay) return replay;
+
     if (current.status === "COMPLETED") {
       throw new VerificationTransitionError(
         executionId,
@@ -138,22 +168,6 @@ export class VerificationEvidenceLifecycle {
         stepId,
         `contextual verification requires EFFECT_RECORDED, found ${step.status}.`
       );
-    }
-
-    const property = current.definition.criticalProperties.find(
-      (candidate) => candidate.propertyId === observation.propertyId
-    );
-    if (!property) {
-      throw new VerificationPropertyNotFoundError(executionId, observation.propertyId);
-    }
-
-    const existing = current.verificationEvidence.find(
-      (candidate) => candidate.evidenceId === observation.evidenceId
-    );
-    if (existing) {
-      const linkedToStep = step.verificationEvidenceIds.includes(observation.evidenceId);
-      if (linkedToStep && sameObservation(existing, observation)) return current;
-      throw new VerificationEvidenceConflictError(executionId, observation.evidenceId);
     }
 
     const evidence: VerificationEvidenceRecord = {
@@ -186,7 +200,18 @@ export class VerificationEvidenceLifecycle {
         : candidate
     );
 
-    return this.journal.compareAndSet(executionId, current.revision, next);
+    try {
+      return await this.journal.compareAndSet(executionId, current.revision, next);
+    } catch (error) {
+      if (!(error instanceof ExecutionJournalRevisionError)) throw error;
+
+      const reloaded = await this.loadRequired(executionId);
+      const reloadedStep = reloaded.steps.find((candidate) => candidate.stepId === stepId);
+      if (!reloadedStep) throw new VerificationStepNotFoundError(executionId, stepId);
+      const concurrentReplay = existingReplay(reloaded, reloadedStep, observation);
+      if (concurrentReplay) return concurrentReplay;
+      throw error;
+    }
   }
 
   async latestEvidence(
