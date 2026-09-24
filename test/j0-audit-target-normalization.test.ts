@@ -29,11 +29,9 @@ function serviceRejectingAuthorization(audit: AuditLogger): AuthorizedGristServi
   );
 }
 
-test("J0 T3: rejected resource URL never reaches audit output verbatim", async () => {
+async function rejectedAuditEvent(resource: string): Promise<Record<string, unknown>> {
   const audit = new AuditLogger();
   const service = serviceRejectingAuthorization(audit);
-  const marker = "SYNTHETIC-T3-LINK-KEY";
-  const resource = `https://grist.example.org/doc/example?LinkKey=${marker}`;
   const lines: string[] = [];
   const originalLog = console.log;
   console.log = (...args: unknown[]) => {
@@ -50,17 +48,33 @@ test("J0 T3: rejected resource URL never reaches audit output verbatim", async (
   }
 
   assert.equal(lines.length, 1);
-  assert.equal(lines[0]!.includes(marker), false);
-  assert.equal(lines[0]!.includes(resource), false);
+  return JSON.parse(lines[0]!) as Record<string, unknown>;
+}
 
-  const event = JSON.parse(lines[0]!) as Record<string, unknown>;
+test("J0 T3: rejected resource URL never reaches audit output verbatim", async () => {
+  const marker = "SYNTHETIC-T3-LINK-KEY";
+  const resource = `https://grist.example.org/doc/example?LinkKey=${marker}`;
+  const event = await rejectedAuditEvent(resource);
+  const serialized = JSON.stringify(event);
+
+  assert.equal(serialized.includes(marker), false);
+  assert.equal(serialized.includes(resource), false);
   assert.equal(event.type, "grist.audit");
   assert.equal(event.status, "error");
   assert.equal(event.operation, "list_tables");
   assert.equal("documentId" in event, false);
 });
 
-test("audit keeps normalized non-URL document IDs", () => {
+test("J0 T3: rejected opaque target is not mistaken for a normalized audit ID", async () => {
+  const rawTarget = "opaque-unresolved-target";
+  const event = await rejectedAuditEvent(rawTarget);
+
+  assert.equal(JSON.stringify(event).includes(rawTarget), false);
+  assert.equal(event.status, "error");
+  assert.equal("documentId" in event, false);
+});
+
+test("audit keeps normalized non-URL document IDs for successful operations", () => {
   const audit = new AuditLogger();
   const lines: string[] = [];
   const originalLog = console.log;
@@ -85,4 +99,32 @@ test("audit keeps normalized non-URL document IDs", () => {
 
   const event = JSON.parse(lines[0]!) as Record<string, unknown>;
   assert.equal(event.documentId, "doc-safe-123");
+});
+
+test("audit omits document targets from error events without resolution proof", () => {
+  const audit = new AuditLogger();
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  };
+
+  try {
+    audit.record({
+      requestId: "req-error",
+      principal: "principal-1",
+      transport: "mcp",
+      operation: "query_records",
+      capability: "doc:read",
+      documentId: "looks-safe-but-unproven",
+      status: "error",
+      durationMs: 1,
+      errorType: "Error"
+    });
+  } finally {
+    console.log = originalLog;
+  }
+
+  const event = JSON.parse(lines[0]!) as Record<string, unknown>;
+  assert.equal("documentId" in event, false);
 });
