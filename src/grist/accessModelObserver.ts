@@ -7,6 +7,10 @@ const MAX_IDENTIFIER_LENGTH = 160;
 const MAX_METADATA_JSON_CHARS = 65_536;
 const MAX_FORMULA_AST_NODES = 4_096;
 const MAX_FORMULA_AST_DEPTH = 64;
+const MAX_FINGERPRINT_NODES = 100_000;
+const MAX_FINGERPRINT_DEPTH = 32;
+const MAX_FINGERPRINT_ARRAY_ITEMS = 2_100;
+const MAX_FINGERPRINT_OBJECT_KEYS = 256;
 const PERMISSION_KEYS = ["create", "read", "update", "delete", "schemaEdit"] as const;
 
 type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -93,6 +97,11 @@ interface RawSnapshot {
   docInfo: unknown;
 }
 
+interface FingerprintState {
+  nodes: number;
+  complete: boolean;
+}
+
 function boundedIdentifier(value: unknown): string | null {
   if (typeof value !== "string") return null;
   if (value.length < 1 || value.length > MAX_IDENTIFIER_LENGTH) return null;
@@ -128,21 +137,74 @@ function recordsFromResponse(value: unknown): MetadataRecord[] | null {
   return normalized;
 }
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value === null || typeof value !== "object") return value;
+function boundedCanonicalize(
+  value: unknown,
+  state: FingerprintState,
+  depth = 0
+): unknown {
+  if (state.nodes >= MAX_FINGERPRINT_NODES || depth > MAX_FINGERPRINT_DEPTH) {
+    state.complete = false;
+    return "__bounded_metadata__";
+  }
+  state.nodes += 1;
+
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (Number.isFinite(value)) return value;
+    state.complete = false;
+    return "__unsupported_number__";
+  }
+  if (typeof value === "string") {
+    if (value.length <= MAX_METADATA_JSON_CHARS) return value;
+    state.complete = false;
+    return ["__oversized_string__", value.length];
+  }
+  if (typeof value !== "object") {
+    state.complete = false;
+    return `__unsupported_${typeof value}__`;
+  }
+
+  if (Array.isArray(value)) {
+    const length = Math.min(value.length, MAX_FINGERPRINT_ARRAY_ITEMS);
+    if (value.length > MAX_FINGERPRINT_ARRAY_ITEMS) state.complete = false;
+    const result: unknown[] = [];
+    for (let index = 0; index < length; index += 1) {
+      if (state.nodes >= MAX_FINGERPRINT_NODES) {
+        state.complete = false;
+        break;
+      }
+      result.push(boundedCanonicalize(value[index], state, depth + 1));
+    }
+    return result;
+  }
+
   const record = value as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.keys(record)
-      .sort()
-      .map((key) => [key, canonicalize(record[key])])
-  );
+  const rawKeys = Object.keys(record);
+  if (rawKeys.length > MAX_FINGERPRINT_OBJECT_KEYS) state.complete = false;
+  const keys = rawKeys.slice(0, MAX_FINGERPRINT_OBJECT_KEYS).sort();
+  const entries: Array<[string, unknown]> = [];
+  for (const key of keys) {
+    if (state.nodes >= MAX_FINGERPRINT_NODES) {
+      state.complete = false;
+      break;
+    }
+    if (key.length > MAX_IDENTIFIER_LENGTH) {
+      state.complete = false;
+      entries.push(["__oversized_key__", key.length]);
+      continue;
+    }
+    entries.push([key, boundedCanonicalize(record[key], state, depth + 1)]);
+  }
+  return Object.fromEntries(entries);
 }
 
-function fingerprint(snapshot: RawSnapshot): string {
-  return createHash("sha256")
-    .update(JSON.stringify(canonicalize(snapshot)), "utf8")
-    .digest("hex");
+function fingerprint(snapshot: RawSnapshot): { value: string; complete: boolean } {
+  const state: FingerprintState = { nodes: 0, complete: true };
+  const canonical = boundedCanonicalize(snapshot, state);
+  return {
+    value: createHash("sha256").update(JSON.stringify(canonical), "utf8").digest("hex"),
+    complete: state.complete
+  };
 }
 
 function parseColumnIds(value: unknown): "*" | string[] | null {
@@ -374,6 +436,8 @@ export class AccessModelObserver {
     }
 
     const issues = new Set<string>();
+    const metadataFingerprint = fingerprint(snapshot);
+    if (!metadataFingerprint.complete) issues.add("metadata_fingerprint_incomplete");
     if (
       resourceRecords.length >= limit ||
       ruleRecords.length >= limit ||
@@ -425,7 +489,10 @@ export class AccessModelObserver {
         rawFormula === null ||
         rawFormula === undefined ||
         (typeof rawFormula === "string" && rawFormula.length <= MAX_METADATA_JSON_CHARS);
-      if (!formulaWithinBounds || (rawFormula !== null && rawFormula !== undefined && typeof rawFormula !== "string")) {
+      if (
+        !formulaWithinBounds ||
+        (rawFormula !== null && rawFormula !== undefined && typeof rawFormula !== "string")
+      ) {
         issues.add("acl_formula_dependency_unknown");
       }
       const dependencies = dependenciesFromParsedFormula(
@@ -495,7 +562,7 @@ export class AccessModelObserver {
       mandateId,
       observationMode: "owner-authorized-internal-read",
       schemaVersion: version,
-      metadataFingerprint: fingerprint(snapshot),
+      metadataFingerprint: metadataFingerprint.value,
       completeness: issues.size === 0 ? "COMPLETE" : "PARTIAL",
       resources,
       rules,
