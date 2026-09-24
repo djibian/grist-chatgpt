@@ -310,7 +310,7 @@ C1 / C2 / C3 / C4-P0          DONE   C5 Secure Grist onboarding        BLOCKED  
                                                                                   J2-J6                    BLOCKED    C8 Final submission     BLOCKED
 ```
 
-J1 has completed its exact-main integrated completion review. J2 is now the next Builder tranche but is blocked on the explicit business/application binding decisions in `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
+J1 has completed its exact-main integrated completion review. J2 is now the next Builder tranche: its Stage follow-up business semantics are accepted and a partial reference schema/page binding is recorded, but runtime implementation remains blocked on controlled verification of the real teacher LinkKey/ACL path, teacher-specific UI behavior, dependency closure and an isolated fixture. Missing access/UI facts must not be invented. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
 
 The exact dependency map and currently eligible work live in `docs/ROADMAP.md`.
 
