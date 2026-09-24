@@ -17,7 +17,7 @@ Reference: the Grist document named “suivi des stages chatgpt”. This is one 
 | comment | `Stages.Commentaire` | editable Text |
 | placement dates | `Stages.Date_de_debut_modifiee`, `Stages.Date_de_fin_modifiee` | separate editable Date columns; neither is the contact date |
 
-`Date_du_contact` is a genuine non-formula Date column. It can remain blank for records created before the change. The document owner reports that the date was subsequently placed in the visible follow-up sheet. This report is not a controlled test of teacher permissions or J1 engine execution. The existing schema has a single set of current trace fields on each Stage; a per-contact history and actual editor/author audit were not observed. `Suivi_par` is an assignment, not author attribution.
+`Date_du_contact` is a genuine non-formula Date column. It can remain blank for records created before the change. The document owner reports that the date was subsequently placed in the visible follow-up sheet. This report is not a controlled test of teacher permissions or J1 engine execution. The existing schema has a single set of current trace fields on each Stage; a per-contact history and actual editor/author audit were not observed. `Suivi_par` is the assigned teacher and attributed business author in this non-reassignment workflow; it is not a technical editor audit.
 
 ## Observed navigation and UI metadata
 
@@ -33,9 +33,9 @@ The document owner reports that each teacher obtains a specific URL from the `En
 
 ## Required binding/evidence before J2 execution
 
-1. Inspect the exact Grist access rules and `user.LinkKey` attributes, including revoked and reassigned teacher behavior; owner/API access is insufficient.
+1. Inspect the exact Grist access rules and `user.LinkKey` attributes, including invalid and revoked LinkKey behavior; owner/API access is insufficient.
 2. With authorized controlled browser sessions for teacher-specific links, confirm that `Date_du_contact` appears and is editable only for the assigned teacher; record the precise widget field mapping and any necessary layout reconciliation.
-3. Use synthetic Stage/teacher identities and their distinct LinkKey URLs to test assigned, non-assigned, invalid-key, revoked-key, relation-tampering and reassignment cases, including edit/correct/clear of the trace.
+3. Use synthetic Stage/teacher identities and their distinct LinkKey URLs to test assigned, non-assigned, invalid-key, revoked-key and relation-tampering cases, including edit/correct/clear of the trace and verification that `Suivi_par` remains unchanged.
 4. Record the widget field mapping, exact `MANAGED`/`SHARED` regions, formulas, access dependencies and any custom integrations touched by the proposed change.
 5. In an isolated fixture, execute and verify the accepted transformation through the J1 effect boundary, including interruption, concurrency and idempotent rerun. Do not treat the direct live schema edit as this proof.
 

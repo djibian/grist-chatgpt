@@ -40,13 +40,13 @@ The J2 follow-up trace is **part of Stage**, not a separate logical/physical Vis
 
 On the reference fixture the observed columns are `Stages.Type_de_contact`, `Stages.Date_du_contact`, `Stages.Implication`, `Stages.Ponctuel`, `Stages.Commentaire`. These IDs are binding facts only. The optionality of historical rows must be preserved; J2 must not invent dates.
 
-`Stages.Suivi_par` is the teacher **assigned** to conduct the call/visit. It is not the identity of the author or last editor. No author identity is proven by the observed Stage schema. A separate author audit or multiple contacts require a distinct accepted decision.
+`Stages.Suivi_par` is the teacher **assigned** to conduct the call/visit and, in this workflow without reassignment, the attributed business author of the follow-up trace. This attribution does not prove who entered or last edited a cell. A technical author audit or multiple contacts require a distinct accepted decision.
 
 ## 4. Responsibility predicate
 
 `responsible(T, S)` means the current assignment: Stage S references teacher T in the observed `Stages.Suivi_par` relation.
 
-This establishes business responsibility, not effective browser authorization by itself. The owner reports that a teacher-specific URL from `Enseignants` passes a LinkKey and that Grist ACLs restrict the teacher's adapted interface to assigned Stages. The exact LinkKey attribute, rule source and negative/reassignment behavior still require controlled observation. The Builder must bind the predicate to each tested application's real model and must not invent another responsibility relation merely for the test.
+This establishes business responsibility, not effective browser authorization by itself. The owner reports that a teacher-specific URL from `Enseignants` passes a LinkKey and that Grist ACLs restrict the teacher's adapted interface to assigned Stages. The exact LinkKey attribute, rule source and negative access behavior still require controlled observation. The Builder must bind the predicate to each tested application's real model and must not invent another responsibility relation merely for the test.
 
 ## 5. Managed scope
 
@@ -145,12 +145,12 @@ Re-running the same accepted intent against unchanged managed state does not dup
 
 If period/stage generation is outside the confirmed impact graph, it need not block the follow-up change. If affected, verify against the existing application rule.
 
-### STAGE-B10 — reassignment preserves traces and revokes former access
+### STAGE-B10 — assignment remains stable through follow-up
 
-**Criticality:** CRITICAL if reassignment/access logic is affected; otherwise IMPORTANT regression property.  
+**Criticality:** CRITICAL when assignment or access logic is affected.  
 **Authority:** ACCEPTED BASELINE.
 
-Changing `Suivi_par` from A to B preserves the Stage's follow-up trace. A immediately loses responsibility-derived protected access; B gains only the access allowed by the accepted current-responsibility policy. Former assignment alone confers no historical access.
+There is no Stage reassignment in this accepted follow-up workflow. Recording, correcting or clearing the contact trace, and executing the J2 transformation, must not change an existing `Suivi_par` assignment or introduce a teacher-facing reassignment path. Teacher relation tampering is denied by STAGE-B6.
 
 ## 8. AccessModel properties
 
@@ -180,7 +180,7 @@ Successful owner/Builder API calls do not prove teacher access restrictions.
 **Criticality:** CRITICAL  
 **Authority:** fixed product vision.
 
-When the effective policy depends on the Grist web client's `user.LinkKey`, controlled browser scenarios with valid, invalid, revoked and reassigned identities are required. Schema/API observations alone cannot establish those verdicts.
+When the effective policy depends on the Grist web client's `user.LinkKey`, controlled browser scenarios with distinct assigned and unassigned teachers, valid, invalid and revoked keys are required. Schema/API observations alone cannot establish those verdicts.
 
 ## 9. UI behavioral properties
 
@@ -319,7 +319,7 @@ The exact fixture names are synthetic; tests must use controlled identities and 
 | BROW-C | missing/invalid key | denied/limited according to policy; no protected data |
 | BROW-D | revoked key | previously granted protected access gone |
 | BROW-E | Teacher B attempts relation tampering | no access expansion |
-| BROW-F | Stage reassigned A → B | A loses responsibility-derived access, B gains permitted access, trace remains |
+| BROW-F | Stage A remains assigned to A after follow-up entry/correction | A still sees the trace, B still cannot access it and `Suivi_par` stays unchanged |
 | BROW-G | “Suivi des stages” page | contact date appears in the intended teacher-facing sheet and is editable where authorized |
 
 These tests establish contextual scenarios, not universal ACL correctness.
@@ -349,11 +349,11 @@ A critical unknown outside the dependency closure of the J2 change does not auto
 
 ## 19. Resolved choices and outstanding observations
 
-Human-accepted choices: follow-up on the existing Stage row; `Suivi_par` is the assigned teacher; a call or visit trace has type, actual contact date, implication, punctuality and comments; correction/clearing is allowed; former teachers lose responsibility-derived access on reassignment while the trace remains. No separate Visit table or author-audit field is mandated.
+Human-accepted choices: follow-up on the existing Stage row; `Suivi_par` is the assigned teacher and the attributed business author of that trace; there is no reassignment in this workflow; a call or visit trace has type, actual contact date, implication, punctuality and comments; correction/clearing is allowed. No separate Visit table or technical author-audit field is mandated.
 
 Observed binding: the named reference Grist document has `Stages.Suivi_par` (`Ref:Enseignants`), `Type_de_contact` (`Appel`/`Visite`), `Implication`, `Ponctuel`, `Commentaire`, and the newly added editable Date `Date_du_contact`. The “Suivi des stages” page uses widgets 31 and 37 on `Stages`; `Enseignants.Lien_Stages` links there with `LinkKey_Token`. The owner reports that the date is now in the sheet and teacher-specific links filter the displayed Stages through Grist ACLs; those effects still need controlled tests.
 
-Still `UNKNOWN` until direct controlled evidence: exact Grist ACL rules and `user.LinkKey` attributes; the teacher-specific URL's resolved date field mapping; effective teacher read/write/clear permissions, invalid/revoked/reassigned behavior; managed/shared UI regions and dependency closure. No author identity field or per-contact history is established. These facts must not be fabricated from owner API access.
+Still `UNKNOWN` until direct controlled evidence: exact Grist ACL rules and `user.LinkKey` attributes; the teacher-specific URL's resolved date field mapping; effective teacher read/write/clear permissions, invalid/revoked LinkKey behavior and unchanged assignment; managed/shared UI regions and dependency closure. No technical author/editor audit field or per-contact history is established. These facts must not be fabricated from owner API access.
 
 ## 20. J2 exit criteria
 

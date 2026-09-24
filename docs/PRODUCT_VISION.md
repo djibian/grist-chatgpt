@@ -96,7 +96,7 @@ Examples for a stage-tracking application include:
 
 - an assigned teacher can record the visits for which they are responsible;
 - creating a new period does not create duplicate stages;
-- reassigning a stage preserves existing observations unless an accepted rule says otherwise;
+- recording or correcting a Stage follow-up preserves its assigned teacher and unrelated observations;
 - a new table that participates in the protected domain preserves the expected teacher isolation;
 - repeating an already satisfied build intent creates no duplicates.
 

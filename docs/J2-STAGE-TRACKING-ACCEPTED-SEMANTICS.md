@@ -6,7 +6,7 @@ The reference document is the existing Grist document named “suivi des stages 
 
 ## 1. Follow-up responsibility and trace
 
-`Stages.Suivi_par` designates the teacher assigned to contact the student's placement host, either by telephone or during a visit. It does **not** identify the person who entered or last edited a cell.
+`Stages.Suivi_par` designates the teacher assigned to contact the student's placement host, either by telephone or during a visit. Because this workflow does not reassign a Stage, that teacher is the attributed **business author** of the follow-up trace. This does not identify the person who entered or last edited each cell.
 
 The teacher's follow-up trace belongs to the **existing Stage record**. Its current fields are `Type_de_contact` (choices `Appel` and `Visite`), `Date_du_contact` (date of the call or visit), `Implication`, `Ponctuel`, and `Commentaire`. The date is a contact date, distinct from the start/end dates of the placement. Existing rows may have no date; no historical date may be fabricated. A completed new follow-up records the contact date together with the relevant trace fields.
 
@@ -18,7 +18,7 @@ No physical `Visit` table, row, relation or page is required for this reference 
 
 `responsible(T, S)` means that Stage S currently references teacher T through `Stages.Suivi_par`. Authorization for the teacher-facing flow must additionally be established from the real Grist LinkKey policy; this relation alone is not a proof of ACL enforcement.
 
-On reassignment from A to B, A loses access derived solely from current responsibility, B gains only the access granted by the accepted policy, and the existing follow-up trace remains on S. A former assignment does not grant historical visibility. A teacher must not be able to change the responsibility relation to acquire another Stage's protected information.
+No reassignment is part of the accepted follow-up workflow. Entering, correcting or clearing the trace, or applying the J2 transformation, must preserve the existing `Suivi_par` value. A teacher must not be able to change that relation to acquire another Stage's protected information.
 
 ## 3. Teacher-facing behavior
 
@@ -28,15 +28,15 @@ The teacher receives a specific follow-up URL from the `Enseignants` table. Its 
 
 ## 4. Author attribution
 
-`Suivi_par` is the *assigned teacher*, even if another authorized person edits the trace. The observed Stage schema does not establish a dedicated author or editor identity field. J2 must not claim that author identity is already stored or add an author column as if that had been requested. An actual author audit would need an explicit rule and verified implementation.
+`Suivi_par` gives the attributed business author in this non-reassignment workflow. The observed Stage schema does not establish who actually entered or last edited a cell, and a teacher-specific LinkKey URL alone cannot prove the individual who used it. J2 must not add a separate author column as if that had been requested or claim a technical editor audit. Such an audit would need an explicit rule and verified implementation.
 
 ## 5. J2 evidence and remaining gate
 
 The reference acceptance matrix must show, with controlled teacher identities and the supported LinkKey/browser path:
 
 - an assigned teacher can enter, correct and clear the authorized contact date and trace fields on the Stage;
-- another teacher cannot read or write protected follow-up data outside current responsibility;
-- reassignment revokes the former teacher's responsibility-derived access while preserving the trace;
+- another teacher cannot read or write protected follow-up data outside their assignment or change `Suivi_par` to acquire access;
+- contact entry, correction, clearing and J2 execution preserve the assigned `Suivi_par` teacher;
 - missing, invalid and revoked LinkKeys deny the protected path according to the observed policy;
 - the follow-up date appears in the teacher's actual LinkKey flow and is editable only with the intended permissions;
 - repeating the accepted transformation does not duplicate fields, widgets, rules or records;
