@@ -40,21 +40,25 @@ P2 formula/schema safety          DONE
 P3 semantic context/discovery     DONE
 P4 compact MCP surface            DONE
 Q0 retrospective code assurance  DONE
+J0 engine stabilization           ELIGIBLE
 ```
 
 The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a bounded document-UI surface. `main` contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection and mutation through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, bounded native chart-type configuration for explicitly identified chart widgets, and the completed Q0 repairs that enforce the internal metadata-table boundary, close schema-mutation metadata allowlists and fail closed on potentially truncated UI metadata snapshots.
+
+The frozen Product Vision now defines `grist-chatgpt` as an agentic Grist application builder and lifecycle maintainer above the existing bounded execution substrate. The Builder / Execution Engine / Connector separation, contractual execution semantics and stage-tracking BehavioralContract are specified in `docs/PRODUCT_VISION.md`, `docs/EXECUTION-ENGINE-J0-J1.md` and `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`.
 
 The C4 architecture decision is fixed: ProConnect is the upstream institutional identity source, Logto OSS is the reference MCP-facing authorization server, and `grist-chatgpt` remains a provider-neutral standards-based OAuth resource server. Auth0 EU and Curity Standard remain documented fallbacks.
 
 The project advances on three product/platform/distribution axes. Q0 remains recorded below as the completed retrospective trust-baseline tranche:
 
 ```text
-QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT CAPABILITIES       PUBLIC DISTRIBUTION
-Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE    S0 ACTIVE + S1
-                                                                                -> C7 -> C8 -> review
+QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT / BUILDER            PUBLIC DISTRIBUTION
+Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       S0 ACTIVE + S1
+                                                   -> J0 -> J1 -> J2 -> J3          -> C7 -> C8 -> review
+                                                      -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. New bounded product work may proceed only when its own finite roadmap tranche is explicitly defined and eligible.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, and J0 is now the finite committed next product-runtime tranche. J1-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -102,6 +106,7 @@ Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
 - P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
+- J0 is independently eligible as the finite next product-runtime tranche and does not require C5 when developed against an isolated controlled environment;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -231,9 +236,9 @@ Remaining finalization after C4/C5:
 - controlled production deployment and rollback evidence;
 - authenticated post-deploy synthetic smoke evidence.
 
-## Axis B — product capabilities
+## Axis B — product capabilities and Agentic Builder
 
-The product axis may advance now that Q0, P1, P2, P3 and P4 are DONE only when a later tranche has an explicit finite roadmap contract and preserves the existing identity, authorization and bounded-operation invariants.
+P0-P4 remain the historical bounded-bridge product baseline. The new product program is the distinct J0-J6 Agentic Builder sequence. The existing narrow v1 MCP operations remain a compatibility/execution substrate; J0-J6 do not imply a generic super-tool or arbitrary `/apply` surface.
 
 Reference inspirations are design provenance, not dependencies:
 
@@ -422,28 +427,182 @@ Committed next P4 slices: **none**.
 
 Any future compaction or v2 surface requires a new explicit roadmap decision; it is not continuation of P4-E1.
 
+## Agentic Builder sequence
+
+The sequence below is the authoritative continuation of the product axis after P4. `docs/AGENTIC-BUILDER-ROADMAP-DELTA.md` records the proposal that led to this integration; this roadmap controls eligibility.
+
+```text
+P0-P4 bounded bridge baseline  DONE
+             |
+             v
+J0 engine stabilization
+             |
+             v
+J1 contractual execution
+             |
+             v
+J2 stage-tracking reference application
+             |
+             v
+J3 second independent reference application
+             |
+             v
+J4 native Builder generalization
+             |
+             v
+J5 code + integrations
+             |
+             v
+J6 durable lifecycle maintenance
+```
+
+### J0 — engine stabilization
+
+**Status: ELIGIBLE**  
+**Priority: highest product-runtime priority**
+
+Goal: make current mutation outcomes safe inputs for a future orchestrator by correcting the four reproduced audit fragilities without implementing the Builder itself.
+
+Authoritative specification: `docs/EXECUTION-ENGINE-J0-J1.md`, J0 sections.
+
+Committed J0 slices are finite:
+
+1. explicit uncertain-write semantics including first-batch ambiguity;
+2. preserve confirmed partial results/stable IDs across later failure or uncertainty;
+3. safe audit target normalization so rejected secret-bearing URLs are not logged raw;
+4. concurrency classification/protection for overwrite-sensitive current mutations, with refusal where an effective protected mode is unavailable;
+5. focused regression tests reproducing the four audit findings;
+6. integrated J0 completion review.
+
+J0 is complete only when:
+
+- required tests T0-T3 pass;
+- uncertain first writes are structurally distinguishable from proven no-effect failure;
+- successful earlier batch results survive later failure/uncertainty;
+- supported contractual concurrency claims are backed by an effective tested mechanism, otherwise the capability refuses that mode;
+- rejected raw resource URLs cannot leak query secrets into audit;
+- existing non-replay safety is preserved;
+- public/runtime documentation states the exact guarantee boundaries;
+- a fresh integrated J0 completion review records PASS against exact `main`.
+
+J0 runtime changes require independent exact-head review. J0/J1 may be developed and tested against an isolated synthetic/controlled environment before C5, but that does not make the system ready for real multi-user production.
+
+### J1 — first contractual transformation
+
+**Status: BLOCKED by J0**  
+**Priority: high**
+
+Goal: prove one bounded synthetic multi-step transformation using immutable execution contracts, cumulative plan budgets, a durable write-ahead journal, multidimensional state, contextual evidence and recovery/suspension after injected failures.
+
+Authoritative specification: `docs/EXECUTION-ENGINE-J0-J1.md`, J1 sections.
+
+Finite committed J1 work after J0 completion:
+
+1. immutable execution/plan/contract identity;
+2. `ExecutionJournal` abstraction plus one durable controlled-environment implementation;
+3. write-ahead step lifecycle and restart semantics;
+4. cumulative per-plan budget enforcement;
+5. authorization re-check before resumed/new effects;
+6. contextualized property evidence;
+7. one deterministic synthetic transformation with crash/fault injection at the specified boundaries;
+8. integrated J1 completion review.
+
+J1 exit criteria are the complete criteria in `docs/EXECUTION-ENGINE-J0-J1.md`: persistent write-ahead execution, cumulative budgets, authority re-check, multidimensional effect knowledge, retained partial results, uncertainty after crash, capability-specific recovery, suspension on unsafe ambiguity, durable contextual evidence, convergence without duplicate effect where supported, and no new generic Grist escape hatch.
+
+No generalized Builder planner, ACL authoring, browser LinkKey suite or durable scheduler is part of J1.
+
+### J2 — stage-tracking reference application
+
+**Status: BLOCKED by J1 and unresolved J2 business/application bindings**
+
+Goal: demonstrate one realistic cross-cutting application transformation covering schema, access policy, UI, human-change preservation, concurrency and recovery.
+
+Authoritative behavioral specification: `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`.
+
+Before J2 implementation, the explicitly listed `PROPOSED`/`UNKNOWN` business semantics and exact logical-to-Grist bindings that affect critical properties must be accepted/resolved. The Builder may not resolve them unilaterally.
+
+Exit requires all impacted critical properties to be contextually `VERIFIED`, including real supported browser-path LinkKey tests where the policy depends on `user.LinkKey`.
+
+Application-level access-policy work in J2 is limited to the accepted BehavioralContract and ManagedScope. It does not authorize generic user/org/ACL administration or a generic permission-management tool.
+
+### J3 — second independent reference application
+
+**Status: BLOCKED by J2**
+
+Goal: demonstrate that the architecture is not accidentally specialized for stage tracking.
+
+The reference case should be materially different, with a candidate shape such as:
+
+```text
+file/data import
+-> structural transformation
+-> formulas/calculations
+-> analysis
+-> restitution
+```
+
+The exact J3 BehavioralContract requires an explicit roadmap/specification decision after J2 evidence exists; do not invent its detailed scope early.
+
+### J4 — native Builder generalization
+
+**Status: BLOCKED by J3**
+
+Goal: generalize capabilities proven by reference scenarios into explicitly versioned `SUPPORTED` native-Builder capabilities.
+
+Every promoted capability must declare preconditions, effects, permissions, supported Grist versions/environments, verification, concurrency protection, recovery and known limitations.
+
+J4 is not a mandate to expose 100% of the Grist REST API.
+
+### J5 — code and integrations
+
+**Status: BLOCKED by J4 and any capability-specific security/product gates**
+
+Goal: add versioned custom-widget/GitHub/integration workflows under the same execution/evidence model.
+
+This does **not** automatically authorize arbitrary generated code, generic HTTP, arbitrary network destinations or new public scopes. Those remain separately gated where required.
+
+Exit direction includes exact artifact/version identity, declared Grist permissions, declared network destinations, document contract, tests, progressive deployment and compensation/recovery.
+
+### J6 — durable lifecycle maintenance
+
+**Status: BLOCKED by J5**
+
+Goal: add persistent lifecycle operation rather than new basic mutation power.
+
+Candidate committed categories once J6 is explicitly activated:
+
+- durable scheduled/event-triggered jobs;
+- dependency/version monitoring;
+- evidence invalidation and re-verification;
+- drift detection;
+- KnownException review;
+- widget/integration maintenance;
+- bounded upstream Grist issue/PR/release tracking.
+
+J6 must not use conversation memory as job state.
+
 ### P5 — attachments
 
 **Status: DEFERRED**
 
-Attachments are useful but not on the immediate critical path. Before adding model-visible attachment operations, define exact read/write semantics, data minimization, size bounds and whether any authorization-scope change is required. Adding/removing a public scope remains a human gate.
+Attachments are useful but not independently eligible. They may be promoted only when a committed Builder scenario requires them and exact read/write semantics, data minimization, size bounds, recovery behavior and any authorization-scope impact are defined. Adding/removing a public scope remains a human gate.
 
 ### P6 — webhooks
 
 **Status: DEFERRED / HUMAN GATE BEFORE PUBLIC SCOPE CHANGES**
 
-Webhooks introduce external effects and likely additional authorization semantics. Do not add a `doc:webhooks`-style public scope or generic webhook-management surface without an explicit product/security decision.
+Webhooks/integrations are considered under J5 when a committed Builder scenario requires them, with effect-oriented authorization and explicit destinations. Do not add a `doc:webhooks`-style public scope or generic webhook-management surface without an explicit product/security decision.
 
 ### Later product experiments
 
-Not on the current critical path:
+Not independently eligible merely because the Builder program exists:
 
-- generated executable custom widgets;
 - companion Grist widget for visual confirmation/context selection;
 - Apps SDK UI;
-- distributed skills.
+- distributed skills;
+- generated executable custom widgets outside an activated, capability-gated J5 contract.
 
-Generated executable widgets are a materially higher-risk capability and require a separate security decision.
+Generated executable code remains a materially higher-risk capability and requires the capability-specific security/product decisions required by J5.
 
 ## Permanent product/security non-goals
 
@@ -453,7 +612,7 @@ These are architectural boundaries, not deferred feature requests:
 - raw SQL model surface;
 - arbitrary Grist `/apply`;
 - arbitrary Grist UserActions;
-- generic user/ACL administration by the model;
+- generic organization/user/ACL administration by the model outside an explicit bounded ApplicationContract and ManagedScope;
 - model-visible credentials or secrets;
 - deletion by broad filter when explicit stable identifiers can be required;
 - blind automatic replay of partial/ambiguous writes;
@@ -555,13 +714,15 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-Preferred steady state after P4 completion:
+Preferred steady state after Agentic Builder roadmap activation:
 
 ```text
-Worker A: no product-capability tranche currently committed
+Worker A: finite J0 engine-stabilization slice
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
-Controller: integration, review/dependency control, human gates, S0/S1/C7/C8 coordination
+Controller: integration/review/dependency control plus S0/S1/C7/C8 coordination
 ```
+
+J0/J1 isolated engineering may proceed before C5, but no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
@@ -570,8 +731,9 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress independent C4 operational evidence when the required intended environment/operator support is available;
-3. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
-4. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
+2. progress a finite J0 engine-stabilization slice, while preserving exact dependencies and independent review boundaries;
+3. progress independent C4 operational evidence when the required intended environment/operator support is available;
+4. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
+5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
 
 After every durable transition, resolve the new exact `main` SHA and re-evaluate this roadmap against current code and current external requirements.
