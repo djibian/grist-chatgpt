@@ -1,4 +1,5 @@
-export type J2FixtureStateId = "date-absent" | "date-present-human-modified";
+export type J2InitialFixtureStateId = "date-absent" | "date-present-human-modified";
+export type J2FixtureStateId = J2InitialFixtureStateId | "managed-rerun";
 export type J2TeacherId = "teacher-a" | "teacher-b";
 export type J2StageId = "stage-a" | "stage-b";
 export type J2AccessExpectation = "ALLOW" | "DENY" | "NOT_APPLICABLE";
@@ -90,6 +91,64 @@ const teachers = Object.freeze([
   })
 ]);
 
+const dateAbsentStages = Object.freeze([
+  Object.freeze({
+    id: "stage-a" as const,
+    studentLabel: "Élève Alpha (synthétique)",
+    assignedTeacher: "teacher-a" as const,
+    trace: Object.freeze({
+      contactType: "Appel" as const,
+      contactDate: null,
+      implication: "Satisfaisante",
+      punctuality: "Oui",
+      comment: "Trace synthétique A",
+      historicalAuthor: null
+    })
+  }),
+  Object.freeze({
+    id: "stage-b" as const,
+    studentLabel: "Élève Bêta (synthétique)",
+    assignedTeacher: "teacher-b" as const,
+    trace: Object.freeze({
+      contactType: null,
+      contactDate: null,
+      implication: null,
+      punctuality: null,
+      comment: null,
+      historicalAuthor: null
+    })
+  })
+]);
+
+const datePresentStages = Object.freeze([
+  Object.freeze({
+    id: "stage-a" as const,
+    studentLabel: "Élève Alpha (synthétique)",
+    assignedTeacher: "teacher-a" as const,
+    trace: Object.freeze({
+      contactType: "Visite" as const,
+      contactDate: "2026-09-15",
+      implication: "Très satisfaisante",
+      punctuality: "Oui",
+      comment: "Modification humaine synthétique à préserver",
+      historicalAuthor: null
+    })
+  }),
+  Object.freeze({
+    id: "stage-b" as const,
+    studentLabel: "Élève Bêta (synthétique)",
+    assignedTeacher: "teacher-b" as const,
+    trace: Object.freeze({
+      contactType: null,
+      contactDate: null,
+      implication: null,
+      punctuality: null,
+      comment: null,
+      historicalAuthor: null
+    })
+  })
+]);
+
 export const J2_STAGE_TRACKING_FIXTURE_STATES: Readonly<Record<J2FixtureStateId, J2FixtureState>> =
   Object.freeze({
     "date-absent": Object.freeze({
@@ -98,34 +157,7 @@ export const J2_STAGE_TRACKING_FIXTURE_STATES: Readonly<Record<J2FixtureStateId,
       historicalAuthorBindingPresent: false,
       humanLayoutMarker: null,
       teachers,
-      stages: Object.freeze([
-        Object.freeze({
-          id: "stage-a" as const,
-          studentLabel: "Élève Alpha (synthétique)",
-          assignedTeacher: "teacher-a" as const,
-          trace: Object.freeze({
-            contactType: "Appel" as const,
-            contactDate: null,
-            implication: "Satisfaisante",
-            punctuality: "Oui",
-            comment: "Trace synthétique A",
-            historicalAuthor: null
-          })
-        }),
-        Object.freeze({
-          id: "stage-b" as const,
-          studentLabel: "Élève Bêta (synthétique)",
-          assignedTeacher: "teacher-b" as const,
-          trace: Object.freeze({
-            contactType: null,
-            contactDate: null,
-            implication: null,
-            punctuality: null,
-            comment: null,
-            historicalAuthor: null
-          })
-        })
-      ])
+      stages: dateAbsentStages
     }),
     "date-present-human-modified": Object.freeze({
       id: "date-present-human-modified" as const,
@@ -133,34 +165,15 @@ export const J2_STAGE_TRACKING_FIXTURE_STATES: Readonly<Record<J2FixtureStateId,
       historicalAuthorBindingPresent: false,
       humanLayoutMarker: "fixture-human-layout-v1",
       teachers,
-      stages: Object.freeze([
-        Object.freeze({
-          id: "stage-a" as const,
-          studentLabel: "Élève Alpha (synthétique)",
-          assignedTeacher: "teacher-a" as const,
-          trace: Object.freeze({
-            contactType: "Visite" as const,
-            contactDate: "2026-09-15",
-            implication: "Très satisfaisante",
-            punctuality: "Oui",
-            comment: "Modification humaine synthétique à préserver",
-            historicalAuthor: null
-          })
-        }),
-        Object.freeze({
-          id: "stage-b" as const,
-          studentLabel: "Élève Bêta (synthétique)",
-          assignedTeacher: "teacher-b" as const,
-          trace: Object.freeze({
-            contactType: null,
-            contactDate: null,
-            implication: null,
-            punctuality: null,
-            comment: null,
-            historicalAuthor: null
-          })
-        })
-      ])
+      stages: datePresentStages
+    }),
+    "managed-rerun": Object.freeze({
+      id: "managed-rerun" as const,
+      contactDateFieldPresent: true,
+      historicalAuthorBindingPresent: true,
+      humanLayoutMarker: "fixture-human-layout-v1",
+      teachers,
+      stages: datePresentStages
     })
   });
 
@@ -307,7 +320,7 @@ export const J2_STAGE_TRACKING_TRANSFORMATION_ORACLE: readonly J2TransformationE
     }),
     Object.freeze({
       id: "TRANSFORM-RERUN" as const,
-      startingState: "date-present-human-modified" as const,
+      startingState: "managed-rerun" as const,
       propertyIds: Object.freeze(["STAGE-B8", "STAGE-U3"]),
       expected: Object.freeze({
         contactDateFieldCount: 1 as const,
