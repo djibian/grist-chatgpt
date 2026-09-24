@@ -41,7 +41,7 @@ P3 semantic context/discovery     DONE
 P4 compact MCP surface            DONE
 Q0 retrospective code assurance  DONE
 J0 engine stabilization           DONE
-J1 contractual execution          ELIGIBLE
+J1 contractual execution          ACTIVE
 ```
 
 The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a bounded document-UI surface. `main` contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection and mutation through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, bounded native chart-type configuration for explicitly identified chart widgets, and the completed Q0 repairs that enforce the internal metadata-table boundary, close schema-mutation metadata allowlists and fail closed on potentially truncated UI metadata snapshots.
@@ -59,7 +59,7 @@ Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       
                                                               -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 has passed its exact-main integrated completion review, and J1 is now the finite committed next product-runtime tranche. J2-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 has passed its exact-main integrated completion review, and J1 is ACTIVE: PR #130 integrated immutable execution/plan/contract identity plus the durable controlled-environment `ExecutionJournal` foundation on exact `main` `54f742ccd97bb0c53994d4d4b36414a0616c40d1`; the remaining finite committed J1 work is recorded below. J2-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -107,7 +107,7 @@ Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
 - P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
-- J0 has passed its required integrated completion review and is DONE; J1 is independently eligible in an isolated controlled environment and does not require C5;
+- J0 has passed its required integrated completion review and is DONE; J1 is ACTIVE in an isolated controlled environment and does not require C5;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -439,7 +439,7 @@ P0-P4 bounded bridge baseline  DONE
 J0 engine stabilization       DONE
              |
              v
-J1 contractual execution      ELIGIBLE
+J1 contractual execution      ACTIVE
              |
              v
 J2 stage-tracking reference application
@@ -501,23 +501,27 @@ J0 runtime changes required independent exact-head review. J1 may be developed a
 
 ### J1 — first contractual transformation
 
-**Status: ELIGIBLE**  
+**Status: ACTIVE**  
 **Priority: highest product-runtime priority**
 
 Goal: prove one bounded synthetic multi-step transformation using immutable execution contracts, cumulative plan budgets, a durable write-ahead journal, multidimensional state, contextual evidence and recovery/suspension after injected failures.
 
 Authoritative specification: `docs/EXECUTION-ENGINE-J0-J1.md`, J1 sections.
 
-Finite committed J1 work:
+Integrated J1 foundation:
 
-1. immutable execution/plan/contract identity;
-2. `ExecutionJournal` abstraction plus one durable controlled-environment implementation;
-3. write-ahead step lifecycle and restart semantics;
-4. cumulative per-plan budget enforcement;
-5. authorization re-check before resumed/new effects;
-6. contextualized property evidence;
-7. one deterministic synthetic transformation with crash/fault injection at the specified boundaries;
-8. integrated J1 completion review.
+1. **immutable execution/plan/contract identity** — PR #130, integrated on exact `main` `54f742ccd97bb0c53994d4d4b36414a0616c40d1`;
+2. **`ExecutionJournal` abstraction plus one durable controlled-environment implementation** — PR #130, including restart persistence, bounded contractual state vocabulary, same-process CAS protection and explicit one-writer-process filesystem limitation.
+
+Committed remaining J1 work:
+
+1. write-ahead step lifecycle and restart semantics;
+2. cumulative per-plan budget enforcement;
+3. authorization re-check before resumed/new effects;
+4. executable contextual property-evidence transitions;
+5. capability-specific recovery/suspension and convergence rules required by the first scenario;
+6. one deterministic synthetic transformation with crash/fault injection at the specified boundaries;
+7. integrated J1 completion review.
 
 J1 exit criteria are the complete criteria in `docs/EXECUTION-ENGINE-J0-J1.md`: persistent write-ahead execution, cumulative budgets, authority re-check, multidimensional effect knowledge, retained partial results, uncertainty after crash, capability-specific recovery, suspension on unsafe ambiguity, durable contextual evidence, convergence without duplicate effect where supported, and no new generic Grist escape hatch.
 
