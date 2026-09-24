@@ -361,7 +361,7 @@ export class GristClient {
         `Grist API request failed with HTTP ${response.status}`,
         response.status,
         body.slice(0, 1000),
-        mayMutate && response.status >= 500 ? "UNCERTAIN" : "NOT_APPLIED"
+        mayMutate ? "UNCERTAIN" : "NOT_APPLIED"
       );
     }
 
