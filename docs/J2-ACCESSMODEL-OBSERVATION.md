@@ -56,6 +56,8 @@ The semantic output contains:
 - one aggregate SHA-256 metadata fingerprint for change detection;
 - explicit completeness/issues.
 
+Fingerprint construction is itself bounded by finite string, array, object-key, node and depth budgets. If raw metadata exceeds those budgets or contains an unsupported value, the observer hashes only a bounded marker representation, records `metadata_fingerprint_incomplete`, and reports the overall observation as `PARTIAL`; it never falls back to returning the oversized/deep raw value.
+
 ## Data minimization
 
 The output deliberately omits:
@@ -74,7 +76,7 @@ Tests place synthetic secret markers in formulas and share metadata and assert t
 
 Persisted ACL tables are not always the complete effective AccessModel. In current Grist, share processing can synthesize virtual rules on top of persisted rules. Therefore any observed share makes `virtualRuleContext = UNKNOWN` and the overall observation `PARTIAL` until a separately versioned adapter can reproduce or obtain the effective virtual context safely.
 
-Likewise, malformed/unsupported formula ASTs, user-attribute specs, permission strings, resource references, rule positions, schema-version metadata or limit saturation remain explicit issues. The adapter does not fall back to exposing raw rules to recover certainty.
+Likewise, malformed/unsupported formula ASTs, user-attribute specs, permission strings, resource references, rule positions, schema-version metadata, fingerprint-budget exhaustion or limit saturation remain explicit issues. The adapter does not fall back to exposing raw rules to recover certainty.
 
 ## Evidence still required for J2-A
 
