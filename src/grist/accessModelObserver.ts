@@ -565,7 +565,10 @@ export class AccessModelObserver {
             (name) => name === "LinkKey" || name.startsWith("LinkKey.")
           ),
           usesSuiviPar: allDependencyNames.has("Suivi_par"),
-          usesAccesStagesActif: allDependencyNames.has("Acces_Stages_Actif")
+          usesAccesStagesActif: [...allDependencyNames].some(
+            (name) =>
+              name === "Acces_Stages_Actif" || name.endsWith(".Acces_Stages_Actif")
+          )
         },
         dependencyExtractionComplete: dependencies.complete && userAttribute !== "invalid"
       });
