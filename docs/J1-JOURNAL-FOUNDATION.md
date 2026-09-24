@@ -12,7 +12,7 @@ The foundation introduces:
 - persistent multidimensional state shapes for execution, step/effect knowledge, cumulative-budget accounting and contextual verification evidence;
 - optimistic revision checks for journal updates;
 - same-process serialization across `FileExecutionJournal` instances that resolve to the same journal directory and execution;
-- focused restart, immutability, stale-write, identity-canonicalization, evidence-link and corruption tests.
+- focused restart, immutability/snapshot, stale-write, identity-canonicalization/storage-bound, evidence-link and corruption tests.
 
 It does **not** yet implement the J1 execution state machine, effect dispatch, cumulative-budget enforcement, authorization re-check, recovery decisions or the synthetic crash-injection scenario. Those remain later committed J1 slices.
 
@@ -64,9 +64,11 @@ budget limits
 critical property definitions
 ```
 
+`initialize()` takes a structured snapshot of the complete definition before its first asynchronous boundary, validates that snapshot, and thereafter uses only the snapshot. A caller mutating its own object after invoking `initialize()` therefore cannot alter the immutable definition that is compared or persisted.
+
 Re-initializing the same `executionId` with the object-key-order-independent equivalent definition is idempotent. Reusing it with a different plan/contract definition fails with `ExecutionDefinitionConflictError`; callers must create a new execution/plan version instead.
 
-Identifiers used as durable logical IDs are canonical: surrounding whitespace is rejected instead of being silently trimmed. In particular, two accepted execution IDs cannot alias the same journal filename through normalization at the storage boundary.
+Identifiers used as durable logical IDs are canonical: surrounding whitespace is rejected instead of being silently trimmed. In particular, two accepted execution IDs cannot alias through normalization at the storage boundary.
 
 The journal accepts a target identifier as part of this trusted internal definition. Callers must provide the already-resolved/normalized non-secret target identifier, never a raw resource URL, LinkKey-bearing URL or other secret-bearing locator. Target normalization remains the responsibility of the future execution-engine boundary in this foundation slice.
 
@@ -92,7 +94,7 @@ Legal transition rules, monotonic evidence rules and budget-limit enforcement ar
 
 `FileExecutionJournal` is deliberately a **controlled-environment** implementation, not a production persistence decision.
 
-For each execution it stores one JSON file under a caller-supplied private journal directory. The execution ID is base64url-encoded only after canonical identifier validation. Writes use a mode-`0600` temporary file, `fsync`, atomic publish/replace and directory `fsync` before the operation is reported complete.
+For each execution it stores one JSON file under a caller-supplied private journal directory. The exact canonical `executionId` remains inside the validated record; the filesystem component is a fixed-size SHA-256/base64url storage key derived from that exact ID. This keeps every accepted bounded execution ID independent of filesystem filename-expansion limits, while `load()` still validates that the persisted exact ID matches the requested logical ID. Writes use a mode-`0600` temporary file, `fsync`, atomic publish/replace and directory `fsync` before the operation is reported complete.
 
 Initial creation uses an atomic non-overwriting publish. Mutations use revisioned compare-and-set semantics. Mutations for the same resolved journal directory/execution are serialized through a process-wide chain, so separate `FileExecutionJournal` instances in the same writer process cannot both commit the same expected revision.
 
