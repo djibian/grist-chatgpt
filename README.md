@@ -51,7 +51,8 @@ Integrated milestones include:
 - **C5 BLOCKED:** secure per-user Grist credential onboarding still requires C4 productionization plus explicit persistence/encryption decisions.
 - **C6 preparation integrated:** timeouts, release/rollback documentation, OAuth deployment preflight/smoke design, metrics vocabulary and audit contract review are present; finalization still depends on C4/C5.
 - **P1 / P2 / P3 / P4 DONE:** document-UI parity, formula/schema safety, semantic context/discovery and the compact-surface evaluation have passed their integrated reviews; P4 keeps the current narrow v1 surface.
-- **J0 ELIGIBLE:** engine stabilization is the current highest-priority product-runtime tranche. Uncertain/partial-write handling and contractual concurrency refusal are integrated; safe audit-target handling and the final integrated J0 review remain before J1 can start.
+- **J0 DONE:** engine stabilization passed its exact-main integrated completion review after uncertain/partial-write handling, fail-closed contractual concurrency classification and safe audit-target handling were independently reviewed and integrated.
+- **J1 ELIGIBLE:** the first contractual transformation is the current highest-priority product-runtime tranche in an isolated controlled environment.
 - **S0 ACTIVE:** final public-plugin eligibility classification occurs during actual OpenAI review; there is no separate pre-review approval gate.
 - **S1 ELIGIBLE / partially completed:** the remaining committed evidence is reviewer-path UserInfo with `email_verified: true`.
 
@@ -175,7 +176,7 @@ Fixed public capability vocabulary:
 | update records | `updateGristRecords` | `update_records` |
 | delete explicit record IDs | `deleteGristRecords` | `delete_records` |
 
-Large create/update/delete requests may be split into sequential internal batches. Those batches are **not atomic as a group**. Partial failure is reported explicitly and the complete operation must not be blindly replayed.
+Large create/update/delete requests may be split into sequential internal batches. Those batches are **not atomic as a group**. Definite partial failure preserves already-confirmed effects; ambiguous mutating outcomes are reported as uncertain, and the complete operation must not be blindly replayed.
 
 Successful update/delete responses are minimized to bounded semantic acknowledgements rather than forwarding upstream engine response bodies. Creation responses retain the functional created identifiers needed for follow-up work.
 
@@ -215,7 +216,7 @@ P1 has passed its integrated completion review; no committed P1 work remains.
 
 `src/operations/registry.ts` centralizes required capability, product metadata and risk annotations used by authorization, help, MCP contract checks and submission preparation.
 
-Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, target document where present, item count where meaningful, status and duration. Audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
+Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, normalized target document only when safely available, item count where meaningful, status and duration. Unresolved/rejected document targets are omitted from error audit events; audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
 
 ## Credential boundary
 
@@ -304,12 +305,12 @@ The bridge does **not** expose arbitrary HTTP forwarding, raw SQL, arbitrary Gri
 ```text
 QUALITY / BASELINE             PLATFORM / SECURITY                     PRODUCT / BUILDER                 PUBLIC DISTRIBUTION
 Q0                             DONE   C4 Production OAuth               ELIGIBLE   P1 / P2 / P3 / P4       DONE   S0 Public eligibility   ACTIVE
-C1 / C2 / C3 / C4-P0          DONE   C5 Secure Grist onboarding        BLOCKED    J0 Engine stabilization  ELIGIBLE   S1 Preparation         ELIGIBLE
-                                     C6 Production hardening           BLOCKED    J1 Contract execution    BLOCKED    C7 Reviewer env.        BLOCKED
+C1 / C2 / C3 / C4-P0          DONE   C5 Secure Grist onboarding        BLOCKED    J0 Engine stabilization  DONE   S1 Preparation         ELIGIBLE
+                                     C6 Production hardening           BLOCKED    J1 Contract execution    ELIGIBLE   C7 Reviewer env.        BLOCKED
                                                                                   J2-J6                    BLOCKED    C8 Final submission     BLOCKED
 ```
 
-J0 is the finite next product-runtime tranche. J1 starts only after J0's exact-main integrated completion review passes. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
+J1 is the finite next product-runtime tranche after J0's exact-main integrated completion review passed. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
 
 The exact dependency map and currently eligible work live in `docs/ROADMAP.md`.
 
