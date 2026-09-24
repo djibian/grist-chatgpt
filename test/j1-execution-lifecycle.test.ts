@@ -102,7 +102,7 @@ test("J1 lifecycle persists the RUNNING write-ahead barrier and exact intended e
 test("J1 lifecycle refuses an effectful write-ahead transition without immutable effect intent identity", async () => {
   await withJournalDirectory(async (directory) => {
     const definition = plan();
-    definition.steps[0]!.effectIntent = undefined;
+    delete definition.steps[0]!.effectIntent;
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(definition);
 
