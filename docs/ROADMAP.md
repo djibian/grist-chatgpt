@@ -41,7 +41,7 @@ P3 semantic context/discovery     DONE
 P4 compact MCP surface            DONE
 Q0 retrospective code assurance  DONE
 J0 engine stabilization           DONE
-J1 contractual execution          ACTIVE
+J1 contractual execution          DONE
 ```
 
 The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a bounded document-UI surface. `main` contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection and mutation through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, bounded native chart-type configuration for explicitly identified chart widgets, and the completed Q0 repairs that enforce the internal metadata-table boundary, close schema-mutation metadata allowlists and fail closed on potentially truncated UI metadata snapshots.
@@ -55,11 +55,11 @@ The project advances on three product/platform/distribution axes. Q0 remains rec
 ```text
 QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT / BUILDER            PUBLIC DISTRIBUTION
 Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       S0 ACTIVE + S1
-                                                   -> J0 DONE -> J1 -> J2 -> J3     -> C7 -> C8 -> review
-                                                              -> J4 -> J5 -> J6
+                                                   -> J0 DONE -> J1 DONE -> J2      -> C7 -> C8 -> review
+                                                                    -> J3 -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 has passed its exact-main integrated completion review, and J1 is ACTIVE: PR #130 integrated immutable execution/plan/contract identity plus the durable controlled-environment `ExecutionJournal` foundation, and independently reviewed PR #133 integrated the write-ahead lifecycle/restart semantics on exact `main` `8568a8cbca55d0da7b15dcca5c4e48c65fb57c68`; the remaining finite committed J1 work is recorded below. J2-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency but remains blocked on the explicitly unresolved business semantics and logical-to-Grist bindings in `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`; the Builder may not choose those bindings autonomously. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -107,7 +107,7 @@ Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
 - P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
-- J0 has passed its required integrated completion review and is DONE; J1 is ACTIVE in an isolated controlled environment and does not require C5;
+- J0 and J1 have passed their required integrated reviews and are DONE; J2 is blocked on the explicit stage-tracking business/application binding gate;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -287,7 +287,7 @@ Current baseline:
 - bounded `columnSelectByOptions` discovery/configuration for explicit non-summary `Ref`/`RefList` links, using reusable column IDs rather than invented numeric refs, excluding Attachments, chart/custom sources and cycles, with a 5,000-column schema ceiling plus response/candidate truncation semantics;
 - read-only page layout normalization preserves the Grist BoxSpec grouping/order and finite non-negative sizes while replacing verified leaves with stable current widget IDs; collapsed/currently unplaced widget IDs are exposed separately, raw `layoutSpec` is retained for compatibility, and stale/duplicate/malformed state produces `layoutNormalizationIncomplete` rather than guessed output;
 - layout normalization is capped at 1,000 tree nodes, depth 50 and 1,000 collapsed/unplaced IDs and performs no additional upstream read;
-- existing `type === "custom"` widgets expose additive `customWidgetSettings` with normalized access, optional stable gallery/bundled `widgetId`, and single/list/null column mappings translated from Grist numeric refs to current stable column IDs; URLs, plugin identifiers and arbitrary widget-owned options are deliberately excluded from that normalized view;
+- existing `type === "custom"` widgets expose additive bounded `customWidgetSettings` with normalized access, optional stable gallery/bundled `widgetId`, and single/list/null column mappings translated from Grist numeric refs to current stable column IDs; URLs, plugin identifiers and arbitrary widget-owned options are deliberately excluded from that normalized view;
 - custom-widget mapping normalization and mutation are capped at 100 mapping keys, 1,000 mapped columns and 5,000 schema columns, exclude the legacy native-calendar alias `custom.calendar`, and never expose numeric Grist column refs as model inputs;
 - bounded custom-widget mutation may change only access (`none`, `read table`, `full`) and stable-ID column mappings for an explicitly identified existing custom widget; the bridge read-modify-writes the complete `options` object, preserves URL/plugin/widget identity and arbitrary widget-owned options, and verifies the complete expected options object after re-read; malformed or unresolved state is rejected before write and post-write disagreement is non-retryable;
 - table widgets expose normalized bounded `gridOptions` for vertical/horizontal gridlines, zebra stripes and row-number mode; `update_page_widget` may mutate only those named settings for an explicitly identified table widget, preserves every unrelated option through read-modify-write, rejects malformed current options, and verifies the complete expected options object after re-read.
@@ -439,10 +439,10 @@ P0-P4 bounded bridge baseline  DONE
 J0 engine stabilization       DONE
              |
              v
-J1 contractual execution      ACTIVE
+J1 contractual execution      DONE
              |
              v
-J2 stage-tracking reference application
+J2 stage-tracking reference application  BLOCKED — human bindings
              |
              v
 J3 second independent reference application
@@ -501,8 +501,8 @@ J0 runtime changes required independent exact-head review. J1 may be developed a
 
 ### J1 — first contractual transformation
 
-**Status: ACTIVE**  
-**Priority: highest product-runtime priority**
+**Status: DONE**  
+**Priority: completed product-runtime tranche**
 
 Goal: prove one bounded synthetic multi-step transformation using immutable execution contracts, cumulative plan budgets, a durable write-ahead journal, multidimensional state, contextual evidence and recovery/suspension after injected failures.
 
@@ -518,20 +518,20 @@ Integrated J1 foundation:
 6. **point-in-time current-authority gate** — PR #137, integrated on exact `main` `aaea89f08d1a58d6d81e9fdd6ef2e9c451e1b359`, with principal/mandate/target/capability re-resolution and no cached positive authorization;
 7. **verification requirements and safe completion transition** — PR #138, independently reviewed and integrated before exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, freezing bounded verification criteria before execution and requiring latest `VERIFIED` evidence for every required property;
 8. **capability-specific deterministic `update_records` recovery** — PR #139, independently reviewed and integrated before exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, distinguishing frozen before/after states, safe explicit retry and fail-closed suspension on ambiguity;
-9. **bounded synthetic `update_records` effect boundary** — PR #140, independently reviewed and integrated on exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, enforcing fresh isolated-state precondition observation, current authority, durable budget/write-ahead preparation and pessimistic response-loss handling before any recovery decision.
-
-Committed remaining J1 work:
-
-1. one deterministic synthetic transformation exercising the integrated pieces end-to-end with crash/fault injection at the specified boundaries, including convergence/no-duplicate-effect evidence where supported and durable suspension where ambiguity cannot be resolved safely;
-2. integrated J1 completion review.
+9. **bounded synthetic `update_records` effect boundary** — PR #140, independently reviewed and integrated on exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, enforcing fresh isolated-state precondition observation, current authority, durable budget/write-ahead preparation and pessimistic response-loss handling before any recovery decision;
+10. **integrated deterministic synthetic transformation and crash matrix** — PR #142, independently exact-head reviewed and integrated on `main` `afd5e1ef2a1ea26c939cfa0ae2792210ed3b7205`, exercising the two-step `update_records` contract across every required J1 interruption boundary, exact-before safe retry, exact-after confirmation without replay, ambiguity suspension, retained prior confirmed effects, latest-verdict verification and cumulative-budget refusal.
 
 J1 exit criteria are the complete criteria in `docs/EXECUTION-ENGINE-J0-J1.md`: persistent write-ahead execution, cumulative budgets, authority re-check, multidimensional effect knowledge, retained partial results, uncertainty after crash, capability-specific recovery, suspension on unsafe ambiguity, durable contextual evidence, convergence without duplicate effect where supported, and no new generic Grist escape hatch.
+
+Integrated tranche review: **PASS** against exact `main` `afd5e1ef2a1ea26c939cfa0ae2792210ed3b7205`. That merge tree is content-identical to exact tested PR #142 head `9ed9706d660023e03eb9cef013c2523ff74d2f6d`, whose CI run #480 passed `npm ci`, the production dependency audit, TypeScript/check, the complete test suite and build. The review found no new blocking correctness, authorization/security, replay, data-integrity or contract issue: all five required crash boundaries derive restart behavior from durable journal/evidence state; cumulative budgets cannot be evaded by splitting the plan; every new or explicitly retried effect crosses the fresh current-authority gate; response-loss after an upstream effect becomes durable `UNCERTAIN` and is confirmed without replay only from the capability-specific exact-postcondition plus stable-effect evidence; exact-before recovery merely returns the step to `PENDING` so authority/precondition/budget/write-ahead gates run again; observational ambiguity remains suspended; contextual verification uses the frozen requirement contract and latest linked durable verdict; and the controlled synthetic evidence does not claim Grist multi-writer CAS or introduce a generic dispatcher, `/apply`, UserAction, ACL-authoring or scheduler surface. The committed J1 set is exhausted.
+
+Committed next J1 slices: **none**.
 
 No generalized Builder planner, ACL authoring, browser LinkKey suite or durable scheduler is part of J1.
 
 ### J2 — stage-tracking reference application
 
-**Status: BLOCKED by J1 and unresolved J2 business/application bindings**
+**Status: BLOCKED by unresolved J2 business/application bindings**
 
 Goal: demonstrate one realistic cross-cutting application transformation covering schema, access policy, UI, human-change preservation, concurrency and recovery.
 
@@ -732,15 +732,15 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-Preferred steady state after J0 completion:
+Preferred steady state after J1 completion:
 
 ```text
-Worker A: finite J1 contractual-execution slice
+Worker A: J2 only after the explicit business/application binding gate is accepted
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration/review/dependency control plus S0/S1/C7/C8 coordination
 ```
 
-J1 isolated engineering may proceed before C5, but no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
+No autonomous Builder product slice is currently eligible while J2's binding gate remains unresolved. J1 isolated engineering is complete, and no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
@@ -749,7 +749,7 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress a finite J1 contractual-execution slice, while preserving exact dependencies and independent review boundaries;
+2. progress J2 only after the explicit business/application binding gate is accepted; do not invent those decisions autonomously;
 3. progress independent C4 operational evidence when the required intended environment/operator support is available;
 4. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
 5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
