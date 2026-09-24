@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { link, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -545,38 +545,40 @@ export class FileExecutionJournal implements ExecutionJournal {
   }
 
   async initialize(definition: ExecutionPlanDefinition): Promise<ExecutionJournalRecord> {
-    validateDefinition(definition);
+    const immutableDefinition = clone(definition);
+    validateDefinition(immutableDefinition);
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
 
-    const existing = await this.load(definition.identity.executionId);
+    const executionId = immutableDefinition.identity.executionId;
+    const existing = await this.load(executionId);
     if (existing) {
-      if (canonicalJson(existing.definition) !== canonicalJson(definition)) {
-        throw new ExecutionDefinitionConflictError(definition.identity.executionId);
+      if (canonicalJson(existing.definition) !== canonicalJson(immutableDefinition)) {
+        throw new ExecutionDefinitionConflictError(executionId);
       }
       return clone(existing);
     }
 
     const timestamp = this.now().toISOString();
-    const state = initialState(definition);
-    validateMutableState(definition, state);
+    const state = initialState(immutableDefinition);
+    validateMutableState(immutableDefinition, state);
     const record: ExecutionJournalRecord = {
-      definition: clone(definition),
+      definition: clone(immutableDefinition),
       revision: 0,
       createdAt: timestamp,
       updatedAt: timestamp,
       ...state
     };
 
-    const path = this.recordPath(definition.identity.executionId);
+    const path = this.recordPath(executionId);
     const tempPath = await this.writeTemp(path, record);
     try {
       await link(tempPath, path);
     } catch (error) {
       if (!isNodeErrorWithCode(error, "EEXIST")) throw error;
-      const concurrent = await this.load(definition.identity.executionId);
+      const concurrent = await this.load(executionId);
       if (!concurrent) throw error;
-      if (canonicalJson(concurrent.definition) !== canonicalJson(definition)) {
-        throw new ExecutionDefinitionConflictError(definition.identity.executionId);
+      if (canonicalJson(concurrent.definition) !== canonicalJson(immutableDefinition)) {
+        throw new ExecutionDefinitionConflictError(executionId);
       }
       return clone(concurrent);
     } finally {
@@ -649,8 +651,8 @@ export class FileExecutionJournal implements ExecutionJournal {
 
   private recordPath(executionId: string): string {
     const validated = boundedId(executionId, "executionId");
-    const encoded = Buffer.from(validated, "utf8").toString("base64url");
-    return join(this.directory, `${encoded}.json`);
+    const storageKey = createHash("sha256").update(validated, "utf8").digest("base64url");
+    return join(this.directory, `${storageKey}.json`);
   }
 
   private async writeTemp(
