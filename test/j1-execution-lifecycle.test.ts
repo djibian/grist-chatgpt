@@ -35,7 +35,11 @@ function plan(stepCount = 1): ExecutionPlanDefinition {
       operation: index === 0 ? "create_records" : "update_records",
       capability: "doc:write",
       preconditions: ["synthetic fixture is ready"],
-      expectedStateTokens: { fixture: `v${index + 1}` }
+      expectedStateTokens: { fixture: `v${index + 1}` },
+      effectIntent: {
+        intentId: `synthetic-effect-${index + 1}`,
+        fingerprint: `fixture-marker-v${index + 1}`
+      }
     })),
     budgetLimits: {
       writeItems: 10,
@@ -67,7 +71,7 @@ async function withJournalDirectory(
   }
 }
 
-test("J1 lifecycle persists the RUNNING write-ahead barrier before external dispatch", async () => {
+test("J1 lifecycle persists the RUNNING write-ahead barrier and exact intended effect identity before external dispatch", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -78,16 +82,73 @@ test("J1 lifecycle persists the RUNNING write-ahead barrier before external disp
     assert.equal(prepared.status, "RUNNING");
     assert.equal(prepared.steps[0]?.status, "RUNNING");
     assert.equal(prepared.steps[0]?.effectState, "NOT_APPLIED");
+    assert.deepEqual(prepared.steps[0]?.preparedEffect, {
+      intentId: "synthetic-effect-1",
+      fingerprint: "fixture-marker-v1"
+    });
 
     const restarted = new FileExecutionJournal(directory);
     const durable = await restarted.load("j1-lifecycle-001");
     assert.equal(durable?.revision, 1);
     assert.equal(durable?.steps[0]?.status, "RUNNING");
     assert.equal(durable?.steps[0]?.effectState, "NOT_APPLIED");
+    assert.deepEqual(durable?.steps[0]?.preparedEffect, {
+      intentId: "synthetic-effect-1",
+      fingerprint: "fixture-marker-v1"
+    });
   });
 });
 
-test("J1 restart converts an unresolved RUNNING step to UNCERTAIN and suspends", async () => {
+test("J1 lifecycle refuses an effectful write-ahead transition without immutable effect intent identity", async () => {
+  await withJournalDirectory(async (directory) => {
+    const definition = plan();
+    definition.steps[0]!.effectIntent = undefined;
+    const journal = new FileExecutionJournal(directory);
+    await journal.initialize(definition);
+
+    await assert.rejects(
+      () => new ExecutionLifecycle(journal).prepareEffect("j1-lifecycle-001", "step-1"),
+      (error: unknown) => {
+        assert.ok(error instanceof ExecutionLifecycleInvariantError);
+        assert.match(error.message, /no immutable effect intent identity/);
+        return true;
+      }
+    );
+
+    const durable = await journal.load("j1-lifecycle-001");
+    assert.equal(durable?.revision, 0);
+    assert.equal(durable?.steps[0]?.status, "PENDING");
+  });
+});
+
+test("J1 journal rejects a forged prepared effect identity that differs from the immutable plan", async () => {
+  await withJournalDirectory(async (directory) => {
+    const journal = new FileExecutionJournal(directory);
+    const initial = await journal.initialize(plan());
+    const forged = mutableState(initial);
+    forged.status = "RUNNING";
+    forged.steps = [
+      {
+        ...forged.steps[0]!,
+        status: "RUNNING",
+        preparedEffect: {
+          intentId: "different-effect",
+          fingerprint: "different-fingerprint"
+        }
+      }
+    ];
+
+    await assert.rejects(
+      () => journal.compareAndSet("j1-lifecycle-001", 0, forged),
+      /prepared effect does not match the immutable plan intent/
+    );
+
+    const durable = await journal.load("j1-lifecycle-001");
+    assert.equal(durable?.revision, 0);
+  });
+});
+
+test("J1 restart converts an unresolved RUNNING step to UNCERTAIN and retains its intended effect identity", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -102,6 +163,10 @@ test("J1 restart converts an unresolved RUNNING step to UNCERTAIN and suspends",
     assert.equal(recovered.status, "SUSPENDED");
     assert.equal(recovered.steps[0]?.status, "SUSPENDED");
     assert.equal(recovered.steps[0]?.effectState, "UNCERTAIN");
+    assert.deepEqual(recovered.steps[0]?.preparedEffect, {
+      intentId: "synthetic-effect-1",
+      fingerprint: "fixture-marker-v1"
+    });
   });
 });
 
@@ -124,6 +189,10 @@ test("J1 restart does not rewrite a result that was durably recorded before inte
     assert.equal(recovered.steps[0]?.status, "EFFECT_RECORDED");
     assert.equal(recovered.steps[0]?.effectState, "APPLIED");
     assert.deepEqual(recovered.steps[0]?.confirmedEffect.stableIds, [701]);
+    assert.deepEqual(recovered.steps[0]?.preparedEffect, {
+      intentId: "synthetic-effect-1",
+      fingerprint: "fixture-marker-v1"
+    });
   });
 });
 
@@ -211,13 +280,19 @@ test("J1 lifecycle requires prior steps to be VERIFIED before crossing the next 
     const ready = mutableState(initial);
     ready.status = "RUNNING";
     ready.steps = [
-      { ...ready.steps[0]!, status: "VERIFIED", effectState: "APPLIED" },
+      {
+        ...ready.steps[0]!,
+        status: "VERIFIED",
+        effectState: "APPLIED",
+        preparedEffect: structuredClone(initial.definition.steps[0]!.effectIntent!)
+      },
       ready.steps[1]!
     ];
     await journal.compareAndSet("j1-lifecycle-001", 0, ready);
 
     const prepared = await lifecycle.prepareEffect("j1-lifecycle-001", "step-2");
     assert.equal(prepared.steps[1]?.status, "RUNNING");
+    assert.deepEqual(prepared.steps[1]?.preparedEffect, initial.definition.steps[1]!.effectIntent);
   });
 });
 
@@ -252,13 +327,17 @@ test("J1 lifecycle serializes concurrent prepare attempts through the journal CA
   });
 });
 
-test("J1 restart pessimistically marks every structurally valid unresolved RUNNING step uncertain", async () => {
+test("J1 restart pessimistically marks every structurally valid unresolved RUNNING step uncertain while retaining each effect identity", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     const initial = await journal.initialize(plan(2));
     const unsafe = mutableState(initial);
     unsafe.status = "RUNNING";
-    unsafe.steps = unsafe.steps.map((step) => ({ ...step, status: "RUNNING" }));
+    unsafe.steps = unsafe.steps.map((step, index) => ({
+      ...step,
+      status: "RUNNING",
+      preparedEffect: structuredClone(initial.definition.steps[index]!.effectIntent!)
+    }));
     await journal.compareAndSet("j1-lifecycle-001", 0, unsafe);
 
     const recovered = await new ExecutionLifecycle(
@@ -267,10 +346,28 @@ test("J1 restart pessimistically marks every structurally valid unresolved RUNNI
 
     assert.equal(recovered.status, "SUSPENDED");
     assert.deepEqual(
-      recovered.steps.map(({ status, effectState }) => ({ status, effectState })),
+      recovered.steps.map(({ status, effectState, preparedEffect }) => ({
+        status,
+        effectState,
+        preparedEffect
+      })),
       [
-        { status: "SUSPENDED", effectState: "UNCERTAIN" },
-        { status: "SUSPENDED", effectState: "UNCERTAIN" }
+        {
+          status: "SUSPENDED",
+          effectState: "UNCERTAIN",
+          preparedEffect: {
+            intentId: "synthetic-effect-1",
+            fingerprint: "fixture-marker-v1"
+          }
+        },
+        {
+          status: "SUSPENDED",
+          effectState: "UNCERTAIN",
+          preparedEffect: {
+            intentId: "synthetic-effect-2",
+            fingerprint: "fixture-marker-v2"
+          }
+        }
       ]
     );
   });
