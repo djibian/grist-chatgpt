@@ -328,7 +328,7 @@ These tests establish contextual scenarios, not universal ACL correctness.
 
 A J2 reference run should demonstrate:
 
-1. observe and bind an isolated, synthetic copy of the stage application, including the LinkKey rule and UI field mapping;
+1. prepare and bind two isolated synthetic starting states with the relevant LinkKey rules and UI mapping: one without the contact-date field for the actual Builder change, and one with the already-added field and a human-maintained layout for reconciliation; document any difference from the live reference;
 2. accept an exact managed scope and plan for the Stage follow-up date/access/UI behavior;
 3. build an ImpactGraph for touched elements;
 4. establish the safe execution mode;

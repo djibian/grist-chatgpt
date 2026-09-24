@@ -48,7 +48,7 @@ The document owner reports that each teacher obtains a specific URL from the `En
 2. With authorized controlled browser sessions for teacher-specific links, confirm that `Date_du_contact` appears and is editable only for the assigned teacher; record the precise widget field mapping and any necessary layout reconciliation.
 3. Use synthetic Stage/teacher identities and their distinct LinkKey URLs to test assigned, non-assigned, invalid-key, revoked-key and relation-tampering cases, including entry/replacement/correction/clearing of the sole trace on the same Stage and verification that `Suivi_par` remains unchanged. Check other reachable pages and Raw Data for unintended disclosure, rather than equating a filtered sheet with authorization.
 4. Record the widget field mapping, exact `MANAGED`/`SHARED` regions, formulas, access dependencies and any custom integrations touched by the proposed change.
-5. In an isolated fixture, execute and verify the accepted transformation through the J1 effect boundary, including interruption, concurrency and idempotent rerun. Do not treat the direct live schema edit as this proof.
+5. In isolated synthetic fixtures, test both starting states: without the date, the Builder must add and expose it while preserving access and existing rows; with the date already present, it must reconcile human layout and rerun without duplication. Execute needed effects through J1, including interruption and concurrency. A constructed pre-date fixture is representative evidence, not a claim to have reproduced the exact historical live state. Do not treat the direct live schema edit as a Builder proof.
 
 ## Evidence standard for the future test run
 
