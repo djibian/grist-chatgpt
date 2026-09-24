@@ -240,12 +240,14 @@ Explicit Grist upstream abort timeout and bounded inbound HTTP request/header re
 
 For Builder execution, failure and effect knowledge are separate concepts.
 
-The minimum semantic distinction is:
+The durable effect-knowledge vocabulary is:
 
 ```text
 NOT_APPLIED
-CONFIRMED
+PARTIALLY_APPLIED
+APPLIED
 UNCERTAIN
+COMPENSATED
 ```
 
 If the system cannot prove that an effect was not applied, it must not report `NOT_APPLIED`.
