@@ -49,7 +49,15 @@ export interface J2BrowserExpectation {
     currentAssignmentAfter?: J2TeacherId;
     historicalAuthorAfter?: J2TeacherId;
     contactDateReachable?: boolean;
+    postReassignmentAccess?: Readonly<Record<J2TeacherId, {
+      protectedRead: J2AccessExpectation;
+      protectedWrite: J2AccessExpectation;
+    }>>;
   };
+  /**
+   * UNKNOWN_POLICY is reserved for a scenario with an accepted outcome whose
+   * authorization/attribution policy is deliberately unresolved.
+   */
   policyKnowledge: J2PolicyKnowledge;
   notes: string;
 }
@@ -236,10 +244,20 @@ export const J2_STAGE_TRACKING_BROWSER_ORACLE: readonly J2BrowserExpectation[] =
       assignmentWrite: "ALLOW" as const,
       traceRemainsOnSameStage: true,
       currentAssignmentAfter: "teacher-b" as const,
-      historicalAuthorAfter: "teacher-a" as const
+      historicalAuthorAfter: "teacher-a" as const,
+      postReassignmentAccess: Object.freeze({
+        "teacher-a": Object.freeze({
+          protectedRead: "DENY" as const,
+          protectedWrite: "DENY" as const
+        }),
+        "teacher-b": Object.freeze({
+          protectedRead: "ALLOW" as const,
+          protectedWrite: "ALLOW" as const
+        })
+      })
     }),
     policyKnowledge: "UNKNOWN_POLICY" as const,
-    notes: "The reassignment outcome is accepted, but the exact actor authorized to perform it is intentionally unresolved. After reassignment, A must lose responsibility-derived access and B gains only current-responsibility access; B's later edit-attribution policy is also unresolved."
+    notes: "The reassignment outcome is accepted, but the exact actor authorized to perform it is intentionally unresolved. B's later edit-attribution policy is also unresolved."
   }),
   Object.freeze({
     id: "BROW-G" as const,
