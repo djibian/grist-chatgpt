@@ -25,7 +25,7 @@ No real student or teacher row is copied into this fixture.
 
 ## Starting states
 
-Two committed states are represented:
+Two committed **initial** states are represented:
 
 ### `date-absent`
 
@@ -46,6 +46,17 @@ This state is intended to exercise the actual Builder addition when J2-D becomes
 - historical author remains unknown until a new contact is captured under the accepted rule.
 
 This state exercises reconciliation with an already-satisfied structural property and legitimate human changes.
+
+### Derived `managed-rerun` state
+
+The manifest also contains a derived post-transformation verification state used only for the convergence/rerun oracle:
+
+- contact-date field already present exactly once;
+- historical contact-author binding already present exactly once;
+- the human-modified business rows and layout marker are unchanged;
+- the legacy trace's historical author remains unknown rather than being fabricated.
+
+`TRANSFORM-RERUN` starts from this already managed state. It therefore tests a genuine second application of the same accepted intent, rather than accidentally testing the first addition of the historical-author binding again.
 
 ## Browser matrix
 
@@ -70,11 +81,11 @@ Those remain `UNKNOWN_POLICY`. The fixture does not invent answers.
 
 ## Transformation matrix
 
-The manifest also fixes expected transformation behavior for:
+The manifest fixes expected transformation behavior for:
 
-- date-absent state;
-- date-present/human-modified state;
-- rerun/convergence.
+- date-absent initial state;
+- date-present/human-modified initial state;
+- a true rerun from the derived managed post-state.
 
 Each expects exactly one contact-date field and one historical-author binding after the applicable transformation, no duplicated Stage/trace, no fabricated legacy author, preservation of business rows and untargeted schema, and preservation/reconciliation of the human layout.
 
