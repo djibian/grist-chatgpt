@@ -59,7 +59,7 @@ Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       
                                                                     -> J3 -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency. Its Stage follow-up business semantics are accepted, and a partial reference schema/page binding is recorded; critical LinkKey ACL and teacher-specific UI behavior remain unverified, although the owner reports adding the date to the follow-up sheet and confirms that teacher links in `Enseignants` use LinkKeys with ACL-based filtering. J2 implementation is blocked on those observations and a controlled fixture, not on a choice to create a separate Visit entity. The Builder may not invent missing bindings. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency. Its one-trace and historical-author-after-reassignment business semantics are accepted, with two correction/reassignment-authority choices still open; a partial reference schema/page binding is recorded, while critical LinkKey ACL and teacher-specific UI behavior remain unverified, although the owner reports adding the date to the follow-up sheet and confirms that teacher links in `Enseignants` use LinkKeys with ACL-based filtering. J2 observation and test infrastructure are now eligible work because their absence causes that evidence gap. Effectful J2 transformation remains gated on a bound, synthetic fixture and browser-path evidence; the Builder may not invent missing bindings. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -107,7 +107,7 @@ Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
 - P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
-- J0 and J1 have passed their required integrated reviews and are DONE; J2 is blocked on the remaining stage-tracking access/UI binding gate;
+- J0 and J1 have passed their required integrated reviews and are DONE; J2's bounded observation and test slices are ACTIVE, while its effectful transformation waits for their evidence;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -442,7 +442,7 @@ J0 engine stabilization       DONE
 J1 contractual execution      DONE
              |
              v
-J2 stage-tracking reference application  BLOCKED — LinkKey/UI binding and controlled fixture
+J2 stage-tracking reference application  ACTIVE — bounded observation and test infrastructure first
              |
              v
 J3 second independent reference application
@@ -531,17 +531,27 @@ No generalized Builder planner, ACL authoring, browser LinkKey suite or durable 
 
 ### J2 — stage-tracking reference application
 
-**Status: BLOCKED by unverified teacher LinkKey/ACL behavior and controlled fixture**
+**Status: ACTIVE for bounded observation and test infrastructure; effectful transformation GATED by its evidence.**
 
-Goal: demonstrate one realistic cross-cutting application transformation covering schema, access policy, UI, human-change preservation, concurrency and recovery.
+Goal: demonstrate one realistic cross-cutting application transformation covering schema, preservation of the existing access policy, UI, human-change preservation, concurrency and recovery. An ACL **write** is not required merely to exercise access-policy verification; add one only if the observed policy and an accepted plan actually require it.
 
-Authoritative behavioral specification: `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`. Accepted business decisions: `docs/J2-STAGE-TRACKING-ACCEPTED-SEMANTICS.md`. Partial observed fixture binding: `docs/J2-STAGE-TRACKING-REFERENCE-BINDING.md`.
+Authoritative behavioral specification: `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`. Accepted business decisions: `docs/J2-STAGE-TRACKING-ACCEPTED-SEMANTICS.md`. Partially observed reference: `docs/J2-STAGE-TRACKING-REFERENCE-BINDING.md`.
 
-The teacher assigned in `Stages.Suivi_par` makes an `Appel` or `Visite` and leaves the contact date, implication, punctuality and comments in the single editable trace on that Stage. The owner confirms one trace per Stage is sufficient; J2 does not require a contact history. There is no reassignment in this workflow: `Suivi_par` is the attributed business author, not a technical editor audit. The reference document now has editable `Stages.Date_du_contact`, added through direct maintenance; this is not a J2 engine proof. J2 requires no new Visit table. Before effectful J2 implementation, verify the real LinkKey access rules, date visibility and edit permissions through the teacher-specific URLs, dependency closure and a controlled synthetic fixture. The owner confirms that the date is now visible in the follow-up sheet; this is not yet a controlled teacher/ACL verdict. The Builder cannot turn unobserved ACL/UI facts into accepted policy.
+The assigned teacher writes one mutable call/visit trace on the existing `Stages` row and is the business author at contact time. If a separate authorized action later reassigns the Stage A → B, A remains the historical author of A's contact and the trace survives; current `Suivi_par` alone cannot retain A after it points to B. No separate Visit/contact history or technical editor audit is required. The current reference lacks a proven historical-author field. `Date_du_contact` was added directly to the live reference and reported visible by the owner; this is fixture state, not a J1/Builder execution proof.
 
-Exit requires all impacted critical properties to be contextually `VERIFIED`, including real supported browser-path LinkKey tests where the policy depends on `user.LinkKey`.
+The accepted BehavioralContract is the **independent test oracle**. Reading ACLs describes the implementation; it must never generate or relax expected outcomes simply because the implementation would otherwise fail. No synthetic run copies real student or teacher records, and no live document mutation is needed to prove J2.
 
-Application-level access-policy work in J2 is limited to the accepted BehavioralContract and ManagedScope. It does not authorize generic user/org/ACL administration or a generic permission-management tool.
+Finite committed slices, in dependency order:
+
+1. **J2-A — owner-scoped AccessModel observation (read-only, internal first).** In a controlled Grist Community fixture, establish whether the target version permits owner-authorized reads of `_grist_ACLRules`, `_grist_ACLResources` and necessary supporting metadata. Implement a bounded semantic adapter that resolves resources, ordered permission rules, user attributes, relevant sharing/default/virtual-rule context and dependencies on LinkKeys, `Suivi_par` and `Acces_Stages_Actif`. Record document/version/revision or a bounded metadata fingerprint and completeness; unknown or unsupported constructs stay `UNKNOWN`. Keep raw rules and literals server-side; model-facing evidence omits raw formulas, secret constants and token values. Use an owner-authorized, explicit document/mandate context: the present shared owner key must never expose ACL details to another bridge principal. Do not publish an MCP operation or equate this with existing `doc:read`; a future public permission model is a separate security/product decision. If safe metadata access fails, record the failure and seek a narrowly authorized observation path rather than downloading the real document or bypassing Grist permissions.
+2. **J2-B — synthetic fixture and independent expected matrix.** Build disposable Grist Community documents with two fictional teachers, distinct synthetic LinkKeys and stages, retaining only the schema, UI and access dependencies needed for this case. Prepare a date-absent starting state to test the change and a date-present/human-modified state to test reconciliation. A manifest fixes the accepted outcomes for assigned, other, missing/invalid/revoked-key, relation-tampering and separate authorized reassignment A → B scenarios independently of observed rules. The trace and A's historical author binding survive reassignment; who may reassign and what happens if B subsequently corrects/replaces A's trace remain explicit unknowns. Compare the fixture's relevant normalized AccessModel/UI with the real reference when owner-authorized observation is available; a mismatch or inaccessible dependency is `UNKNOWN`, not proof of equivalence. Fixture scaffolding may proceed alongside J2-A; parity claims wait for J2-A.
+3. **J2-C — controlled browser verifier (internal/test surface).** Against a configured Grist origin and fixture IDs only, run separate non-owner sessions using server-held synthetic links; never accept a model-supplied URL, browser command, JavaScript snippet or credential. Automate the contract's positive and negative read/write cases on the teacher page, other reachable pages and Raw Data, plus date visibility, correction/clearing on unchanged assignment and the separate A → B reassignment with retained A author, preserved trace and current-responsibility access. Include a deliberate denial/control case so a verifier that only observes a filtered sheet cannot pass. Produce bounded property evidence with the tested fixture/revision/version, expected and observed outcomes, method and completeness; keep URLs, LinkKeys, cookies, screenshots containing business data and row contents out of model output/audit. Fail closed on a blocked session, uncertain UI state or unsupported Grist version. Browser evidence on a local fixture does not silently become evidence for DINUM; the target Grist version and access-policy binding must be recorded.
+4. **J2-D — bounded J1-backed reference transformation.** Once J2-A/B/C establish the synthetic fixture's critical access/UI behavior, add the smallest needed engine effect adapters for the contact-date column, its teacher-facing field placement and a historical contact-author binding on Stage (unless an existing equivalent is proven), with preconditions, exact target, durable effect knowledge, bounded recovery and postcondition verification. Capture the assigned teacher at contact time without inventing legacy authors, and preserve that identity across later reassignment. Defer B's correction/replacement of A's trace until its authorship rule is accepted. Reuse supported bounded operations; the current J1 synthetic `update_records` proof is not yet a live schema/UI dispatcher. Preserve the already present field and human layout on the second fixture; avoid ACL mutation if the observed Stage policy already covers the new field. If an ACL write is truly necessary, specify that operation separately under the accepted ManagedScope and review its authorization/intermediate-state/recovery semantics before implementing it. Run both starting states, interruption/concurrency cases and idempotent reruns through the same execution engine. Missing live-reference parity does not block this isolated implementation work, but it prevents a reference-specific `VERIFIED` claim.
+5. **J2 integrated completion review.** On exact `main`, independently challenge the property-to-test-to-evidence map, isolation negatives, fixture/reference parity, engine recovery and supported-version limits. Mark J2 DONE only when all impacted critical properties of the reference application have current `VERIFIED` evidence and no committed J2 work remains. If authorized live-reference binding is unavailable, retain its unknown claims and continue the eligible isolated engineering without misreporting completion.
+
+Human intervention is limited to an actual missing authority or policy decision: obtaining an approved owner/test environment if no safe access exists, choosing a new public authorization scope or credential architecture, resolving an observed business-policy contradiction, and production authorization. The accepted one-trace rule and A's historical authorship after A → B do not need to be asked again. The exact authority for reassignment and the attribution policy if B edits A's existing trace remain open business choices. CI or a synthetic fixture alone never proves the real teacher LinkKey path.
+
+J3-J6 remain dependency-gated. Application-level access-policy work here does not authorize generic user/org/ACL administration, raw `_grist_*` access, unrestricted browsing or a generic permission-management tool.
 
 ### J3 — second independent reference application
 
@@ -735,12 +745,12 @@ Normal maximum active development:
 Preferred steady state after J1 completion:
 
 ```text
-Worker A: J2 only after critical LinkKey/UI binding and a controlled fixture are verified
+Worker A: J2-A read-only access observation or J2-B synthetic fixture; effectful J2-D waits for J2-A/B/C evidence
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration/review/dependency control plus S0/S1/C7/C8 coordination
 ```
 
-No autonomous J2 Builder runtime slice is currently eligible while the critical LinkKey/UI binding and controlled fixture remain unresolved. J1 isolated engineering is complete, and no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
+J2-A/J2-B are eligible without waiting for manual ACL transcription. J2-C depends on a controlled synthetic fixture; J2-D waits for fixture access/UI binding and controlled browser evidence; live-reference parity is required for reference-specific completion claims, not for isolated adapter development. J1 isolated engineering is complete, and no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
@@ -749,7 +759,7 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress J2 only after the critical LinkKey/UI binding is verified in a controlled fixture; do not invent missing access decisions;
+2. progress eligible J2-A/J2-B observation and fixture work now; run J2-C after a fixture exists, and J2-D only after synthetic critical binding and browser evidence; do not invent missing access decisions;
 3. progress independent C4 operational evidence when the required intended environment/operator support is available;
 4. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
 5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
