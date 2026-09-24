@@ -743,6 +743,28 @@ export class FileExecutionJournal implements ExecutionJournal {
     }
   }
 
+  /**
+   * Run one controlled-environment companion-state operation under the exact
+   * same per-execution same-process serialization chain as compareAndSet().
+   *
+   * This exists so immutable companion state that must be frozen relative to a
+   * journal transition can validate and publish against the current durable
+   * record without a stale-snapshot gap. The callback must not call
+   * compareAndSet() for the same execution, because it already owns that
+   * execution's serialization slot.
+   */
+  async withExclusiveExecution<T>(
+    executionId: string,
+    operation: (current: ExecutionJournalRecord) => Promise<T>
+  ): Promise<T> {
+    boundedId(executionId, "executionId");
+    return this.serializeWrite(executionId, async () => {
+      const current = await this.load(executionId);
+      if (!current) throw new ExecutionJournalNotFoundError(executionId);
+      return operation(current);
+    });
+  }
+
   async compareAndSet(
     executionId: string,
     expectedRevision: number,
