@@ -1,8 +1,8 @@
 # J2 synthetic stage-tracking fixture
 
-Status: **J2-B fixture/oracle foundation; disposable Grist provisioning and parity evidence still pending.**
+Status: **J2-B fixture/oracle foundation and partial structural provisioning; synthetic ACL/LinkKey execution and parity evidence still pending.**
 
-This document defines the synthetic data states and independent expected-outcome matrix used by the stage-tracking reference scenario. It does not claim that a Grist fixture with the reference AccessModel has already been provisioned, and it does not derive business expectations from observed ACL rules.
+This document defines the synthetic data states and independent expected-outcome matrix used by the stage-tracking reference scenario. The date-present structural fixture exists, but its LinkKey/ACL policy has not been executed or compared with the reference. Business expectations are not derived from observed ACL rules.
 
 ## Independent oracle
 
@@ -109,6 +109,6 @@ J2-A supplies normalized AccessModel evidence for the access portion once its co
 
 The currently connected Grist Community model-facing surface can discover and mutate bounded document/table/page objects, but it cannot create a disposable document or author/read raw ACL metadata through a public model operation. That limitation is intentional for the existing public contract.
 
-Therefore this foundation does **not** mutate the real `suivi des stages chatgpt` document and does not repurpose unrelated test documents. A later internal/test provisioner must create or receive an explicitly disposable owner-controlled document, install only the minimum synthetic schema/UI/access dependencies, inject secret LinkKeys server-side, then bind the resulting document to this immutable expected matrix.
+Therefore this foundation does **not** mutate the real `suivi des stages chatgpt` document and does not repurpose unrelated test documents. The integrated internal provisioner receives the explicitly disposable, owner-controlled `J2-stage-tracking-fixture` document; it does not create or publicly share a document. Before any ACL action, it must establish the exact fixture identity and owner access through Grist discovery, then verify the two fictional teacher and Stage identities and their assignments. It installs the ACL rules before writing the synthetic LinkKeys in its action sequence. A failed identity/shape check refuses the operation, and even a successful provision must still be followed by actual owner-observer and browser evidence.
 
 The provisioner is J2 test infrastructure, not a mandate to expose generic document creation, raw `_grist_*` access or ACL authoring as a public MCP capability.

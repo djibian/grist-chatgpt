@@ -2,8 +2,11 @@ import {
   J2_STAGE_TRACKING_FIXTURE_STATES,
   type J2TeacherId
 } from "./stageTrackingFixture.js";
+import type { GristOrgSummary, GristWorkspaceSummary } from "../grist/client.js";
 
 const HARD_READ_LIMIT = 32;
+const FIXTURE_DOCUMENT_NAME = "J2-stage-tracking-fixture";
+const FIXTURE_WORKSPACE_NAME = "ChatGPT";
 const FIXTURE_STATE = J2_STAGE_TRACKING_FIXTURE_STATES["date-present-human-modified"];
 const PROTECTED_TRACE_COLUMNS = [
   "Type_de_contact",
@@ -56,6 +59,8 @@ interface QueryOptions {
 }
 
 export interface J2SyntheticAccessClient {
+  listOrgs(): Promise<GristOrgSummary[]>;
+  listWorkspaces(orgId: string | number): Promise<GristWorkspaceSummary[]>;
   queryRecords(
     documentIdOrUrl: string,
     tableId: string,
@@ -109,8 +114,37 @@ interface FixtureSecrets {
 
 interface Snapshot {
   teachers: MetadataRecord[];
+  stages: MetadataRecord[];
   resources: MetadataRecord[];
   rules: MetadataRecord[];
+}
+
+async function assertOwnerFixture(client: J2SyntheticAccessClient, documentId: string): Promise<void> {
+  let matches = 0;
+  for (const org of await client.listOrgs()) {
+    for (const workspace of await client.listWorkspaces(org.id)) {
+      for (const document of workspace.docs ?? []) {
+        if (
+          String(document.id) === documentId &&
+          document.name === FIXTURE_DOCUMENT_NAME &&
+          document.access === "owners" &&
+          workspace.name === FIXTURE_WORKSPACE_NAME
+        ) {
+          matches += 1;
+        }
+      }
+    }
+  }
+  if (matches !== 1) {
+    throw new Error("Owner-accessible J2 disposable fixture identity could not be established.");
+  }
+}
+
+function boundedFixtureId(value: string): string {
+  if (!/^[A-Za-z0-9_-]{8,96}$/.test(value)) {
+    throw new Error("J2 fixture target must be one bounded Grist document ID, not a URL.");
+  }
+  return value;
 }
 
 function boundedAuthorityValue(value: string, label: string): string {
@@ -222,6 +256,29 @@ function teacherRecords(records: MetadataRecord[]): Record<J2TeacherId, TeacherR
     throw new Error("Synthetic fixture teacher identities are incomplete.");
   }
   return { "teacher-a": teacherA, "teacher-b": teacherB };
+}
+
+function validateSyntheticStages(
+  records: MetadataRecord[],
+  teachers: Record<J2TeacherId, TeacherRecord>
+): void {
+  if (records.length !== FIXTURE_STATE.stages.length) {
+    throw new Error("Synthetic fixture must contain exactly two Stage rows.");
+  }
+  const byId = new Map(records.map((record) => [record.fields.Fixture_Id, record]));
+  if (byId.size !== FIXTURE_STATE.stages.length) {
+    throw new Error("Synthetic fixture has duplicated or missing Stage identities.");
+  }
+  for (const expected of FIXTURE_STATE.stages) {
+    const actual = byId.get(expected.id);
+    if (
+      !actual ||
+      actual.fields.Eleve !== expected.studentLabel ||
+      actual.fields.Suivi_par !== teachers[expected.assignedTeacher].id
+    ) {
+      throw new Error("Synthetic Stage identity or assignment does not match the fixture oracle.");
+    }
+  }
 }
 
 function emptyish(value: unknown): boolean {
@@ -394,8 +451,6 @@ function buildActions(
   secrets: FixtureSecrets
 ): unknown[][] {
   const actions: unknown[][] = [
-    ["UpdateRecord", "Enseignants", teachers["teacher-a"].id, { Token_Stages: secrets["teacher-a"] }],
-    ["UpdateRecord", "Enseignants", teachers["teacher-b"].id, { Token_Stages: secrets["teacher-b"] }],
     ["RemoveRecord", "_grist_ACLRules", legacyRuleId],
     ["RemoveRecord", "_grist_ACLResources", legacyResourceId]
   ];
@@ -406,6 +461,11 @@ function buildActions(
   for (const aclRule of expectedRules()) {
     actions.push(["AddRecord", "_grist_ACLRules", aclRule.id, aclRule.fields]);
   }
+  // ACL denies for non-owners must be installed before any synthetic LinkKey is written.
+  actions.push(
+    ["UpdateRecord", "Enseignants", teachers["teacher-a"].id, { Token_Stages: secrets["teacher-a"] }],
+    ["UpdateRecord", "Enseignants", teachers["teacher-b"].id, { Token_Stages: secrets["teacher-b"] }]
+  );
   return actions;
 }
 
@@ -419,9 +479,10 @@ export class J2StageTrackingSyntheticAccessProvisioner {
     if (authority.ownerAuthorized !== true) {
       throw new Error("Synthetic AccessModel provisioning requires explicit owner authorization.");
     }
-    const documentId = boundedAuthorityValue(authority.documentId, "documentId");
+    const documentId = boundedFixtureId(authority.documentId);
     boundedAuthorityValue(authority.principalId, "principalId");
     boundedAuthorityValue(authority.mandateId, "mandateId");
+    await assertOwnerFixture(this.client, documentId);
 
     const [stageColumnsRaw, teacherColumnsRaw, initialSnapshot] = await Promise.all([
       this.client.listColumns(documentId, "Stages"),
@@ -433,6 +494,7 @@ export class J2StageTrackingSyntheticAccessProvisioner {
       columnsFromResponse(teacherColumnsRaw, "Enseignants")
     );
     const initialTeachers = teacherRecords(initialSnapshot.teachers);
+    validateSyntheticStages(initialSnapshot.stages, initialTeachers);
     const secrets = await loadSecrets(this.vault);
 
     if (
@@ -468,6 +530,7 @@ export class J2StageTrackingSyntheticAccessProvisioner {
 
     const postSnapshot = await this.readSnapshot(documentId);
     const postTeachers = teacherRecords(postSnapshot.teachers);
+    validateSyntheticStages(postSnapshot.stages, postTeachers);
     const exactPostcondition =
       metadataMatches(postSnapshot.resources, expectedResources()) &&
       metadataMatches(postSnapshot.rules, expectedRules()) &&
@@ -488,8 +551,12 @@ export class J2StageTrackingSyntheticAccessProvisioner {
   }
 
   private async readSnapshot(documentId: string): Promise<Snapshot> {
-    const [teachersRaw, resourcesRaw, rulesRaw] = await Promise.all([
+    const [teachersRaw, stagesRaw, resourcesRaw, rulesRaw] = await Promise.all([
       this.client.queryRecords(documentId, "Enseignants", {
+        limit: HARD_READ_LIMIT,
+        cellFormat: "normal"
+      }),
+      this.client.queryRecords(documentId, "Stages", {
         limit: HARD_READ_LIMIT,
         cellFormat: "normal"
       }),
@@ -506,6 +573,7 @@ export class J2StageTrackingSyntheticAccessProvisioner {
     ]);
     return {
       teachers: recordsFromResponse(teachersRaw, "Enseignants"),
+      stages: recordsFromResponse(stagesRaw, "Stages"),
       resources: recordsFromResponse(resourcesRaw, "_grist_ACLResources"),
       rules: recordsFromResponse(rulesRaw, "_grist_ACLRules")
     };

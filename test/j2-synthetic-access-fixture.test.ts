@@ -23,6 +23,20 @@ class FixtureClient implements J2SyntheticAccessClient {
   readonly observedActions: unknown[][][] = [];
   applyMode: "success" | "uncertain-after-apply" = "success";
   includeHistoricalAuthor = false;
+  documentName = "J2-stage-tracking-fixture";
+  documentAccess = "owners";
+
+  async listOrgs() {
+    return [{ id: 1 }];
+  }
+
+  async listWorkspaces() {
+    return [{
+      id: 1,
+      name: "ChatGPT",
+      docs: [{ id: "synthetic-j2", name: this.documentName, access: this.documentAccess }]
+    }];
+  }
 
   private readonly tables = new Map<string, MutableRecord[]>([
     [
@@ -42,6 +56,27 @@ class FixtureClient implements J2SyntheticAccessClient {
             Fixture_Id: "teacher-b",
             Token_Stages: "",
             Acces_Stages_Actif: true
+          }
+        }
+      ]
+    ],
+    [
+      "Stages",
+      [
+        {
+          id: 21,
+          fields: {
+            Fixture_Id: "stage-a",
+            Eleve: "Élève Alpha (synthétique)",
+            Suivi_par: 11
+          }
+        },
+        {
+          id: 22,
+          fields: {
+            Fixture_Id: "stage-b",
+            Eleve: "Élève Bêta (synthétique)",
+            Suivi_par: 12
           }
         }
       ]
@@ -123,6 +158,10 @@ class FixtureClient implements J2SyntheticAccessClient {
     });
   }
 
+  setUnexpectedStage(): void {
+    this.tables.get("Stages")![0]!.fields.Eleve = "Real student data";
+  }
+
   private apply(action: unknown[]): void {
     const [name, tableId, rowId, fields] = action;
     assert.equal(typeof tableId, "string");
@@ -179,6 +218,9 @@ test("J2-B provisions only the bounded synthetic LinkKey AccessModel and does no
   assert.equal(outcome.aclRuleCount, 13);
   assert.equal(client.observedActions.length, 1);
   assert.equal(client.observedActions[0]!.length, 22);
+  const actions = client.observedActions[0]!;
+  assert.deepEqual(actions.slice(-2).map((action) => action[0]), ["UpdateRecord", "UpdateRecord"]);
+  assert.ok(actions.slice(0, -2).every((action) => action[1] !== "Enseignants"));
 
   const serializedResult = JSON.stringify(outcome);
   assert.equal(serializedResult.includes(SECRET_A), false);
@@ -241,5 +283,20 @@ test("J2-B requires explicit owner authority", async () => {
     () => provisioner.provision({ ...AUTHORITY, ownerAuthorized: false }),
     /requires explicit owner authorization/
   );
+  assert.equal(client.observedActions.length, 0);
+});
+
+test("J2-B refuses a mismatched fixture or non-owner document before any ACL write", async () => {
+  const client = new FixtureClient();
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+
+  client.documentName = "suivi des stages chatgpt";
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /identity could not be established/);
+  client.documentName = "J2-stage-tracking-fixture";
+  client.documentAccess = "viewers";
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /identity could not be established/);
+  client.documentAccess = "owners";
+  client.setUnexpectedStage();
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /Stage identity or assignment/);
   assert.equal(client.observedActions.length, 0);
 });
