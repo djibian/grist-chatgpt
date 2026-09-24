@@ -40,7 +40,8 @@ P2 formula/schema safety          DONE
 P3 semantic context/discovery     DONE
 P4 compact MCP surface            DONE
 Q0 retrospective code assurance  DONE
-J0 engine stabilization           ELIGIBLE
+J0 engine stabilization           DONE
+J1 contractual execution          ELIGIBLE
 ```
 
 The repository already contains the bounded Grist business surface, registry-driven MCP contract, credential-provider seam, per-principal Grist context/cache isolation, compact semantic document inspection, audit-aware risk metadata and a bounded document-UI surface. `main` contains bounded direct and Ref/RefList column select-by option discovery/configuration, bounded widget saved-sort configuration through stable column IDs, bounded normalized page-layout inspection and mutation through stable widget IDs, bounded normalized existing-custom-widget access/mapping inspection and mutation through stable column IDs, bounded table/grid display-option inspection and mutation while preserving unrelated widget options, bounded advisory formula-reference and one-hop reference-field inspection with explicit unavailable-target incompleteness, a non-secret OAuth deployment smoke command/runbook, explicit minimization of public discovery metadata and success-only mutation results while preserving functional creation IDs, a documented production observability/audit contract, bounded widget-description mutation with post-write verification, bounded native chart-type configuration for explicitly identified chart widgets, and the completed Q0 repairs that enforce the internal metadata-table boundary, close schema-mutation metadata allowlists and fail closed on potentially truncated UI metadata snapshots.
@@ -54,11 +55,11 @@ The project advances on three product/platform/distribution axes. Q0 remains rec
 ```text
 QUALITY ASSURANCE         PLATFORM / SECURITY      PRODUCT / BUILDER            PUBLIC DISTRIBUTION
 Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       S0 ACTIVE + S1
-                                                   -> J0 -> J1 -> J2 -> J3          -> C7 -> C8 -> review
-                                                      -> J4 -> J5 -> J6
+                                                   -> J0 DONE -> J1 -> J2 -> J3     -> C7 -> C8 -> review
+                                                              -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, and J0 is now the finite committed next product-runtime tranche. J1-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 has passed its exact-main integrated completion review, and J1 is now the finite committed next product-runtime tranche. J2-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -106,7 +107,7 @@ Post-Q0 dependency state:
 
 - P1, P2 and P3 have passed their required integrated reviews and are DONE;
 - P4's former P1/Q0/P2/P3 dependency chain was satisfied; P4-E1 has now passed its integrated completion review and P4 is DONE with KEEP as the v1 decision;
-- J0 is independently eligible as the finite next product-runtime tranche and does not require C5 when developed against an isolated controlled environment;
+- J0 has passed its required integrated completion review and is DONE; J1 is independently eligible in an isolated controlled environment and does not require C5;
 - C6's Q0 prerequisite is satisfied, but C6 finalization still waits for C4/C5;
 - C4 operational evidence and S1's remaining low-risk external evidence remain independently eligible when the required external environment/evidence is available.
 
@@ -435,10 +436,10 @@ The sequence below is the authoritative continuation of the product axis after P
 P0-P4 bounded bridge baseline  DONE
              |
              v
-J0 engine stabilization
+J0 engine stabilization       DONE
              |
              v
-J1 contractual execution
+J1 contractual execution      ELIGIBLE
              |
              v
 J2 stage-tracking reference application
@@ -458,14 +459,14 @@ J6 durable lifecycle maintenance
 
 ### J0 — engine stabilization
 
-**Status: ELIGIBLE**  
-**Priority: highest product-runtime priority**
+**Status: DONE**  
+**Priority: completed product-runtime stabilization**
 
 Goal: make current mutation outcomes safe inputs for a future orchestrator by correcting the four reproduced audit fragilities without implementing the Builder itself.
 
 Authoritative specification: `docs/EXECUTION-ENGINE-J0-J1.md`, J0 sections.
 
-Committed J0 slices are finite:
+Committed J0 slices were finite:
 
 1. explicit uncertain-write semantics including first-batch ambiguity;
 2. preserve confirmed partial results/stable IDs across later failure or uncertainty;
@@ -474,7 +475,7 @@ Committed J0 slices are finite:
 5. focused regression tests reproducing the four audit findings;
 6. integrated J0 completion review.
 
-J0 is complete only when:
+J0 exit criteria:
 
 - required tests T0-T3 pass;
 - uncertain first writes are structurally distinguishable from proven no-effect failure;
@@ -485,18 +486,29 @@ J0 is complete only when:
 - public/runtime documentation states the exact guarantee boundaries;
 - a fresh integrated J0 completion review records PASS against exact `main`.
 
-J0 runtime changes require independent exact-head review. J0/J1 may be developed and tested against an isolated synthetic/controlled environment before C5, but that does not make the system ready for real multi-user production.
+Integrated tranche review: **PASS** against exact `main` `70d6e918219189b1aed82a209afc3049df9f10ec`. PR #125 integrated explicit uncertain/partial-write effect knowledge and T0/T1 evidence after independent exact-head review; PR #127 integrated fail-closed contractual concurrency classification/refusal and T2 evidence after independent exact-head review; PR #126 integrated fail-closed audit-target handling and T3 evidence after independent exact-head review. Exact `main` is tree-identical to the exact tested #126 head `98dac82cb3a4731183de531e1c52e2701a06d775`, whose CI passed production dependency audit, TypeScript check, the complete test suite and build with the earlier J0 slices already integrated. The integrated review found no new blocking correctness, authorization/security, data-integrity, replay or contract finding; the committed J0 set is exhausted.
+
+Completed J0 slices:
+
+1. **J0-F1/F2 — uncertain and partial writes** — PR #125 preserves confirmed effects/stable IDs, represents first/later ambiguous write outcomes explicitly and forbids whole-operation replay.
+2. **J0-F3 — concurrency classification** — PR #127 classifies every current operation and refuses overwrite-sensitive contractual direct execution where no proven effective concurrency protection exists.
+3. **J0-F4 — safe audit targets** — PR #126 prevents unresolved/rejected raw document targets from reaching audit output while retaining normalized non-URL IDs for successful events.
+4. **integrated J0 completion review** — PASS recorded above against exact post-repair `main` `70d6e918219189b1aed82a209afc3049df9f10ec`.
+
+Committed next J0 slices: **none**.
+
+J0 runtime changes required independent exact-head review. J1 may be developed and tested against an isolated synthetic/controlled environment before C5, but that does not make the system ready for real multi-user production.
 
 ### J1 — first contractual transformation
 
-**Status: BLOCKED by J0**  
-**Priority: high**
+**Status: ELIGIBLE**  
+**Priority: highest product-runtime priority**
 
 Goal: prove one bounded synthetic multi-step transformation using immutable execution contracts, cumulative plan budgets, a durable write-ahead journal, multidimensional state, contextual evidence and recovery/suspension after injected failures.
 
 Authoritative specification: `docs/EXECUTION-ENGINE-J0-J1.md`, J1 sections.
 
-Finite committed J1 work after J0 completion:
+Finite committed J1 work:
 
 1. immutable execution/plan/contract identity;
 2. `ExecutionJournal` abstraction plus one durable controlled-environment implementation;
@@ -714,15 +726,15 @@ Normal maximum active development:
 (+ 1 exceptional independent Worker)
 ```
 
-Preferred steady state after Agentic Builder roadmap activation:
+Preferred steady state after J0 completion:
 
 ```text
-Worker A: finite J0 engine-stabilization slice
+Worker A: finite J1 contractual-execution slice
 Worker B: platform/security operational evidence (C4) when the intended environment/operator is available
 Controller: integration/review/dependency control plus S0/S1/C7/C8 coordination
 ```
 
-J0/J1 isolated engineering may proceed before C5, but no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
+J1 isolated engineering may proceed before C5, but no second real user or production Builder deployment may rely on the shared static Grist credential path as if it provided per-user isolation.
 
 Do not deploy a product-feature branch onto the shared POC/production endpoint merely to test code if that would destroy an active authentication/security experiment. Use isolated test evidence when needed.
 
@@ -731,7 +743,7 @@ Do not deploy a product-feature branch onto the shared POC/production endpoint m
 When multiple actions are eligible, prefer:
 
 1. close a ready existing dependency or prior-execution review-required PR;
-2. progress a finite J0 engine-stabilization slice, while preserving exact dependencies and independent review boundaries;
+2. progress a finite J1 contractual-execution slice, while preserving exact dependencies and independent review boundaries;
 3. progress independent C4 operational evidence when the required intended environment/operator support is available;
 4. progress S1 and S0 submission evidence, and begin C7 reviewer preparation as soon as C4/C5 dependencies permit rather than waiting for unavailable pre-approval;
 5. stop at remaining human gates rather than embedding unapproved persistence, scope, destructive-surface, institutional or branding decisions.
