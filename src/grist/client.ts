@@ -56,15 +56,36 @@ interface GristClientOptions {
   apiKey: string;
 }
 
+export type GristEffectKnowledge = "NOT_APPLIED" | "UNCERTAIN";
+
 export class GristApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly responseBody?: string
+    public readonly responseBody?: string,
+    public readonly effectKnowledge: GristEffectKnowledge = "NOT_APPLIED"
   ) {
     super(message);
     this.name = "GristApiError";
   }
+}
+
+export class GristTransportError extends Error {
+  constructor(
+    message: string,
+    public readonly effectKnowledge: GristEffectKnowledge,
+    public readonly cause?: unknown
+  ) {
+    super(message);
+    this.name = "GristTransportError";
+  }
+}
+
+export function isUncertainGristEffect(error: unknown): boolean {
+  return (
+    (error instanceof GristApiError || error instanceof GristTransportError) &&
+    error.effectKnowledge === "UNCERTAIN"
+  );
 }
 
 export class GristClient {
@@ -301,24 +322,46 @@ export class GristClient {
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<unknown> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        ...init.headers
-      },
-      signal: AbortSignal.timeout(10_000)
-    });
+    const method = (init.method ?? "GET").toUpperCase();
+    const mayMutate = method !== "GET" && method !== "HEAD";
+    let response: Response;
 
-    const body = await response.text();
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+          ...(init.body ? { "Content-Type": "application/json" } : {}),
+          ...init.headers
+        },
+        signal: AbortSignal.timeout(10_000)
+      });
+    } catch (cause) {
+      throw new GristTransportError(
+        "Grist API request failed before an HTTP response was received.",
+        mayMutate ? "UNCERTAIN" : "NOT_APPLIED",
+        cause
+      );
+    }
+
+    let body: string;
+    try {
+      body = await response.text();
+    } catch (cause) {
+      throw new GristTransportError(
+        "Grist API response body could not be read.",
+        mayMutate ? "UNCERTAIN" : "NOT_APPLIED",
+        cause
+      );
+    }
 
     if (!response.ok) {
       throw new GristApiError(
         `Grist API request failed with HTTP ${response.status}`,
         response.status,
-        body.slice(0, 1000)
+        body.slice(0, 1000),
+        mayMutate ? "UNCERTAIN" : "NOT_APPLIED"
       );
     }
 
@@ -330,7 +373,8 @@ export class GristClient {
       throw new GristApiError(
         "Grist API returned a non-JSON response.",
         response.status,
-        body.slice(0, 1000)
+        body.slice(0, 1000),
+        mayMutate ? "UNCERTAIN" : "NOT_APPLIED"
       );
     }
   }

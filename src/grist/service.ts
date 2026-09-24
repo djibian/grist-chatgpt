@@ -1,6 +1,7 @@
 import { AccessPolicy } from "./accessPolicy.js";
 import {
   GristClient,
+  isUncertainGristEffect,
   type GristColumnSpec,
   type GristColumnUpdate,
   type GristTableSpec,
@@ -30,12 +31,35 @@ export class PartialBatchError extends Error {
     public readonly completedBatches: number,
     public readonly completedItems: number,
     public readonly failedBatch: number,
-    public readonly cause: unknown
+    public readonly cause: unknown,
+    public readonly confirmedResults: unknown[] = [],
+    public readonly failedItems: number = 0,
+    public readonly remainingBatches: number = 0,
+    public readonly remainingItems: number = 0
   ) {
     super(
       `${operation} partially completed: ${completedItems} item(s) were already applied in ${completedBatches} batch(es) before batch ${failedBatch} failed. Do not retry the whole operation blindly.`
     );
     this.name = "PartialBatchError";
+  }
+}
+
+export class UncertainWriteError extends Error {
+  constructor(
+    public readonly operation: string,
+    public readonly completedBatches: number,
+    public readonly completedItems: number,
+    public readonly uncertainBatch: number,
+    public readonly uncertainItems: number,
+    public readonly remainingBatches: number,
+    public readonly remainingItems: number,
+    public readonly confirmedResults: unknown[],
+    public readonly cause: unknown
+  ) {
+    super(
+      `${operation} has an uncertain write outcome for batch ${uncertainBatch}. Do not retry the whole operation until the uncertain effect is reconciled.`
+    );
+    this.name = "UncertainWriteError";
   }
 }
 
@@ -53,6 +77,12 @@ function batchedResult(results: unknown[]): unknown {
     batches: results.length,
     results
   };
+}
+
+function countRemainingItems<T>(batches: readonly T[][], index: number): number {
+  return batches
+    .slice(index + 1)
+    .reduce((count, batch) => count + batch.length, 0);
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -272,7 +302,10 @@ export class GristService {
     await this.executeBatchesForAcknowledgement(
       "deleteColumns",
       columnIds.map((columnId) => [columnId]),
-      async (batch) => this.client.deleteColumn(documentId, tableId, batch[0]!)
+      async (batch) => {
+        await this.client.deleteColumn(documentId, tableId, batch[0]!);
+        return { columnIds: [batch[0]!] };
+      }
     );
     return { tableId, columnIds, deleted: true };
   }
@@ -322,7 +355,10 @@ export class GristService {
     await this.executeBatchesForAcknowledgement(
       "updateRecords",
       chunk(records, this.options.writeBatchRecords),
-      async (batch) => this.client.updateRecords(documentId, tableId, batch)
+      async (batch) => {
+        await this.client.updateRecords(documentId, tableId, batch);
+        return { recordIds: batch.map((record) => record.id) };
+      }
     );
     return {
       tableId,
@@ -342,7 +378,10 @@ export class GristService {
     await this.executeBatchesForAcknowledgement(
       "deleteRecords",
       chunk(recordIds, this.options.writeBatchRecords),
-      async (batch) => this.client.deleteRecords(documentId, tableId, batch)
+      async (batch) => {
+        await this.client.deleteRecords(documentId, tableId, batch);
+        return { recordIds: [...batch] };
+      }
     );
     return { tableId, recordIds, deleted: true };
   }
@@ -361,13 +400,32 @@ export class GristService {
         results.push(await execute(batch));
         completedItems += batch.length;
       } catch (error) {
+        const remainingBatches = batches.length - index - 1;
+        const remainingItems = countRemainingItems(batches, index);
+        if (isUncertainGristEffect(error)) {
+          throw new UncertainWriteError(
+            operation,
+            index,
+            completedItems,
+            index + 1,
+            batch.length,
+            remainingBatches,
+            remainingItems,
+            [...results],
+            error
+          );
+        }
         if (index === 0) throw error;
         throw new PartialBatchError(
           operation,
           index,
           completedItems,
           index + 1,
-          error
+          error,
+          [...results],
+          batch.length,
+          remainingBatches,
+          remainingItems
         );
       }
     }
@@ -380,21 +438,41 @@ export class GristService {
     batches: T[][],
     execute: (batch: T[]) => Promise<unknown>
   ): Promise<void> {
+    const confirmedResults: unknown[] = [];
     let completedItems = 0;
 
     for (let index = 0; index < batches.length; index += 1) {
       const batch = batches[index]!;
       try {
-        await execute(batch);
+        confirmedResults.push(await execute(batch));
         completedItems += batch.length;
       } catch (error) {
+        const remainingBatches = batches.length - index - 1;
+        const remainingItems = countRemainingItems(batches, index);
+        if (isUncertainGristEffect(error)) {
+          throw new UncertainWriteError(
+            operation,
+            index,
+            completedItems,
+            index + 1,
+            batch.length,
+            remainingBatches,
+            remainingItems,
+            [...confirmedResults],
+            error
+          );
+        }
         if (index === 0) throw error;
         throw new PartialBatchError(
           operation,
           index,
           completedItems,
           index + 1,
-          error
+          error,
+          [...confirmedResults],
+          batch.length,
+          remainingBatches,
+          remainingItems
         );
       }
     }
