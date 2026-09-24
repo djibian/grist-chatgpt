@@ -17,6 +17,8 @@ PR #136 made contextual property evidence durable but deliberately refused to in
 
 The companion file is part of the accepted J1 plan package even though it is physically separate from the execution journal. Changing its criteria therefore requires a new execution/plan identity; it cannot be changed after execution starts.
 
+Freezing is serialized through the paired `FileExecutionJournal`'s existing same-process, per-directory/per-execution write chain. The store snapshots caller inputs before its first asynchronous boundary, then re-resolves the current durable journal record while holding that serialization slot. A stale revision-0 caller snapshot therefore cannot publish a new verification contract after another lifecycle transition has crossed the write-ahead barrier. This guarantee has the same controlled-environment limit as `FileExecutionJournal`: one active writer process for the journal directory; it is not a distributed or production multi-writer lock.
+
 ## Completion transition
 
 `VerificationCompletionLifecycle.markStepVerified()`:
@@ -46,7 +48,7 @@ The filesystem store has the same controlled-environment character as the J1 `Fi
 
 ## Evidence
 
-Focused tests cover durable restart, exact immutable binding, critical-property coverage, unknown-property refusal, conflict against later weakening, refusal to freeze criteria after execution starts, latest-verdict semantics, safe `EFFECT_RECORDED -> VERIFIED`, idempotent verified replay and whole-execution completion only after every step verifies.
+Focused tests cover durable restart, exact immutable binding, critical-property coverage, unknown-property refusal, conflict against later weakening, refusal to freeze criteria after execution starts, stale-pristine-snapshot refusal after the durable write-ahead barrier, latest-verdict semantics, safe `EFFECT_RECORDED -> VERIFIED`, idempotent verified replay and whole-execution completion only after every step verifies.
 
 ## Provenance
 

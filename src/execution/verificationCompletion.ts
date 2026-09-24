@@ -8,6 +8,7 @@ import {
   type ExecutionJournal,
   type ExecutionJournalMutableState,
   type ExecutionJournalRecord,
+  type FileExecutionJournal,
   type VerificationEvidenceRecord,
   type VerificationVerdict
 } from "./executionJournal.js";
@@ -245,13 +246,19 @@ function isNodeErrorWithCode(error: unknown, code: string): boolean {
  *
  * The contract is frozen while the execution journal is still pristine, is
  * keyed by exact execution/plan identity, and cannot be weakened later under
- * the same execution ID. Like FileExecutionJournal, this is controlled-
- * environment persistence rather than a production multi-writer store.
+ * the same execution ID. Publication is serialized through the paired
+ * FileExecutionJournal's same-process per-execution write chain, so a stale
+ * caller snapshot cannot race a write-ahead transition. Like
+ * FileExecutionJournal, this is controlled-environment persistence rather than
+ * a production multi-writer store.
  */
 export class FileVerificationContractStore implements VerificationContractStore {
   private readonly directory: string;
 
-  constructor(directory: string) {
+  constructor(
+    directory: string,
+    private readonly journal: FileExecutionJournal
+  ) {
     this.directory = resolve(directory);
   }
 
@@ -259,50 +266,67 @@ export class FileVerificationContractStore implements VerificationContractStore 
     execution: ExecutionJournalRecord,
     definition: ExecutionVerificationContractDefinition
   ): Promise<ExecutionVerificationContractDefinition> {
-    validatePristineInitialization(execution);
-    validateContractAgainstExecution(execution, definition);
+    // Snapshot caller-owned inputs before the first asynchronous boundary.
+    const executionSnapshot = clone(execution);
     const frozen = clone(definition);
-    await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    const executionId = boundedId(
+      executionSnapshot.definition.identity.executionId,
+      "executionId"
+    );
 
-    const existing = await this.load(execution.definition.identity.executionId);
-    if (existing) {
-      if (canonicalJson(existing) !== canonicalJson(frozen)) {
-        throw new VerificationContractConflictError(execution.definition.identity.executionId);
+    return this.journal.withExclusiveExecution(executionId, async (current) => {
+      if (
+        current.revision !== executionSnapshot.revision ||
+        canonicalJson(current.definition) !== canonicalJson(executionSnapshot.definition)
+      ) {
+        throw new VerificationContractInvariantError(
+          `Verification contract initialization requires the current durable execution snapshot for "${executionId}".`
+        );
       }
-      return clone(existing);
-    }
 
-    const executionId = execution.definition.identity.executionId;
-    const path = this.contractPath(executionId);
-    const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
-    const handle = await open(tempPath, "wx", 0o600);
-    try {
-      await handle.writeFile(`${JSON.stringify(frozen, null, 2)}\n`, "utf8");
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
+      validatePristineInitialization(current);
+      validateContractAgainstExecution(current, frozen);
+      await mkdir(this.directory, { recursive: true, mode: 0o700 });
 
-    try {
-      await link(tempPath, path);
-    } catch (error) {
-      if (!isNodeErrorWithCode(error, "EEXIST")) throw error;
-      const concurrent = await this.load(executionId);
-      if (!concurrent || canonicalJson(concurrent) !== canonicalJson(frozen)) {
-        throw new VerificationContractConflictError(executionId);
+      const existing = await this.load(executionId);
+      if (existing) {
+        if (canonicalJson(existing) !== canonicalJson(frozen)) {
+          throw new VerificationContractConflictError(executionId);
+        }
+        return clone(existing);
       }
-      return clone(concurrent);
-    } finally {
-      await unlink(tempPath).catch(() => undefined);
-    }
 
-    const directoryHandle = await open(this.directory, "r");
-    try {
-      await directoryHandle.sync();
-    } finally {
-      await directoryHandle.close();
-    }
-    return clone(frozen);
+      const path = this.contractPath(executionId);
+      const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+      const handle = await open(tempPath, "wx", 0o600);
+      try {
+        await handle.writeFile(`${JSON.stringify(frozen, null, 2)}\n`, "utf8");
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+
+      try {
+        await link(tempPath, path);
+      } catch (error) {
+        if (!isNodeErrorWithCode(error, "EEXIST")) throw error;
+        const concurrent = await this.load(executionId);
+        if (!concurrent || canonicalJson(concurrent) !== canonicalJson(frozen)) {
+          throw new VerificationContractConflictError(executionId);
+        }
+        return clone(concurrent);
+      } finally {
+        await unlink(tempPath).catch(() => undefined);
+      }
+
+      const directoryHandle = await open(this.directory, "r");
+      try {
+        await directoryHandle.sync();
+      } finally {
+        await directoryHandle.close();
+      }
+      return clone(frozen);
+    });
   }
 
   async load(executionId: string): Promise<ExecutionVerificationContractDefinition | null> {

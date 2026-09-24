@@ -91,7 +91,7 @@ test("J1 verification contract freezes exact step requirements before execution 
   await withDirectories(async (journalDirectory, contractDirectory) => {
     const journal = new FileExecutionJournal(journalDirectory);
     const initial = await journal.initialize(plan());
-    const store = new FileVerificationContractStore(contractDirectory);
+    const store = new FileVerificationContractStore(contractDirectory, journal);
 
     const frozen = await store.initialize(initial, contract());
     assert.deepEqual(frozen.steps, [
@@ -101,9 +101,10 @@ test("J1 verification contract freezes exact step requirements before execution 
       }
     ]);
 
-    const restarted = await new FileVerificationContractStore(contractDirectory).load(
-      "j1-completion-001"
-    );
+    const restarted = await new FileVerificationContractStore(
+      contractDirectory,
+      journal
+    ).load("j1-completion-001");
     assert.deepEqual(restarted, frozen);
     const durable = await journal.load("j1-completion-001");
     assert.equal(durable?.revision, 0);
@@ -115,7 +116,7 @@ test("J1 verification contract cannot omit a CRITICAL property or invent a prope
   await withDirectories(async (journalDirectory, contractDirectory) => {
     const journal = new FileExecutionJournal(journalDirectory);
     const initial = await journal.initialize(plan());
-    const store = new FileVerificationContractStore(contractDirectory);
+    const store = new FileVerificationContractStore(contractDirectory, journal);
 
     await assert.rejects(
       () =>
@@ -153,7 +154,7 @@ test("J1 verification contract cannot be weakened under the same execution ident
   await withDirectories(async (journalDirectory, contractDirectory) => {
     const journal = new FileExecutionJournal(journalDirectory);
     const initial = await journal.initialize(plan());
-    const store = new FileVerificationContractStore(contractDirectory);
+    const store = new FileVerificationContractStore(contractDirectory, journal);
     await store.initialize(initial, contract());
 
     await assert.rejects(
@@ -185,7 +186,7 @@ test("J1 verification contract cannot first appear after execution has crossed t
 
     await assert.rejects(
       () =>
-        new FileVerificationContractStore(contractDirectory).initialize(
+        new FileVerificationContractStore(contractDirectory, journal).initialize(
           running,
           contract(running.definition)
         ),
@@ -194,11 +195,34 @@ test("J1 verification contract cannot first appear after execution has crossed t
   });
 });
 
+test("J1 verification contract rejects a stale pristine snapshot after the durable write-ahead barrier", async () => {
+  await withDirectories(async (journalDirectory, contractDirectory) => {
+    const journal = new FileExecutionJournal(journalDirectory);
+    const stalePristine = await journal.initialize(plan());
+    const store = new FileVerificationContractStore(contractDirectory, journal);
+
+    await new ExecutionLifecycle(journal).prepareEffect(
+      "j1-completion-001",
+      "create-marker"
+    );
+
+    await assert.rejects(
+      () => store.initialize(stalePristine, contract(stalePristine.definition)),
+      (error: unknown) => {
+        assert.ok(error instanceof VerificationContractInvariantError);
+        assert.match(error.message, /current durable execution snapshot/);
+        return true;
+      }
+    );
+    assert.equal(await store.load("j1-completion-001"), null);
+  });
+});
+
 test("J1 completion requires the latest linked verdict for every frozen property to be VERIFIED", async () => {
   await withDirectories(async (journalDirectory, contractDirectory) => {
     const journal = new FileExecutionJournal(journalDirectory);
     const initial = await journal.initialize(plan());
-    const store = new FileVerificationContractStore(contractDirectory);
+    const store = new FileVerificationContractStore(contractDirectory, journal);
     await store.initialize(initial, contract());
     await recordAppliedEffect(journal);
 
@@ -256,7 +280,7 @@ test("J1 completion fails when a later linked observation invalidates an earlier
   await withDirectories(async (journalDirectory, contractDirectory) => {
     const journal = new FileExecutionJournal(journalDirectory);
     const initial = await journal.initialize(plan());
-    const store = new FileVerificationContractStore(contractDirectory);
+    const store = new FileVerificationContractStore(contractDirectory, journal);
     await store.initialize(initial, contract());
     await recordAppliedEffect(journal);
 
@@ -307,7 +331,7 @@ test("J1 completion works after restart from only durable journal and verificati
   await withDirectories(async (journalDirectory, contractDirectory) => {
     const journal = new FileExecutionJournal(journalDirectory);
     const initial = await journal.initialize(plan());
-    await new FileVerificationContractStore(contractDirectory).initialize(
+    await new FileVerificationContractStore(contractDirectory, journal).initialize(
       initial,
       contract()
     );
@@ -326,9 +350,10 @@ test("J1 completion works after restart from only durable journal and verificati
       });
     }
 
+    const restartedJournal = new FileExecutionJournal(journalDirectory);
     const restartedCompletion = new VerificationCompletionLifecycle(
-      new FileExecutionJournal(journalDirectory),
-      new FileVerificationContractStore(contractDirectory)
+      restartedJournal,
+      new FileVerificationContractStore(contractDirectory, restartedJournal)
     );
     const completed = await restartedCompletion.markStepVerified(
       "j1-completion-001",
