@@ -215,7 +215,7 @@ P1 has passed its integrated completion review; no committed P1 work remains.
 
 `src/operations/registry.ts` centralizes required capability, product metadata and risk annotations used by authorization, help, MCP contract checks and submission preparation.
 
-Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, target document when safely available, item count where meaningful, status and duration. Audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
+Every operation passing through `AuthorizedGristService` emits a structured JSON audit event including request ID, principal, transport, operation, capability, target document where present, item count where meaningful, status and duration. Audit events do **not** contain bearer tokens, Grist credentials or full cell contents.
 
 ## Credential boundary
 
