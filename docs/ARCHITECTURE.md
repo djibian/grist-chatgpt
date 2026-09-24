@@ -244,7 +244,7 @@ Its core rules are:
 - authorization/mandate re-check before effectful work and resumed work;
 - cumulative per-plan budgets, not only per-call limits;
 - durable write-ahead effect journal before dispatch;
-- explicit `NOT_APPLIED` / `CONFIRMED` / `UNCERTAIN` effect knowledge;
+- explicit `NOT_APPLIED` / `PARTIALLY_APPLIED` / `APPLIED` / `UNCERTAIN` / `COMPENSATED` effect knowledge;
 - preservation of confirmed stable identifiers/results;
 - no blind replay after uncertain or partial effects;
 - declared concurrency protection, isolation or refusal rather than a false guarantee;
@@ -353,8 +353,8 @@ C4 -> C5 -> C6            P0-P4 DONE
 - C4 remains eligible production OAuth operating evidence.
 - C5 remains blocked by C4 plus human persistence/encryption/key-management decisions.
 - C6 remains blocked by C4/C5 for finalization.
-- J0 is the finite next product-runtime tranche after roadmap reconciliation.
-- J1-J6 remain dependency-gated and do not become eligible early.
+- J0 has passed its integrated completion review and is DONE.
+- J1 is the current finite ELIGIBLE product-runtime tranche; J2-J6 remain dependency-gated.
 - S0/S1/C7/C8 remain a separate public-distribution path.
 
 ## Architectural invariant
