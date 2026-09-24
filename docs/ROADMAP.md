@@ -512,16 +512,18 @@ Integrated J1 foundation:
 
 1. **immutable execution/plan/contract identity** — PR #130, integrated on exact `main` `54f742ccd97bb0c53994d4d4b36414a0616c40d1`;
 2. **`ExecutionJournal` abstraction plus one durable controlled-environment implementation** — PR #130, including restart persistence, bounded contractual state vocabulary, same-process CAS protection and explicit one-writer-process filesystem limitation;
-3. **write-ahead step lifecycle and restart uncertainty** — PR #133, independently reviewed and integrated on exact `main` `8568a8cbca55d0da7b15dcca5c4e48c65fb57c68`, including immutable bounded effect-intent identity, durable `RUNNING` preparation before any dispatch, retained confirmed effect evidence and pessimistic `UNCERTAIN` + `SUSPENDED` restart semantics without blind replay.
+3. **write-ahead step lifecycle and restart uncertainty** — PR #133, independently reviewed and integrated on exact `main` `8568a8cbca55d0da7b15dcca5c4e48c65fb57c68`, including immutable bounded effect-intent identity, durable `RUNNING` preparation before any dispatch, retained confirmed effect evidence and pessimistic `UNCERTAIN` + `SUSPENDED` restart semantics without blind replay;
+4. **cumulative per-plan budget enforcement** — PR #135, integrated before exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, with durable reservation/consumption accounting and refusal before dispatch when the plan budget would be exceeded;
+5. **durable contextual property evidence** — PR #136, integrated before exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, with immutable step/property linkage and append-only evidence revisions;
+6. **point-in-time current-authority gate** — PR #137, integrated on exact `main` `aaea89f08d1a58d6d81e9fdd6ef2e9c451e1b359`, with principal/mandate/target/capability re-resolution and no cached positive authorization;
+7. **verification requirements and safe completion transition** — PR #138, independently reviewed and integrated before exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, freezing bounded verification criteria before execution and requiring latest `VERIFIED` evidence for every required property;
+8. **capability-specific deterministic `update_records` recovery** — PR #139, independently reviewed and integrated before exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, distinguishing frozen before/after states, safe explicit retry and fail-closed suspension on ambiguity;
+9. **bounded synthetic `update_records` effect boundary** — PR #140, independently reviewed and integrated on exact `main` `6d42b731415f25ce1d67a2c61cc7c2931aae97dd`, enforcing fresh isolated-state precondition observation, current authority, durable budget/write-ahead preparation and pessimistic response-loss handling before any recovery decision.
 
 Committed remaining J1 work:
 
-1. cumulative per-plan budget enforcement;
-2. authorization re-check before resumed/new effects;
-3. executable contextual property-evidence transitions;
-4. capability-specific recovery/suspension and convergence rules required by the first scenario;
-5. one deterministic synthetic transformation with crash/fault injection at the specified boundaries;
-6. integrated J1 completion review.
+1. one deterministic synthetic transformation exercising the integrated pieces end-to-end with crash/fault injection at the specified boundaries, including convergence/no-duplicate-effect evidence where supported and durable suspension where ambiguity cannot be resolved safely;
+2. integrated J1 completion review.
 
 J1 exit criteria are the complete criteria in `docs/EXECUTION-ENGINE-J0-J1.md`: persistent write-ahead execution, cumulative budgets, authority re-check, multidimensional effect knowledge, retained partial results, uncertainty after crash, capability-specific recovery, suspension on unsafe ambiguity, durable contextual evidence, convergence without duplicate effect where supported, and no new generic Grist escape hatch.
 
