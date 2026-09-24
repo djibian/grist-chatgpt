@@ -1,6 +1,6 @@
 # J2 stage-tracking fixture provisioning evidence
 
-Status: **PARTIAL J2-B evidence — structural/data/UI fixture provisioned; AccessModel/LinkKey binding not yet proven.**
+Status: **PARTIAL J2-B evidence — date-present structural/data/UI fixture provisioned; AccessModel/LinkKey binding not yet proven.**
 
 Date: 2026-09-24  
 Repository baseline: `main` `4571a700eba03ac318eda57a5f0c07c28900f4a2`
@@ -11,20 +11,22 @@ This evidence records a controlled provisioning step performed against the expli
 
 A pre-mutation semantic inspection showed the disposable document contained only the default `Table1` with three default columns and no relevant stage-tracking structure.
 
-The controlled fixture was then provisioned with the minimum currently reachable synthetic structure needed for the committed J2 scenario:
+The controlled fixture was provisioned with the minimum currently reachable synthetic structure for the committed `date-present-human-modified` starting state:
 
 - `Enseignants` table with stable synthetic fixture IDs, fictional names, `Token_Stages`, and `Acces_Stages_Actif`;
-- `Stages` table with stable synthetic fixture IDs, a fictional student label, `Suivi_par -> Enseignants`, the follow-up fields `Type_de_contact`, `Date_du_contact`, `Ponctuel`, `Implication`, `Commentaire`, and `Auteur_du_contact -> Enseignants`;
+- `Stages` table with stable synthetic fixture IDs, a fictional student label, `Suivi_par -> Enseignants`, and the follow-up fields `Type_de_contact`, `Date_du_contact`, `Ponctuel`, `Implication`, `Commentaire`;
 - fictional teacher A and teacher B rows only;
-- fictional stage A assigned to teacher A with the committed human-modified synthetic follow-up values and no fabricated historical author;
+- fictional stage A assigned to teacher A with the committed human-modified synthetic follow-up values;
 - fictional stage B assigned to teacher B with an empty trace;
 - a `Suivi des stages` page backed by `Stages`, with a record widget and a selected single-record follow-up widget.
 
-A post-provisioning semantic inspection verified:
+During the controlled run, an `Auteur_du_contact -> Enseignants` column was initially added too early. Re-checking the independent fixture oracle showed that `date-present-human-modified` requires `historicalAuthorBindingPresent: false`; the synthetic column was empty and was therefore explicitly removed before this evidence was finalized. This correction is important: J2-D must demonstrate addition/reconciliation of the historical-author binding rather than receiving it pre-provisioned.
+
+Post-correction inspection/reads verified:
 
 - `Stages.Suivi_par` resolves as `Ref:Enseignants`;
-- `Stages.Auteur_du_contact` resolves as `Ref:Enseignants`;
 - `Date_du_contact` exists as a real `Date` column;
+- no historical contact-author binding is pre-provisioned in this starting state;
 - the `Suivi des stages` page exists;
 - both page widgets are backed by `Stages`;
 - the single-record widget is directly selected by the stage-list widget;
@@ -61,8 +63,8 @@ Until those items are evidenced, access-related bindings remain `UNKNOWN`; owner
 | --- | --- |
 | `Stage.table` | PROVISIONED |
 | `Stage.currentTeacherRelation` | PROVISIONED (`Suivi_par`) |
-| `Stage.followUpFields` | PROVISIONED |
-| `Stage.historicalContactAuthorBinding` | PROVISIONED structurally (`Auteur_du_contact`), behavioral semantics unverified |
+| `Stage.followUpFields` | PROVISIONED for the date-present starting state |
+| `Stage.historicalContactAuthorBinding` | ABSENT BY DESIGN in this starting state; J2-D target |
 | `Teacher.table` | PROVISIONED |
 | `Teacher.linkKeyAttribute` | PLACEHOLDER ONLY; no secret key injected |
 | `AccessModel.stageProtection` | UNKNOWN |
