@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -131,6 +131,26 @@ test("J1 journal treats execution contract and plan definition as immutable", as
   });
 });
 
+test("J1 journal snapshots the immutable definition before the first asynchronous boundary", async () => {
+  await withJournalDirectory(async (directory) => {
+    const journal = new FileExecutionJournal(directory);
+    const definition = plan();
+
+    const initializing = journal.initialize(definition);
+    definition.identity.planVersion = "caller-mutated-plan";
+    definition.steps[0]!.operation = "caller_mutated_operation";
+
+    const created = await initializing;
+    assert.equal(created.definition.identity.planVersion, "plan-v1");
+    assert.equal(created.definition.steps[0]?.operation, "inspect_document");
+
+    const restarted = new FileExecutionJournal(directory);
+    const persisted = await restarted.load("j1-execution-001");
+    assert.equal(persisted?.definition.identity.planVersion, "plan-v1");
+    assert.equal(persisted?.definition.steps[0]?.operation, "inspect_document");
+  });
+});
+
 test("J1 journal rejects non-canonical execution IDs before they can alias a journal path", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
@@ -146,6 +166,23 @@ test("J1 journal rejects non-canonical execution IDs before they can alias a jou
       /canonical identifier without surrounding whitespace/
     );
     assert.equal(await journal.load("j1-execution-001"), null);
+  });
+});
+
+test("J1 journal supports the declared maximum execution ID without filesystem-name expansion failure", async () => {
+  await withJournalDirectory(async (directory) => {
+    const executionId = "x".repeat(200);
+    const definition = plan();
+    definition.identity.executionId = executionId;
+    const journal = new FileExecutionJournal(directory);
+
+    const created = await journal.initialize(definition);
+    assert.equal(created.definition.identity.executionId, executionId);
+    assert.deepEqual(await new FileExecutionJournal(directory).load(executionId), created);
+
+    const entries = await readdir(directory);
+    assert.equal(entries.length, 1);
+    assert.match(entries[0]!, /^[A-Za-z0-9_-]{43}\.json$/);
   });
 });
 
@@ -377,10 +414,10 @@ test("J1 journal fails closed when persisted state is corrupt, unsupported or us
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
 
-    const file = join(
-      directory,
-      `${Buffer.from("j1-execution-001", "utf8").toString("base64url")}.json`
-    );
+    const entries = await readdir(directory);
+    const journalFile = entries.find((entry) => entry.endsWith(".json"));
+    assert.ok(journalFile);
+    const file = join(directory, journalFile);
     const raw = JSON.parse(await readFile(file, "utf8")) as {
       status: string;
       steps: Array<{ effectState: string }>;
