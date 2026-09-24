@@ -1,6 +1,7 @@
 import {
   ExecutionJournalNotFoundError,
   type ConfirmedEffectEvidence,
+  type EffectIntentIdentity,
   type ExecutionEffectState,
   type ExecutionJournal,
   type ExecutionJournalMutableState,
@@ -69,6 +70,13 @@ function cloneConfirmedEffect(
   };
 }
 
+function cloneEffectIntent(identity: EffectIntentIdentity): EffectIntentIdentity {
+  return {
+    intentId: identity.intentId,
+    fingerprint: identity.fingerprint
+  };
+}
+
 function hasConfirmedEffect(evidence: ConfirmedEffectEvidence): boolean {
   return evidence.confirmedItems > 0 || evidence.stableIds.length > 0;
 }
@@ -77,16 +85,18 @@ function hasConfirmedEffect(evidence: ConfirmedEffectEvidence): boolean {
  * Small J1 lifecycle layer above the durable journal.
  *
  * This class deliberately does not dispatch Grist effects. prepareEffect()
- * establishes only the durable RUNNING write-ahead prerequisite. It is not a
- * dispatch authorization: a future J1 coordinator must also satisfy the frozen
- * preconditions, cumulative budget check/reservation and current authority /
- * mandate re-check before any external effect is invoked.
+ * establishes only the durable RUNNING write-ahead prerequisite, including a
+ * bounded non-secret identity for the exact effect accepted into the immutable
+ * plan. It is not a dispatch authorization: a future J1 coordinator must also
+ * satisfy the frozen preconditions, cumulative budget check/reservation and
+ * current authority / mandate re-check before any external effect is invoked.
  *
  * Recovery is intentionally pessimistic. After restart, a durable RUNNING step
  * without persisted result knowledge is converted to UNCERTAIN and the
- * execution is suspended. Later capability-specific reconciliation is a
- * separate J1 slice; this layer never guesses that the effect was absent and
- * never replays it automatically.
+ * execution is suspended. The prepared effect identity is retained so later
+ * capability-specific reconciliation can reason about the exact intended
+ * effect without reconstructing it from process memory. This layer never
+ * guesses that the effect was absent and never replays it automatically.
  */
 export class ExecutionLifecycle {
   constructor(private readonly journal: ExecutionJournal) {}
@@ -98,6 +108,7 @@ export class ExecutionLifecycle {
     const current = await this.loadRequired(executionId);
     const stepIndex = this.stepIndex(current, stepId);
     const step = current.steps[stepIndex]!;
+    const definitionStep = current.definition.steps[stepIndex]!;
 
     if (current.status === "SUSPENDED" || current.status === "COMPLETED") {
       throw new ExecutionStepTransitionError(
@@ -111,6 +122,16 @@ export class ExecutionLifecycle {
         executionId,
         stepId,
         `expected PENDING, found ${step.status}.`
+      );
+    }
+    if (definitionStep.effectIntent === undefined) {
+      throw new ExecutionLifecycleInvariantError(
+        `Effectful step "${stepId}" has no immutable effect intent identity.`
+      );
+    }
+    if (step.preparedEffect !== undefined) {
+      throw new ExecutionLifecycleInvariantError(
+        `Pending step "${stepId}" already contains a prepared effect identity.`
       );
     }
     if (step.effectState !== "NOT_APPLIED" || hasConfirmedEffect(step.confirmedEffect)) {
@@ -149,7 +170,8 @@ export class ExecutionLifecycle {
             status: "RUNNING",
             effectState: "NOT_APPLIED",
             confirmedEffect: emptyConfirmedEffect(),
-            verificationEvidenceIds: []
+            verificationEvidenceIds: [],
+            preparedEffect: cloneEffectIntent(definitionStep.effectIntent!)
           }
         : candidate
     );
@@ -171,6 +193,11 @@ export class ExecutionLifecycle {
         executionId,
         stepId,
         `effect knowledge may only be recorded from RUNNING, found ${step.status}.`
+      );
+    }
+    if (step.preparedEffect === undefined) {
+      throw new ExecutionLifecycleInvariantError(
+        `RUNNING step "${stepId}" has no durable prepared effect identity.`
       );
     }
 
