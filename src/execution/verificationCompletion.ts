@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { mkdir, open, readFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { link, mkdir, open, readFile, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import {
@@ -214,7 +214,16 @@ function parseContract(
     );
   }
   const definition = parsed as ExecutionVerificationContractDefinition;
-  boundedId(definition.identity?.executionId, "verification identity executionId");
+  if (
+    definition.identity === null ||
+    typeof definition.identity !== "object" ||
+    Array.isArray(definition.identity)
+  ) {
+    throw new VerificationContractInvariantError(
+      `Verification contract for execution "${executionId}" is corrupt.`
+    );
+  }
+  boundedId(definition.identity.executionId, "verification identity executionId");
   if (definition.identity.executionId !== executionId || !Array.isArray(definition.steps)) {
     throw new VerificationContractInvariantError(
       `Verification contract for execution "${executionId}" is corrupt.`
@@ -263,30 +272,37 @@ export class FileVerificationContractStore implements VerificationContractStore 
       return clone(existing);
     }
 
-    const path = this.contractPath(execution.definition.identity.executionId);
+    const executionId = execution.definition.identity.executionId;
+    const path = this.contractPath(executionId);
+    const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    const handle = await open(tempPath, "wx", 0o600);
     try {
-      const handle = await open(path, "wx", 0o600);
-      try {
-        await handle.writeFile(`${JSON.stringify(frozen, null, 2)}\n`, "utf8");
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
-      const directoryHandle = await open(this.directory, "r");
-      try {
-        await directoryHandle.sync();
-      } finally {
-        await directoryHandle.close();
-      }
-      return clone(frozen);
+      await handle.writeFile(`${JSON.stringify(frozen, null, 2)}\n`, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+
+    try {
+      await link(tempPath, path);
     } catch (error) {
       if (!isNodeErrorWithCode(error, "EEXIST")) throw error;
-      const concurrent = await this.load(execution.definition.identity.executionId);
+      const concurrent = await this.load(executionId);
       if (!concurrent || canonicalJson(concurrent) !== canonicalJson(frozen)) {
-        throw new VerificationContractConflictError(execution.definition.identity.executionId);
+        throw new VerificationContractConflictError(executionId);
       }
       return clone(concurrent);
+    } finally {
+      await unlink(tempPath).catch(() => undefined);
     }
+
+    const directoryHandle = await open(this.directory, "r");
+    try {
+      await directoryHandle.sync();
+    } finally {
+      await directoryHandle.close();
+    }
+    return clone(frozen);
   }
 
   async load(executionId: string): Promise<ExecutionVerificationContractDefinition | null> {
