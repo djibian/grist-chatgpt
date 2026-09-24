@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { link, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
-export type ExecutionStatus = "PLANNED" | "RUNNING" | "SUSPENDED" | "COMPLETED";
+export type ExecutionStatus = "PENDING" | "RUNNING" | "SUSPENDED" | "COMPLETED";
 export type ExecutionStepStatus =
   | "PENDING"
   | "RUNNING"
@@ -10,12 +10,17 @@ export type ExecutionStepStatus =
   | "VERIFIED"
   | "SUSPENDED";
 export type ExecutionEffectState =
-  | "NOT_DISPATCHED"
-  | "CONFIRMED"
-  | "PARTIALLY_CONFIRMED"
-  | "UNCERTAIN";
-export type PropertyCriticality = "CRITICAL" | "NON_CRITICAL";
-export type VerificationVerdict = "VERIFIED" | "FAILED" | "INCONCLUSIVE";
+  | "NOT_APPLIED"
+  | "PARTIALLY_APPLIED"
+  | "APPLIED"
+  | "UNCERTAIN"
+  | "COMPENSATED";
+export type PropertyCriticality = "CRITICAL" | "IMPORTANT" | "INFORMATIONAL";
+export type VerificationVerdict =
+  | "VERIFIED"
+  | "VIOLATED"
+  | "UNKNOWN"
+  | "NOT_APPLICABLE";
 
 export interface ExecutionIdentity {
   executionId: string;
@@ -142,7 +147,7 @@ export class ExecutionJournalCorruptError extends Error {
 }
 
 const EXECUTION_STATUSES: readonly ExecutionStatus[] = [
-  "PLANNED",
+  "PENDING",
   "RUNNING",
   "SUSPENDED",
   "COMPLETED"
@@ -155,32 +160,51 @@ const STEP_STATUSES: readonly ExecutionStepStatus[] = [
   "SUSPENDED"
 ];
 const EFFECT_STATES: readonly ExecutionEffectState[] = [
-  "NOT_DISPATCHED",
-  "CONFIRMED",
-  "PARTIALLY_CONFIRMED",
-  "UNCERTAIN"
+  "NOT_APPLIED",
+  "PARTIALLY_APPLIED",
+  "APPLIED",
+  "UNCERTAIN",
+  "COMPENSATED"
 ];
-const CRITICALITIES: readonly PropertyCriticality[] = ["CRITICAL", "NON_CRITICAL"];
+const CRITICALITIES: readonly PropertyCriticality[] = [
+  "CRITICAL",
+  "IMPORTANT",
+  "INFORMATIONAL"
+];
 const VERDICTS: readonly VerificationVerdict[] = [
   "VERIFIED",
-  "FAILED",
-  "INCONCLUSIVE"
+  "VIOLATED",
+  "UNKNOWN",
+  "NOT_APPLICABLE"
 ];
 
 const MAX_ID_LENGTH = 200;
+const MAX_TEXT_LENGTH = 1_000;
 const MAX_STEPS = 100;
+const MAX_PRECONDITIONS_PER_STEP = 100;
 const MAX_BUDGET_DIMENSIONS = 32;
 const MAX_CRITICAL_PROPERTIES = 100;
 const MAX_STATE_TOKENS_PER_STEP = 64;
+const MAX_CONFIRMED_EFFECT_IDS = 1_000;
+const MAX_EVIDENCE_PER_EXECUTION = 1_000;
+const MAX_EVIDENCE_IDS_PER_STEP = 100;
 const MAX_EVIDENCE_DEPENDENCIES = 100;
 
-function nonEmpty(value: string, label: string): string {
-  const normalized = value.trim();
-  if (!normalized) throw new Error(`${label} must not be empty.`);
-  if (normalized.length > MAX_ID_LENGTH) {
+function boundedText(value: string, label: string, maxLength = MAX_TEXT_LENGTH): string {
+  if (typeof value !== "string") throw new Error(`${label} must be a string.`);
+  if (!value.trim()) throw new Error(`${label} must not be empty.`);
+  if (value.length > maxLength) {
     throw new Error(`${label} exceeds the maximum supported length.`);
   }
-  return normalized;
+  return value;
+}
+
+function boundedId(value: string, label: string): string {
+  boundedText(value, label, MAX_ID_LENGTH);
+  if (value !== value.trim()) {
+    throw new Error(`${label} must use a canonical identifier without surrounding whitespace.`);
+  }
+  return value;
 }
 
 function assertOneOf<T extends string>(
@@ -233,32 +257,41 @@ function clone<T>(value: T): T {
 
 function validateDefinition(definition: ExecutionPlanDefinition): void {
   const identity = definition.identity;
-  nonEmpty(identity.executionId, "executionId");
-  nonEmpty(identity.executionContractVersion, "executionContractVersion");
-  nonEmpty(identity.planId, "planId");
-  nonEmpty(identity.planVersion, "planVersion");
+  boundedId(identity.executionId, "executionId");
+  boundedId(identity.executionContractVersion, "executionContractVersion");
+  boundedId(identity.planId, "planId");
+  boundedId(identity.planVersion, "planVersion");
   if (identity.applicationId !== undefined) {
-    nonEmpty(identity.applicationId, "applicationId");
+    boundedId(identity.applicationId, "applicationId");
   }
-  nonEmpty(identity.target, "target");
-  nonEmpty(identity.principalId, "principalId");
-  nonEmpty(identity.mandateVersion, "mandateVersion");
+  boundedText(identity.target, "target", MAX_ID_LENGTH);
+  boundedId(identity.principalId, "principalId");
+  boundedId(identity.mandateVersion, "mandateVersion");
 
   if (definition.steps.length < 1 || definition.steps.length > MAX_STEPS) {
     throw new Error(`Plan must contain between 1 and ${MAX_STEPS} steps.`);
   }
+
   const stepIds = new Set<string>();
   for (const [index, step] of definition.steps.entries()) {
-    const stepId = nonEmpty(step.stepId, `steps[${index}].stepId`);
+    const stepId = boundedId(step.stepId, `steps[${index}].stepId`);
     if (stepIds.has(stepId)) throw new Error(`Duplicate stepId "${stepId}".`);
     stepIds.add(stepId);
     if (step.order !== index + 1) {
       throw new Error("Step order must be contiguous, deterministic and start at 1.");
     }
-    nonEmpty(step.operation, `steps[${index}].operation`);
-    nonEmpty(step.capability, `steps[${index}].capability`);
+    boundedId(step.operation, `steps[${index}].operation`);
+    boundedId(step.capability, `steps[${index}].capability`);
+    if (step.preconditions.length > MAX_PRECONDITIONS_PER_STEP) {
+      throw new Error(
+        `steps[${index}].preconditions exceeds ${MAX_PRECONDITIONS_PER_STEP} entries.`
+      );
+    }
     for (const [preconditionIndex, precondition] of step.preconditions.entries()) {
-      nonEmpty(precondition, `steps[${index}].preconditions[${preconditionIndex}]`);
+      boundedText(
+        precondition,
+        `steps[${index}].preconditions[${preconditionIndex}]`
+      );
     }
     const stateTokens = Object.entries(step.expectedStateTokens);
     if (stateTokens.length > MAX_STATE_TOKENS_PER_STEP) {
@@ -267,8 +300,8 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
       );
     }
     for (const [key, value] of stateTokens) {
-      nonEmpty(key, `steps[${index}].expectedStateTokens key`);
-      nonEmpty(value, `steps[${index}].expectedStateTokens.${key}`);
+      boundedId(key, `steps[${index}].expectedStateTokens key`);
+      boundedText(value, `steps[${index}].expectedStateTokens.${key}`);
     }
   }
 
@@ -277,7 +310,7 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
     throw new Error(`budgetLimits exceeds ${MAX_BUDGET_DIMENSIONS} dimensions.`);
   }
   for (const [dimension, limit] of budgetEntries) {
-    nonEmpty(dimension, "budget dimension");
+    boundedId(dimension, "budget dimension");
     positiveInteger(limit, `budgetLimits.${dimension}`);
   }
 
@@ -288,7 +321,7 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
   }
   const propertyIds = new Set<string>();
   for (const property of definition.criticalProperties) {
-    const propertyId = nonEmpty(property.propertyId, "propertyId");
+    const propertyId = boundedId(property.propertyId, "propertyId");
     assertOneOf(property.criticality, CRITICALITIES, `criticality for ${propertyId}`);
     if (propertyIds.has(propertyId)) {
       throw new Error(`Duplicate critical property "${propertyId}".`);
@@ -299,11 +332,11 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
 
 function initialState(definition: ExecutionPlanDefinition): ExecutionJournalMutableState {
   return {
-    status: "PLANNED",
+    status: "PENDING",
     steps: definition.steps.map((step) => ({
       stepId: step.stepId,
       status: "PENDING",
-      effectState: "NOT_DISPATCHED",
+      effectState: "NOT_APPLIED",
       confirmedEffect: {
         stableIds: [],
         confirmedItems: 0
@@ -328,6 +361,7 @@ function validateMutableState(
   if (state.steps.length !== definition.steps.length) {
     throw new Error("Journal step state must match the immutable plan step set exactly.");
   }
+
   for (const [index, stepState] of state.steps.entries()) {
     const definitionStep = definition.steps[index]!;
     if (stepState.stepId !== definitionStep.stepId) {
@@ -339,18 +373,39 @@ function validateMutableState(
       stepState.confirmedEffect.confirmedItems,
       `steps[${index}].confirmedEffect.confirmedItems`
     );
+    if (stepState.confirmedEffect.stableIds.length > MAX_CONFIRMED_EFFECT_IDS) {
+      throw new Error(
+        `steps[${index}].confirmedEffect.stableIds exceeds ${MAX_CONFIRMED_EFFECT_IDS} entries.`
+      );
+    }
+    const stableIds = new Set<string>();
     for (const stableId of stepState.confirmedEffect.stableIds) {
-      if (
-        !(
-          (typeof stableId === "string" && stableId.trim().length > 0) ||
-          (typeof stableId === "number" && Number.isSafeInteger(stableId) && stableId > 0)
-        )
-      ) {
+      let stableIdKey: string;
+      if (typeof stableId === "string") {
+        boundedId(stableId, `steps[${index}].confirmedEffect.stableIds`);
+        stableIdKey = `s:${stableId}`;
+      } else if (typeof stableId === "number" && Number.isSafeInteger(stableId) && stableId > 0) {
+        stableIdKey = `n:${stableId}`;
+      } else {
         throw new Error(`steps[${index}] contains an invalid stable effect ID.`);
       }
+      if (stableIds.has(stableIdKey)) {
+        throw new Error(`steps[${index}] contains a duplicate stable effect ID.`);
+      }
+      stableIds.add(stableIdKey);
     }
+    if (stepState.verificationEvidenceIds.length > MAX_EVIDENCE_IDS_PER_STEP) {
+      throw new Error(
+        `steps[${index}].verificationEvidenceIds exceeds ${MAX_EVIDENCE_IDS_PER_STEP} entries.`
+      );
+    }
+    const stepEvidenceIds = new Set<string>();
     for (const evidenceId of stepState.verificationEvidenceIds) {
-      nonEmpty(evidenceId, `steps[${index}].verificationEvidenceIds`);
+      boundedId(evidenceId, `steps[${index}].verificationEvidenceIds`);
+      if (stepEvidenceIds.has(evidenceId)) {
+        throw new Error(`steps[${index}] contains a duplicate verification evidence ID.`);
+      }
+      stepEvidenceIds.add(evidenceId);
     }
   }
 
@@ -365,16 +420,22 @@ function validateMutableState(
     nonNegativeInteger(usage.consumed, `budgets.${dimension}.consumed`);
   }
 
+  if (state.verificationEvidence.length > MAX_EVIDENCE_PER_EXECUTION) {
+    throw new Error(
+      `verificationEvidence exceeds ${MAX_EVIDENCE_PER_EXECUTION} entries.`
+    );
+  }
   const propertyDefinitions = new Map(
     definition.criticalProperties.map((property) => [property.propertyId, property])
   );
   const evidenceIds = new Set<string>();
   for (const evidence of state.verificationEvidence) {
-    const evidenceId = nonEmpty(evidence.evidenceId, "evidenceId");
+    const evidenceId = boundedId(evidence.evidenceId, "evidenceId");
     if (evidenceIds.has(evidenceId)) {
       throw new Error(`Duplicate verification evidence ID "${evidenceId}".`);
     }
     evidenceIds.add(evidenceId);
+    boundedId(evidence.propertyId, `verificationEvidence.${evidenceId}.propertyId`);
     assertOneOf(evidence.criticality, CRITICALITIES, `criticality for ${evidenceId}`);
     assertOneOf(evidence.verdict, VERDICTS, `verdict for ${evidenceId}`);
     const property = propertyDefinitions.get(evidence.propertyId);
@@ -392,12 +453,12 @@ function validateMutableState(
         `Verification evidence "${evidenceId}" does not match immutable execution identity.`
       );
     }
-    nonEmpty(evidence.method, `verificationEvidence.${evidenceId}.method`);
+    boundedText(evidence.method, `verificationEvidence.${evidenceId}.method`);
     if (!Number.isFinite(Date.parse(evidence.timestamp))) {
       throw new Error(`Verification evidence "${evidenceId}" has an invalid timestamp.`);
     }
     if (evidence.targetStateToken !== undefined) {
-      nonEmpty(
+      boundedText(
         evidence.targetStateToken,
         `verificationEvidence.${evidenceId}.targetStateToken`
       );
@@ -408,7 +469,7 @@ function validateMutableState(
       );
     }
     for (const dependency of evidence.dependencies) {
-      nonEmpty(dependency, `verificationEvidence.${evidenceId}.dependencies`);
+      boundedText(dependency, `verificationEvidence.${evidenceId}.dependencies`);
     }
   }
 
@@ -433,6 +494,7 @@ function parseRecord(executionId: string, serialized: string): ExecutionJournalR
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new ExecutionJournalCorruptError(executionId);
   }
+
   const record = value as ExecutionJournalRecord;
   try {
     validateDefinition(record.definition);
@@ -462,22 +524,23 @@ export interface FileExecutionJournalOptions {
   now?: () => Date;
 }
 
+const PROCESS_WRITE_CHAINS = new Map<string, Promise<unknown>>();
+
 /**
  * Durable journal for the isolated J1 controlled environment.
  *
  * Records are written as one JSON file per execution. File contents are fsync'd
- * before an atomic publish/replace. The implementation serializes mutations
- * within one process and assumes that process is the sole writer for the
+ * before an atomic publish/replace. Mutations are serialized per resolved
+ * directory/execution across FileExecutionJournal instances in this process.
+ * The implementation therefore assumes this process is the sole writer for the
  * directory; it is not a distributed lock or production multi-writer store.
  */
 export class FileExecutionJournal implements ExecutionJournal {
+  private readonly directory: string;
   private readonly now: () => Date;
-  private readonly writeChains = new Map<string, Promise<unknown>>();
 
-  constructor(
-    private readonly directory: string,
-    options: FileExecutionJournalOptions = {}
-  ) {
+  constructor(directory: string, options: FileExecutionJournalOptions = {}) {
+    this.directory = resolve(directory);
     this.now = options.now ?? (() => new Date());
   }
 
@@ -524,7 +587,7 @@ export class FileExecutionJournal implements ExecutionJournal {
   }
 
   async load(executionId: string): Promise<ExecutionJournalRecord | null> {
-    nonEmpty(executionId, "executionId");
+    boundedId(executionId, "executionId");
     try {
       const serialized = await readFile(this.recordPath(executionId), "utf8");
       return clone(parseRecord(executionId, serialized));
@@ -539,7 +602,7 @@ export class FileExecutionJournal implements ExecutionJournal {
     expectedRevision: number,
     nextState: ExecutionJournalMutableState
   ): Promise<ExecutionJournalRecord> {
-    nonEmpty(executionId, "executionId");
+    boundedId(executionId, "executionId");
     nonNegativeInteger(expectedRevision, "expectedRevision");
     return this.serializeWrite(executionId, async () => {
       const current = await this.load(executionId);
@@ -573,20 +636,20 @@ export class FileExecutionJournal implements ExecutionJournal {
   }
 
   private serializeWrite<T>(executionId: string, operation: () => Promise<T>): Promise<T> {
-    const previous = this.writeChains.get(executionId) ?? Promise.resolve();
+    const key = `${this.directory}\u0000${executionId}`;
+    const previous = PROCESS_WRITE_CHAINS.get(key) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
-    this.writeChains.set(executionId, current);
+    PROCESS_WRITE_CHAINS.set(key, current);
     return current.finally(() => {
-      if (this.writeChains.get(executionId) === current) {
-        this.writeChains.delete(executionId);
+      if (PROCESS_WRITE_CHAINS.get(key) === current) {
+        PROCESS_WRITE_CHAINS.delete(key);
       }
     });
   }
 
   private recordPath(executionId: string): string {
-    const encoded = Buffer.from(nonEmpty(executionId, "executionId"), "utf8").toString(
-      "base64url"
-    );
+    const validated = boundedId(executionId, "executionId");
+    const encoded = Buffer.from(validated, "utf8").toString("base64url");
     return join(this.directory, `${encoded}.json`);
   }
 

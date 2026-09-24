@@ -75,7 +75,7 @@ async function withJournalDirectory(
   }
 }
 
-test("J1 journal persists immutable execution identity and initial state across re-instantiation", async () => {
+test("J1 journal persists immutable execution identity and contractual initial vocabulary across restart", async () => {
   await withJournalDirectory(async (directory) => {
     const now = new Date("2026-09-24T08:30:00.000Z");
     const journal = new FileExecutionJournal(directory, { now: () => now });
@@ -83,7 +83,7 @@ test("J1 journal persists immutable execution identity and initial state across 
 
     const created = await journal.initialize(definition);
     assert.equal(created.revision, 0);
-    assert.equal(created.status, "PLANNED");
+    assert.equal(created.status, "PENDING");
     assert.equal(created.definition.identity.executionId, "j1-execution-001");
     assert.equal(created.definition.identity.planVersion, "plan-v1");
     assert.equal(created.steps.length, 2);
@@ -94,8 +94,8 @@ test("J1 journal persists immutable execution identity and initial state across 
         effectState
       })),
       [
-        { stepId: "inspect", status: "PENDING", effectState: "NOT_DISPATCHED" },
-        { stepId: "create", status: "PENDING", effectState: "NOT_DISPATCHED" }
+        { stepId: "inspect", status: "PENDING", effectState: "NOT_APPLIED" },
+        { stepId: "create", status: "PENDING", effectState: "NOT_APPLIED" }
       ]
     );
     assert.deepEqual(created.budgets, {
@@ -131,7 +131,25 @@ test("J1 journal treats execution contract and plan definition as immutable", as
   });
 });
 
-test("J1 journal serializes same-process compare-and-set updates and rejects the stale revision", async () => {
+test("J1 journal rejects non-canonical execution IDs before they can alias a journal path", async () => {
+  await withJournalDirectory(async (directory) => {
+    const journal = new FileExecutionJournal(directory);
+    const definition = plan();
+    definition.identity.executionId = " j1-execution-001 ";
+
+    await assert.rejects(
+      () => journal.initialize(definition),
+      /canonical identifier without surrounding whitespace/
+    );
+    await assert.rejects(
+      () => journal.load(" j1-execution-001 "),
+      /canonical identifier without surrounding whitespace/
+    );
+    assert.equal(await journal.load("j1-execution-001"), null);
+  });
+});
+
+test("J1 journal serializes same-instance compare-and-set updates and rejects the stale revision", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     const initial = await journal.initialize(plan());
@@ -160,6 +178,36 @@ test("J1 journal serializes same-process compare-and-set updates and rejects the
     assert.ok(rejected[0]!.reason instanceof ExecutionJournalRevisionError);
     assert.equal(rejected[0]!.reason.expectedRevision, 0);
     assert.equal(rejected[0]!.reason.actualRevision, 1);
+  });
+});
+
+test("J1 journal serializes compare-and-set across journal instances in the same writer process", async () => {
+  await withJournalDirectory(async (directory) => {
+    const first = new FileExecutionJournal(directory);
+    const second = new FileExecutionJournal(directory);
+    const initial = await first.initialize(plan());
+
+    const running = mutableState(initial);
+    running.status = "RUNNING";
+    const suspended = mutableState(initial);
+    suspended.status = "SUSPENDED";
+
+    const results = await Promise.allSettled([
+      first.compareAndSet("j1-execution-001", 0, running),
+      second.compareAndSet("j1-execution-001", 0, suspended)
+    ]);
+
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<ExecutionJournalRecord> =>
+        result.status === "fulfilled"
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    );
+
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.ok(rejected[0]!.reason instanceof ExecutionJournalRevisionError);
 
     const restarted = new FileExecutionJournal(directory);
     const persisted = await restarted.load("j1-execution-001");
@@ -195,15 +243,23 @@ test("J1 journal rejects mutable state that changes immutable step or budget dim
   });
 });
 
-test("J1 journal validates contextual verification evidence against immutable identity", async () => {
+test("J1 journal persists the final contextual evidence vocabulary and validates immutable identity", async () => {
   await withJournalDirectory(async (directory) => {
+    const definition = plan({
+      criticalProperties: [
+        { propertyId: "marker-created-once", criticality: "CRITICAL" },
+        { propertyId: "marker-observed", criticality: "IMPORTANT" },
+        { propertyId: "trace-only", criticality: "INFORMATIONAL" },
+        { propertyId: "negative-example", criticality: "CRITICAL" }
+      ]
+    });
     const journal = new FileExecutionJournal(directory);
-    const initial = await journal.initialize(plan());
+    const initial = await journal.initialize(definition);
     const next = mutableState(initial);
     next.status = "RUNNING";
     next.verificationEvidence = [
       {
-        evidenceId: "evidence-1",
+        evidenceId: "evidence-verified",
         propertyId: "marker-created-once",
         criticality: "CRITICAL",
         verdict: "VERIFIED",
@@ -214,19 +270,70 @@ test("J1 journal validates contextual verification evidence against immutable id
         timestamp: "2026-09-24T08:31:00.000Z",
         targetStateToken: "fixture-v2",
         dependencies: ["step:create"]
+      },
+      {
+        evidenceId: "evidence-unknown",
+        propertyId: "marker-observed",
+        criticality: "IMPORTANT",
+        verdict: "UNKNOWN",
+        executionId: "j1-execution-001",
+        planVersion: "plan-v1",
+        principalId: "principal-j1",
+        method: "bounded observation",
+        timestamp: "2026-09-24T08:31:01.000Z",
+        dependencies: ["step:inspect"]
+      },
+      {
+        evidenceId: "evidence-na",
+        propertyId: "trace-only",
+        criticality: "INFORMATIONAL",
+        verdict: "NOT_APPLICABLE",
+        executionId: "j1-execution-001",
+        planVersion: "plan-v1",
+        principalId: "principal-j1",
+        method: "scenario classification",
+        timestamp: "2026-09-24T08:31:02.000Z",
+        dependencies: []
+      },
+      {
+        evidenceId: "evidence-violated",
+        propertyId: "negative-example",
+        criticality: "CRITICAL",
+        verdict: "VIOLATED",
+        executionId: "j1-execution-001",
+        planVersion: "plan-v1",
+        principalId: "principal-j1",
+        method: "negative fixture check",
+        timestamp: "2026-09-24T08:31:03.000Z",
+        dependencies: ["step:create"]
       }
     ];
     next.steps = [
       next.steps[0]!,
-      { ...next.steps[1]!, verificationEvidenceIds: ["evidence-1"] }
+      {
+        ...next.steps[1]!,
+        verificationEvidenceIds: ["evidence-verified", "evidence-violated"]
+      }
     ];
 
     const saved = await journal.compareAndSet("j1-execution-001", 0, next);
-    assert.equal(saved.verificationEvidence[0]?.propertyId, "marker-created-once");
+    assert.deepEqual(
+      saved.verificationEvidence.map(({ criticality, verdict }) => ({
+        criticality,
+        verdict
+      })),
+      [
+        { criticality: "CRITICAL", verdict: "VERIFIED" },
+        { criticality: "IMPORTANT", verdict: "UNKNOWN" },
+        { criticality: "INFORMATIONAL", verdict: "NOT_APPLICABLE" },
+        { criticality: "CRITICAL", verdict: "VIOLATED" }
+      ]
+    );
 
     const invalid = mutableState(saved);
     invalid.verificationEvidence = [
-      { ...saved.verificationEvidence[0]!, principalId: "other-principal" }
+      { ...saved.verificationEvidence[0]!, principalId: "other-principal" },
+      ...saved.verificationEvidence.slice(1)
     ];
     await assert.rejects(
       () => journal.compareAndSet("j1-execution-001", 1, invalid),
@@ -235,7 +342,37 @@ test("J1 journal validates contextual verification evidence against immutable id
   });
 });
 
-test("J1 journal fails closed when persisted state is corrupt or unsupported", async () => {
+test("J1 journal retains contractual applied and compensated effect knowledge", async () => {
+  await withJournalDirectory(async (directory) => {
+    const journal = new FileExecutionJournal(directory);
+    const initial = await journal.initialize(plan());
+    const next = mutableState(initial);
+    next.status = "RUNNING";
+    next.steps = [
+      next.steps[0]!,
+      {
+        ...next.steps[1]!,
+        status: "EFFECT_RECORDED",
+        effectState: "PARTIALLY_APPLIED",
+        confirmedEffect: { stableIds: [701, 702], confirmedItems: 2 }
+      }
+    ];
+
+    const partial = await journal.compareAndSet("j1-execution-001", 0, next);
+    assert.equal(partial.steps[1]?.effectState, "PARTIALLY_APPLIED");
+    assert.deepEqual(partial.steps[1]?.confirmedEffect.stableIds, [701, 702]);
+
+    const compensated = mutableState(partial);
+    compensated.steps = [
+      compensated.steps[0]!,
+      { ...compensated.steps[1]!, effectState: "COMPENSATED" }
+    ];
+    const saved = await journal.compareAndSet("j1-execution-001", 1, compensated);
+    assert.equal(saved.steps[1]?.effectState, "COMPENSATED");
+  });
+});
+
+test("J1 journal fails closed when persisted state is corrupt, unsupported or uses legacy vocabulary", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -244,8 +381,12 @@ test("J1 journal fails closed when persisted state is corrupt or unsupported", a
       directory,
       `${Buffer.from("j1-execution-001", "utf8").toString("base64url")}.json`
     );
-    const raw = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
-    raw.status = "TELEPORTED";
+    const raw = JSON.parse(await readFile(file, "utf8")) as {
+      status: string;
+      steps: Array<{ effectState: string }>;
+    };
+    raw.status = "PLANNED";
+    raw.steps[0]!.effectState = "CONFIRMED";
     await writeFile(file, `${JSON.stringify(raw)}\n`, "utf8");
 
     const restarted = new FileExecutionJournal(directory);
