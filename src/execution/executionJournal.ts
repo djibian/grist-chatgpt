@@ -33,6 +33,17 @@ export interface ExecutionIdentity {
   mandateVersion: string;
 }
 
+/**
+ * Bounded, non-secret identity for the exact effect accepted into an immutable
+ * plan. It identifies the intended target/arguments without persisting the
+ * business payload itself. Callers must not derive the fingerprint from secret
+ * material whose disclosure through an offline guess would be unsafe.
+ */
+export interface EffectIntentIdentity {
+  intentId: string;
+  fingerprint: string;
+}
+
 export interface PlannedExecutionStep {
   stepId: string;
   order: number;
@@ -40,6 +51,7 @@ export interface PlannedExecutionStep {
   capability: string;
   preconditions: readonly string[];
   expectedStateTokens: Readonly<Record<string, string>>;
+  effectIntent?: EffectIntentIdentity;
 }
 
 export interface CriticalPropertyDefinition {
@@ -65,6 +77,7 @@ export interface ExecutionStepState {
   effectState: ExecutionEffectState;
   confirmedEffect: ConfirmedEffectEvidence;
   verificationEvidenceIds: readonly string[];
+  preparedEffect?: EffectIntentIdentity;
 }
 
 export interface BudgetUsage {
@@ -207,6 +220,14 @@ function boundedId(value: string, label: string): string {
   return value;
 }
 
+function validateEffectIntent(value: EffectIntentIdentity, label: string): void {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an effect-intent identity object.`);
+  }
+  boundedId(value.intentId, `${label}.intentId`);
+  boundedId(value.fingerprint, `${label}.fingerprint`);
+}
+
 function assertOneOf<T extends string>(
   value: T,
   allowed: readonly T[],
@@ -303,6 +324,9 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
       boundedId(key, `steps[${index}].expectedStateTokens key`);
       boundedText(value, `steps[${index}].expectedStateTokens.${key}`);
     }
+    if (step.effectIntent !== undefined) {
+      validateEffectIntent(step.effectIntent, `steps[${index}].effectIntent`);
+    }
   }
 
   const budgetEntries = Object.entries(definition.budgetLimits);
@@ -369,6 +393,22 @@ function validateMutableState(
     }
     assertOneOf(stepState.status, STEP_STATUSES, `steps[${index}].status`);
     assertOneOf(stepState.effectState, EFFECT_STATES, `steps[${index}].effectState`);
+
+    if (stepState.preparedEffect !== undefined) {
+      validateEffectIntent(stepState.preparedEffect, `steps[${index}].preparedEffect`);
+      if (definitionStep.effectIntent === undefined) {
+        throw new Error(`steps[${index}] records a prepared effect absent from the immutable plan.`);
+      }
+      if (canonicalJson(stepState.preparedEffect) !== canonicalJson(definitionStep.effectIntent)) {
+        throw new Error(`steps[${index}] prepared effect does not match the immutable plan intent.`);
+      }
+      if (stepState.status === "PENDING") {
+        throw new Error(`steps[${index}] cannot retain a prepared effect while PENDING.`);
+      }
+    } else if (definitionStep.effectIntent !== undefined && stepState.status !== "PENDING") {
+      throw new Error(`steps[${index}] left PENDING without durably retaining its effect intent.`);
+    }
+
     nonNegativeInteger(
       stepState.confirmedEffect.confirmedItems,
       `steps[${index}].confirmedEffect.confirmedItems`
