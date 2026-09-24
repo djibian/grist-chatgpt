@@ -52,7 +52,7 @@ Integrated milestones include:
 - **C6 preparation integrated:** timeouts, release/rollback documentation, OAuth deployment preflight/smoke design, metrics vocabulary and audit contract review are present; finalization still depends on C4/C5.
 - **P1 / P2 / P3 / P4 DONE:** document-UI parity, formula/schema safety, semantic context/discovery and the compact-surface evaluation have passed their integrated reviews; P4 keeps the current narrow v1 surface.
 - **J0 DONE:** engine stabilization passed its exact-main integrated completion review after uncertain/partial-write handling, fail-closed contractual concurrency classification and safe audit-target handling were independently reviewed and integrated.
-- **J1 ELIGIBLE:** the first contractual transformation is the current highest-priority product-runtime tranche in an isolated controlled environment.
+- **J1 DONE:** the first contractual transformation passed its exact-main integrated completion review after the deterministic two-step synthetic crash/recovery matrix proved durable write-ahead, cumulative budgets, authority re-checks, capability-specific recovery, ambiguity suspension and contextual verification without adding a generic Grist escape hatch.
 - **S0 ACTIVE:** final public-plugin eligibility classification occurs during actual OpenAI review; there is no separate pre-review approval gate.
 - **S1 ELIGIBLE / partially completed:** the remaining committed evidence is reviewer-path UserInfo with `email_verified: true`.
 
@@ -306,11 +306,11 @@ The bridge does **not** expose arbitrary HTTP forwarding, raw SQL, arbitrary Gri
 QUALITY / BASELINE             PLATFORM / SECURITY                     PRODUCT / BUILDER                 PUBLIC DISTRIBUTION
 Q0                             DONE   C4 Production OAuth               ELIGIBLE   P1 / P2 / P3 / P4       DONE   S0 Public eligibility   ACTIVE
 C1 / C2 / C3 / C4-P0          DONE   C5 Secure Grist onboarding        BLOCKED    J0 Engine stabilization  DONE   S1 Preparation         ELIGIBLE
-                                     C6 Production hardening           BLOCKED    J1 Contract execution    ELIGIBLE   C7 Reviewer env.        BLOCKED
+                                     C6 Production hardening           BLOCKED    J1 Contract execution    DONE   C7 Reviewer env.        BLOCKED
                                                                                   J2-J6                    BLOCKED    C8 Final submission     BLOCKED
 ```
 
-J1 is the finite next product-runtime tranche after J0's exact-main integrated completion review passed. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
+J1 has completed its exact-main integrated completion review. J2 is now the next Builder tranche but is blocked on the explicit business/application binding decisions in `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`. C4's remaining work requires evidence from the intended deployment; C5 also requires explicit human decisions on persistence and encryption. Public-directory eligibility is decided during the eventual OpenAI review rather than by a separate pre-review approval.
 
 The exact dependency map and currently eligible work live in `docs/ROADMAP.md`.
 
