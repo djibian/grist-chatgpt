@@ -1,12 +1,14 @@
 import {
   ExecutionJournalNotFoundError,
+  type BudgetUsage,
   type ConfirmedEffectEvidence,
   type EffectIntentIdentity,
   type ExecutionEffectState,
   type ExecutionJournal,
   type ExecutionJournalMutableState,
   type ExecutionJournalRecord,
-  type ExecutionStepState
+  type ExecutionStepState,
+  type PlannedExecutionStep
 } from "./executionJournal.js";
 
 export type RecordableEffectState = Exclude<ExecutionEffectState, "COMPENSATED">;
@@ -41,6 +43,24 @@ export class ExecutionStepTransitionError extends Error {
   ) {
     super(`Execution "${executionId}" step "${stepId}": ${message}`);
     this.name = "ExecutionStepTransitionError";
+  }
+}
+
+export class ExecutionBudgetExceededError extends Error {
+  constructor(
+    public readonly executionId: string,
+    public readonly stepId: string,
+    public readonly dimension: string,
+    public readonly limit: number,
+    public readonly reserved: number,
+    public readonly consumed: number,
+    public readonly requested: number
+  ) {
+    super(
+      `Execution "${executionId}" step "${stepId}" would exceed budget "${dimension}": ` +
+        `${consumed} consumed + ${reserved} reserved + ${requested} requested > ${limit}.`
+    );
+    this.name = "ExecutionBudgetExceededError";
   }
 }
 
@@ -81,22 +101,126 @@ function hasConfirmedEffect(evidence: ConfirmedEffectEvidence): boolean {
   return evidence.confirmedItems > 0 || evidence.stableIds.length > 0;
 }
 
+function stepBudgetCost(step: PlannedExecutionStep): Readonly<Record<string, number>> {
+  return step.budgetCost ?? {};
+}
+
+function cloneBudgets(
+  budgets: Readonly<Record<string, BudgetUsage>>
+): Record<string, BudgetUsage> {
+  return Object.fromEntries(
+    Object.entries(budgets).map(([dimension, usage]) => [dimension, { ...usage }])
+  );
+}
+
+function safeBudgetTotal(
+  executionId: string,
+  stepId: string,
+  dimension: string,
+  usage: BudgetUsage,
+  requested: number
+): number {
+  const total = usage.consumed + usage.reserved + requested;
+  if (!Number.isSafeInteger(total)) {
+    throw new ExecutionLifecycleInvariantError(
+      `Execution "${executionId}" step "${stepId}" budget "${dimension}" exceeds the safe-integer range.`
+    );
+  }
+  return total;
+}
+
+function reserveStepBudget(
+  record: ExecutionJournalRecord,
+  stepIndex: number
+): Record<string, BudgetUsage> {
+  const step = record.definition.steps[stepIndex]!;
+  const stepId = step.stepId;
+  const budgets = cloneBudgets(record.budgets);
+
+  for (const [dimension, requested] of Object.entries(stepBudgetCost(step)).sort(
+    ([left], [right]) => left.localeCompare(right)
+  )) {
+    const usage = budgets[dimension];
+    const limit = record.definition.budgetLimits[dimension];
+    if (usage === undefined || limit === undefined) {
+      throw new ExecutionLifecycleInvariantError(
+        `Execution "${record.definition.identity.executionId}" step "${stepId}" references unknown budget "${dimension}".`
+      );
+    }
+    const total = safeBudgetTotal(
+      record.definition.identity.executionId,
+      stepId,
+      dimension,
+      usage,
+      requested
+    );
+    if (total > limit) {
+      throw new ExecutionBudgetExceededError(
+        record.definition.identity.executionId,
+        stepId,
+        dimension,
+        limit,
+        usage.reserved,
+        usage.consumed,
+        requested
+      );
+    }
+    usage.reserved += requested;
+  }
+
+  return budgets;
+}
+
+function settleStepBudget(
+  record: ExecutionJournalRecord,
+  stepIndex: number,
+  effectState: RecordableEffectState
+): Record<string, BudgetUsage> {
+  const step = record.definition.steps[stepIndex]!;
+  const budgets = cloneBudgets(record.budgets);
+
+  if (effectState === "UNCERTAIN") return budgets;
+
+  for (const [dimension, amount] of Object.entries(stepBudgetCost(step))) {
+    const usage = budgets[dimension];
+    if (usage === undefined || usage.reserved < amount) {
+      throw new ExecutionLifecycleInvariantError(
+        `Execution "${record.definition.identity.executionId}" step "${step.stepId}" has no matching durable reservation for budget "${dimension}".`
+      );
+    }
+    usage.reserved -= amount;
+    if (effectState === "APPLIED" || effectState === "PARTIALLY_APPLIED") {
+      const consumed = usage.consumed + amount;
+      if (!Number.isSafeInteger(consumed)) {
+        throw new ExecutionLifecycleInvariantError(
+          `Execution "${record.definition.identity.executionId}" step "${step.stepId}" budget "${dimension}" consumption exceeds the safe-integer range.`
+        );
+      }
+      usage.consumed = consumed;
+    }
+  }
+
+  return budgets;
+}
+
 /**
  * Small J1 lifecycle layer above the durable journal.
  *
  * This class deliberately does not dispatch Grist effects. prepareEffect()
- * establishes only the durable RUNNING write-ahead prerequisite, including a
+ * establishes the durable RUNNING write-ahead prerequisite, including a
  * bounded non-secret identity for the exact effect accepted into the immutable
- * plan. It is not a dispatch authorization: a future J1 coordinator must also
- * satisfy the frozen preconditions, cumulative budget check/reservation and
- * current authority / mandate re-check before any external effect is invoked.
+ * plan and the immutable cumulative-budget reservation for that step. It is
+ * still not dispatch authorization: a future J1 coordinator must additionally
+ * satisfy the frozen preconditions and current authority / mandate re-check
+ * before any external effect is invoked.
  *
  * Recovery is intentionally pessimistic. After restart, a durable RUNNING step
  * without persisted result knowledge is converted to UNCERTAIN and the
- * execution is suspended. The prepared effect identity is retained so later
- * capability-specific reconciliation can reason about the exact intended
- * effect without reconstructing it from process memory. This layer never
- * guesses that the effect was absent and never replays it automatically.
+ * execution is suspended. Its reservation and prepared effect identity are
+ * retained so later capability-specific reconciliation can reason about the
+ * exact intended effect without reconstructing it from process memory. This
+ * layer never guesses that the effect was absent and never replays it
+ * automatically.
  */
 export class ExecutionLifecycle {
   constructor(private readonly journal: ExecutionJournal) {}
@@ -163,6 +287,7 @@ export class ExecutionLifecycle {
 
     const next = mutableState(current);
     next.status = "RUNNING";
+    next.budgets = reserveStepBudget(current, stepIndex);
     next.steps = next.steps.map((candidate, index) =>
       index === stepIndex
         ? {
@@ -221,6 +346,7 @@ export class ExecutionLifecycle {
       knowledge.effectState === "PARTIALLY_APPLIED";
     const next = mutableState(current);
     next.status = mustSuspend ? "SUSPENDED" : "RUNNING";
+    next.budgets = settleStepBudget(current, stepIndex, knowledge.effectState);
     next.steps = next.steps.map((candidate, index) =>
       index === stepIndex
         ? {

@@ -12,6 +12,7 @@ import {
   type ExecutionPlanDefinition
 } from "../src/execution/executionJournal.js";
 import {
+  ExecutionBudgetExceededError,
   ExecutionLifecycle,
   ExecutionLifecycleInvariantError,
   ExecutionStepTransitionError
@@ -39,6 +40,10 @@ function plan(stepCount = 1): ExecutionPlanDefinition {
       effectIntent: {
         intentId: `synthetic-effect-${index + 1}`,
         fingerprint: `fixture-marker-v${index + 1}`
+      },
+      budgetCost: {
+        writeItems: 1,
+        effectfulSteps: 1
       }
     })),
     budgetLimits: {
@@ -71,7 +76,7 @@ async function withJournalDirectory(
   }
 }
 
-test("J1 lifecycle persists the RUNNING write-ahead barrier and exact intended effect identity before external dispatch", async () => {
+test("J1 lifecycle persists the RUNNING write-ahead barrier, exact intended effect identity and budget reservation before external dispatch", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -86,6 +91,10 @@ test("J1 lifecycle persists the RUNNING write-ahead barrier and exact intended e
       intentId: "synthetic-effect-1",
       fingerprint: "fixture-marker-v1"
     });
+    assert.deepEqual(prepared.budgets, {
+      effectfulSteps: { reserved: 1, consumed: 0 },
+      writeItems: { reserved: 1, consumed: 0 }
+    });
 
     const restarted = new FileExecutionJournal(directory);
     const durable = await restarted.load("j1-lifecycle-001");
@@ -96,6 +105,7 @@ test("J1 lifecycle persists the RUNNING write-ahead barrier and exact intended e
       intentId: "synthetic-effect-1",
       fingerprint: "fixture-marker-v1"
     });
+    assert.deepEqual(durable?.budgets, prepared.budgets);
   });
 });
 
@@ -118,6 +128,18 @@ test("J1 lifecycle refuses an effectful write-ahead transition without immutable
     const durable = await journal.load("j1-lifecycle-001");
     assert.equal(durable?.revision, 0);
     assert.equal(durable?.steps[0]?.status, "PENDING");
+  });
+});
+
+test("J1 journal rejects an effectful budgeted plan step without immutable budget cost", async () => {
+  await withJournalDirectory(async (directory) => {
+    const definition = plan();
+    delete definition.steps[0]!.budgetCost;
+
+    await assert.rejects(
+      () => new FileExecutionJournal(directory).initialize(definition),
+      /Effectful steps must declare a non-empty immutable budgetCost/
+    );
   });
 });
 
@@ -148,7 +170,28 @@ test("J1 journal rejects a forged prepared effect identity that differs from the
   });
 });
 
-test("J1 restart converts an unresolved RUNNING step to UNCERTAIN and retains its intended effect identity", async () => {
+test("J1 journal rejects budget totals that do not match immutable costs and durable effect state", async () => {
+  await withJournalDirectory(async (directory) => {
+    const journal = new FileExecutionJournal(directory);
+    const initial = await journal.initialize(plan());
+    const forged = mutableState(initial);
+    forged.status = "RUNNING";
+    forged.steps = [
+      {
+        ...forged.steps[0]!,
+        status: "RUNNING",
+        preparedEffect: structuredClone(initial.definition.steps[0]!.effectIntent!)
+      }
+    ];
+
+    await assert.rejects(
+      () => journal.compareAndSet("j1-lifecycle-001", 0, forged),
+      /budget usage must match immutable step costs and durable effect state exactly/
+    );
+  });
+});
+
+test("J1 restart converts an unresolved RUNNING step to UNCERTAIN while retaining intended effect identity and reservation", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -166,6 +209,10 @@ test("J1 restart converts an unresolved RUNNING step to UNCERTAIN and retains it
     assert.deepEqual(recovered.steps[0]?.preparedEffect, {
       intentId: "synthetic-effect-1",
       fingerprint: "fixture-marker-v1"
+    });
+    assert.deepEqual(recovered.budgets, {
+      effectfulSteps: { reserved: 1, consumed: 0 },
+      writeItems: { reserved: 1, consumed: 0 }
     });
   });
 });
@@ -193,10 +240,14 @@ test("J1 restart does not rewrite a result that was durably recorded before inte
       intentId: "synthetic-effect-1",
       fingerprint: "fixture-marker-v1"
     });
+    assert.deepEqual(recovered.budgets, {
+      effectfulSteps: { reserved: 0, consumed: 1 },
+      writeItems: { reserved: 0, consumed: 1 }
+    });
   });
 });
 
-test("J1 uncertain effect knowledge retains confirmed evidence and suspends without replay", async () => {
+test("J1 uncertain effect knowledge retains confirmed evidence and reservation and suspends without replay", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -212,10 +263,14 @@ test("J1 uncertain effect knowledge retains confirmed evidence and suspends with
     assert.equal(recorded.steps[0]?.status, "SUSPENDED");
     assert.equal(recorded.steps[0]?.effectState, "UNCERTAIN");
     assert.deepEqual(recorded.steps[0]?.confirmedEffect.stableIds, [701, 702]);
+    assert.deepEqual(recorded.budgets, {
+      effectfulSteps: { reserved: 1, consumed: 0 },
+      writeItems: { reserved: 1, consumed: 0 }
+    });
   });
 });
 
-test("J1 partial effect knowledge suspends until capability-specific recovery exists", async () => {
+test("J1 partial effect knowledge conservatively consumes the full immutable step budget and suspends", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     await journal.initialize(plan());
@@ -230,6 +285,29 @@ test("J1 partial effect knowledge suspends until capability-specific recovery ex
     assert.equal(recorded.status, "SUSPENDED");
     assert.equal(recorded.steps[0]?.status, "SUSPENDED");
     assert.equal(recorded.steps[0]?.effectState, "PARTIALLY_APPLIED");
+    assert.deepEqual(recorded.budgets, {
+      effectfulSteps: { reserved: 0, consumed: 1 },
+      writeItems: { reserved: 0, consumed: 1 }
+    });
+  });
+});
+
+test("J1 proven NOT_APPLIED effect knowledge releases the immutable step reservation", async () => {
+  await withJournalDirectory(async (directory) => {
+    const journal = new FileExecutionJournal(directory);
+    await journal.initialize(plan());
+    const lifecycle = new ExecutionLifecycle(journal);
+    await lifecycle.prepareEffect("j1-lifecycle-001", "step-1");
+
+    const recorded = await lifecycle.recordEffect("j1-lifecycle-001", "step-1", {
+      effectState: "NOT_APPLIED"
+    });
+
+    assert.equal(recorded.steps[0]?.status, "EFFECT_RECORDED");
+    assert.deepEqual(recorded.budgets, {
+      effectfulSteps: { reserved: 0, consumed: 0 },
+      writeItems: { reserved: 0, consumed: 0 }
+    });
   });
 });
 
@@ -259,13 +337,14 @@ test("J1 lifecycle rejects contradictory no-effect and partial-effect evidence",
     const durable = await journal.load("j1-lifecycle-001");
     assert.equal(durable?.revision, 1);
     assert.equal(durable?.steps[0]?.status, "RUNNING");
+    assert.deepEqual(durable?.budgets.writeItems, { reserved: 1, consumed: 0 });
   });
 });
 
 test("J1 lifecycle requires prior steps to be VERIFIED before crossing the next write-ahead barrier", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
-    const initial = await journal.initialize(plan(2));
+    await journal.initialize(plan(2));
     const lifecycle = new ExecutionLifecycle(journal);
 
     await assert.rejects(
@@ -277,22 +356,75 @@ test("J1 lifecycle requires prior steps to be VERIFIED before crossing the next 
       }
     );
 
-    const ready = mutableState(initial);
-    ready.status = "RUNNING";
+    await lifecycle.prepareEffect("j1-lifecycle-001", "step-1");
+    const applied = await lifecycle.recordEffect("j1-lifecycle-001", "step-1", {
+      effectState: "APPLIED",
+      confirmedEffect: { stableIds: [701], confirmedItems: 1 }
+    });
+    const ready = mutableState(applied);
     ready.steps = [
-      {
-        ...ready.steps[0]!,
-        status: "VERIFIED",
-        effectState: "APPLIED",
-        preparedEffect: structuredClone(initial.definition.steps[0]!.effectIntent!)
-      },
+      { ...ready.steps[0]!, status: "VERIFIED" },
       ready.steps[1]!
     ];
-    await journal.compareAndSet("j1-lifecycle-001", 0, ready);
+    await journal.compareAndSet("j1-lifecycle-001", applied.revision, ready);
 
     const prepared = await lifecycle.prepareEffect("j1-lifecycle-001", "step-2");
     assert.equal(prepared.steps[1]?.status, "RUNNING");
-    assert.deepEqual(prepared.steps[1]?.preparedEffect, initial.definition.steps[1]!.effectIntent);
+    assert.deepEqual(prepared.steps[1]?.preparedEffect, applied.definition.steps[1]!.effectIntent);
+    assert.deepEqual(prepared.budgets, {
+      effectfulSteps: { reserved: 1, consumed: 1 },
+      writeItems: { reserved: 1, consumed: 1 }
+    });
+  });
+});
+
+test("J1 cumulative budget cannot be exceeded by splitting work across verified steps", async () => {
+  await withJournalDirectory(async (directory) => {
+    const definition = plan(2);
+    definition.budgetLimits = {
+      writeItems: 1,
+      effectfulSteps: 2
+    };
+    const journal = new FileExecutionJournal(directory);
+    await journal.initialize(definition);
+    const lifecycle = new ExecutionLifecycle(journal);
+
+    await lifecycle.prepareEffect("j1-lifecycle-001", "step-1");
+    const applied = await lifecycle.recordEffect("j1-lifecycle-001", "step-1", {
+      effectState: "APPLIED",
+      confirmedEffect: { stableIds: [701], confirmedItems: 1 }
+    });
+    const verified = mutableState(applied);
+    verified.steps = [
+      { ...verified.steps[0]!, status: "VERIFIED" },
+      verified.steps[1]!
+    ];
+    const ready = await journal.compareAndSet(
+      "j1-lifecycle-001",
+      applied.revision,
+      verified
+    );
+
+    await assert.rejects(
+      () => lifecycle.prepareEffect("j1-lifecycle-001", "step-2"),
+      (error: unknown) => {
+        assert.ok(error instanceof ExecutionBudgetExceededError);
+        assert.equal(error.dimension, "writeItems");
+        assert.equal(error.limit, 1);
+        assert.equal(error.consumed, 1);
+        assert.equal(error.reserved, 0);
+        assert.equal(error.requested, 1);
+        return true;
+      }
+    );
+
+    const durable = await journal.load("j1-lifecycle-001");
+    assert.equal(durable?.revision, ready.revision);
+    assert.equal(durable?.steps[1]?.status, "PENDING");
+    assert.deepEqual(durable?.budgets, {
+      effectfulSteps: { reserved: 0, consumed: 1 },
+      writeItems: { reserved: 0, consumed: 1 }
+    });
   });
 });
 
@@ -324,10 +456,11 @@ test("J1 lifecycle serializes concurrent prepare attempts through the journal CA
     const durable = await new FileExecutionJournal(directory).load("j1-lifecycle-001");
     assert.equal(durable?.revision, 1);
     assert.equal(durable?.steps[0]?.status, "RUNNING");
+    assert.deepEqual(durable?.budgets.writeItems, { reserved: 1, consumed: 0 });
   });
 });
 
-test("J1 restart pessimistically marks every structurally valid unresolved RUNNING step uncertain while retaining each effect identity", async () => {
+test("J1 restart pessimistically marks every structurally valid unresolved RUNNING step uncertain while retaining each effect identity and reservation", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
     const initial = await journal.initialize(plan(2));
@@ -338,6 +471,10 @@ test("J1 restart pessimistically marks every structurally valid unresolved RUNNI
       status: "RUNNING",
       preparedEffect: structuredClone(initial.definition.steps[index]!.effectIntent!)
     }));
+    unsafe.budgets = {
+      effectfulSteps: { reserved: 2, consumed: 0 },
+      writeItems: { reserved: 2, consumed: 0 }
+    };
     await journal.compareAndSet("j1-lifecycle-001", 0, unsafe);
 
     const recovered = await new ExecutionLifecycle(
@@ -370,5 +507,6 @@ test("J1 restart pessimistically marks every structurally valid unresolved RUNNI
         }
       ]
     );
+    assert.deepEqual(recovered.budgets, unsafe.budgets);
   });
 });
