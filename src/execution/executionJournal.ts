@@ -52,6 +52,12 @@ export interface PlannedExecutionStep {
   preconditions: readonly string[];
   expectedStateTokens: Readonly<Record<string, string>>;
   effectIntent?: EffectIntentIdentity;
+  /**
+   * Immutable cumulative-budget charge for one accepted attempt of this step.
+   * Missing means zero cost and is allowed only for steps that do not carry an
+   * effect intent when the plan declares budget dimensions.
+   */
+  budgetCost?: Readonly<Record<string, number>>;
 }
 
 export interface CriticalPropertyDefinition {
@@ -250,6 +256,14 @@ function positiveInteger(value: number, label: string): number {
   return value;
 }
 
+function safeAdd(left: number, right: number, label: string): number {
+  const result = left + right;
+  if (!Number.isSafeInteger(result)) {
+    throw new Error(`${label} exceeds the supported safe-integer range.`);
+  }
+  return result;
+}
+
 function sortedObject<T>(value: Readonly<Record<string, T>>): Record<string, T> {
   return Object.fromEntries(
     Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
@@ -333,9 +347,34 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
   if (budgetEntries.length > MAX_BUDGET_DIMENSIONS) {
     throw new Error(`budgetLimits exceeds ${MAX_BUDGET_DIMENSIONS} dimensions.`);
   }
+  const budgetDimensions = new Set<string>();
   for (const [dimension, limit] of budgetEntries) {
     boundedId(dimension, "budget dimension");
     positiveInteger(limit, `budgetLimits.${dimension}`);
+    budgetDimensions.add(dimension);
+  }
+
+  for (const [index, step] of definition.steps.entries()) {
+    const costEntries = Object.entries(step.budgetCost ?? {});
+    if (costEntries.length > MAX_BUDGET_DIMENSIONS) {
+      throw new Error(
+        `steps[${index}].budgetCost exceeds ${MAX_BUDGET_DIMENSIONS} dimensions.`
+      );
+    }
+    if (step.effectIntent !== undefined && budgetEntries.length > 0 && costEntries.length === 0) {
+      throw new Error(
+        `Effectful steps must declare a non-empty immutable budgetCost when plan budgets are configured.`
+      );
+    }
+    for (const [dimension, amount] of costEntries) {
+      boundedId(dimension, `steps[${index}].budgetCost dimension`);
+      if (!budgetDimensions.has(dimension)) {
+        throw new Error(
+          `steps[${index}].budgetCost.${dimension} is not declared in budgetLimits.`
+        );
+      }
+      positiveInteger(amount, `steps[${index}].budgetCost.${dimension}`);
+    }
   }
 
   if (definition.criticalProperties.length > MAX_CRITICAL_PROPERTIES) {
@@ -375,6 +414,57 @@ function initialState(definition: ExecutionPlanDefinition): ExecutionJournalMuta
     ),
     verificationEvidence: []
   };
+}
+
+type BudgetDisposition = "NONE" | "RESERVED" | "CONSUMED";
+
+function budgetDisposition(step: ExecutionStepState): BudgetDisposition {
+  if (step.status === "PENDING") return "NONE";
+  if (step.effectState === "UNCERTAIN") return "RESERVED";
+  if (
+    step.effectState === "PARTIALLY_APPLIED" ||
+    step.effectState === "APPLIED" ||
+    step.effectState === "COMPENSATED"
+  ) {
+    return "CONSUMED";
+  }
+  if (step.status === "RUNNING") return "RESERVED";
+  return "NONE";
+}
+
+function expectedBudgetUsage(
+  definition: ExecutionPlanDefinition,
+  state: ExecutionJournalMutableState
+): Record<string, BudgetUsage> {
+  const expected: Record<string, BudgetUsage> = Object.fromEntries(
+    Object.keys(sortedObject(definition.budgetLimits)).map((dimension) => [
+      dimension,
+      { reserved: 0, consumed: 0 }
+    ])
+  );
+
+  for (const [index, stepState] of state.steps.entries()) {
+    const disposition = budgetDisposition(stepState);
+    if (disposition === "NONE") continue;
+    const cost = definition.steps[index]!.budgetCost ?? {};
+    for (const [dimension, amount] of Object.entries(cost)) {
+      const usage = expected[dimension]!;
+      if (disposition === "RESERVED") {
+        usage.reserved = safeAdd(
+          usage.reserved,
+          amount,
+          `derived budget reservation for ${dimension}`
+        );
+      } else {
+        usage.consumed = safeAdd(
+          usage.consumed,
+          amount,
+          `derived budget consumption for ${dimension}`
+        );
+      }
+    }
+  }
+  return expected;
 }
 
 function validateMutableState(
@@ -458,6 +548,20 @@ function validateMutableState(
     const usage = state.budgets[dimension]!;
     nonNegativeInteger(usage.reserved, `budgets.${dimension}.reserved`);
     nonNegativeInteger(usage.consumed, `budgets.${dimension}.consumed`);
+    const total = safeAdd(
+      usage.reserved,
+      usage.consumed,
+      `budgets.${dimension} total usage`
+    );
+    if (total > definition.budgetLimits[dimension]!) {
+      throw new Error(`budgets.${dimension} exceeds the immutable plan limit.`);
+    }
+  }
+  const derivedBudgetUsage = expectedBudgetUsage(definition, state);
+  if (canonicalJson(sortedObject(state.budgets)) !== canonicalJson(sortedObject(derivedBudgetUsage))) {
+    throw new Error(
+      "Journal budget usage must match immutable step costs and durable effect state exactly."
+    );
   }
 
   if (state.verificationEvidence.length > MAX_EVIDENCE_PER_EXECUTION) {
