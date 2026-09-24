@@ -4,6 +4,9 @@ import type { GristService } from "./service.js";
 
 const HARD_METADATA_LIMIT = 2_000;
 const MAX_IDENTIFIER_LENGTH = 160;
+const MAX_METADATA_JSON_CHARS = 65_536;
+const MAX_FORMULA_AST_NODES = 4_096;
+const MAX_FORMULA_AST_DEPTH = 64;
 const PERMISSION_KEYS = ["create", "read", "update", "delete", "schemaEdit"] as const;
 
 type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -196,6 +199,23 @@ function parsePermissions(value: unknown): Record<PermissionKey, PermissionDecis
   return permissions;
 }
 
+function astWithinBounds(root: unknown): boolean {
+  if (!Array.isArray(root) || root.length === 0 || typeof root[0] !== "string") return false;
+
+  const stack: Array<{ node: unknown; depth: number }> = [{ node: root, depth: 0 }];
+  let visited = 0;
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    visited += 1;
+    if (visited > MAX_FORMULA_AST_NODES || current.depth > MAX_FORMULA_AST_DEPTH) return false;
+    if (!Array.isArray(current.node)) continue;
+    for (const child of current.node.slice(1)) {
+      stack.push({ node: child, depth: current.depth + 1 });
+    }
+  }
+  return true;
+}
+
 function attrPath(node: unknown): string[] | null {
   if (!Array.isArray(node) || node.length < 2) return null;
   if (node[0] === "Name" && typeof node[1] === "string") {
@@ -224,16 +244,22 @@ function collectAttributePaths(node: unknown, paths: Set<string>, state: { compl
 
 function dependenciesFromParsedFormula(
   parsedFormula: unknown,
-  formulaPresent: boolean
+  formulaPresent: boolean,
+  formulaWithinBounds: boolean
 ): {
   userAttributes: string[];
   recordFields: string[];
   complete: boolean;
 } {
   if (!formulaPresent) {
-    return { userAttributes: [], recordFields: [], complete: true };
+    return { userAttributes: [], recordFields: [], complete: formulaWithinBounds };
   }
-  if (typeof parsedFormula !== "string" || !parsedFormula) {
+  if (
+    !formulaWithinBounds ||
+    typeof parsedFormula !== "string" ||
+    !parsedFormula ||
+    parsedFormula.length > MAX_METADATA_JSON_CHARS
+  ) {
     return { userAttributes: [], recordFields: [], complete: false };
   }
 
@@ -241,6 +267,9 @@ function dependenciesFromParsedFormula(
   try {
     parsed = JSON.parse(parsedFormula);
   } catch {
+    return { userAttributes: [], recordFields: [], complete: false };
+  }
+  if (!astWithinBounds(parsed)) {
     return { userAttributes: [], recordFields: [], complete: false };
   }
 
@@ -260,7 +289,7 @@ function dependenciesFromParsedFormula(
 
 function parseUserAttribute(value: unknown): AccessModelUserAttribute | null | "invalid" {
   if (value === "" || value === null || value === undefined) return null;
-  if (typeof value !== "string") return "invalid";
+  if (typeof value !== "string" || value.length > MAX_METADATA_JSON_CHARS) return "invalid";
 
   let parsed: unknown;
   try {
@@ -284,7 +313,7 @@ function publishedShareCount(records: MetadataRecord[]): { count: number; comple
   for (const record of records) {
     const options = record.fields.options;
     if (options === "" || options === null || options === undefined) continue;
-    if (typeof options !== "string") {
+    if (typeof options !== "string" || options.length > MAX_METADATA_JSON_CHARS) {
       complete = false;
       continue;
     }
@@ -375,6 +404,7 @@ export class AccessModelObserver {
       });
     }
     resources.sort((a, b) => a.id - b.id);
+    const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
 
     const rules: AccessModelRule[] = [];
     for (const record of ruleRecords) {
@@ -388,11 +418,20 @@ export class AccessModelObserver {
         issues.add("unsupported_acl_permissions");
         continue;
       }
-      const formulaPresent =
-        typeof record.fields.aclFormula === "string" && record.fields.aclFormula.length > 0;
+
+      const rawFormula = record.fields.aclFormula;
+      const formulaPresent = typeof rawFormula === "string" && rawFormula.length > 0;
+      const formulaWithinBounds =
+        rawFormula === null ||
+        rawFormula === undefined ||
+        (typeof rawFormula === "string" && rawFormula.length <= MAX_METADATA_JSON_CHARS);
+      if (!formulaWithinBounds || (rawFormula !== null && rawFormula !== undefined && typeof rawFormula !== "string")) {
+        issues.add("acl_formula_dependency_unknown");
+      }
       const dependencies = dependenciesFromParsedFormula(
         record.fields.aclFormulaParsed,
-        formulaPresent
+        formulaPresent,
+        formulaWithinBounds
       );
       if (!dependencies.complete) issues.add("acl_formula_dependency_unknown");
 
@@ -417,7 +456,7 @@ export class AccessModelObserver {
           : null;
       if (position === null) issues.add("rule_position_unknown");
 
-      const resource = resources.find((candidate) => candidate.id === resourceId);
+      const resource = resourcesById.get(resourceId as number);
       rules.push({
         id: record.id,
         resourceId: resourceId as number,
@@ -428,7 +467,9 @@ export class AccessModelObserver {
         dependencies: {
           userAttributes: dependencies.userAttributes,
           recordFields: dependencies.recordFields,
-          usesLinkKey: [...allDependencyNames].some((name) => name === "LinkKey" || name.startsWith("LinkKey.")),
+          usesLinkKey: [...allDependencyNames].some(
+            (name) => name === "LinkKey" || name.startsWith("LinkKey.")
+          ),
           usesSuiviPar: allDependencyNames.has("Suivi_par"),
           usesAccesStagesActif: allDependencyNames.has("Acces_Stages_Actif")
         },
