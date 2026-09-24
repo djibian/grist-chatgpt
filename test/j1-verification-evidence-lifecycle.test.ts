@@ -200,6 +200,42 @@ test("J1 replay of the same evidence identity and context is idempotent", async 
   });
 });
 
+test("J1 concurrent replay of the same contextual evidence converges to one durable record", async () => {
+  await withJournalDirectory(async (directory) => {
+    const firstJournal = new FileExecutionJournal(directory);
+    const secondJournal = new FileExecutionJournal(directory);
+    await recordEffect(firstJournal);
+    const observation = {
+      evidenceId: "ev-concurrent",
+      propertyId: "marker-created-once",
+      verdict: "VERIFIED" as const,
+      method: "fixture read",
+      targetStateToken: "fixture-v2",
+      dependencies: ["target:fixture-v2"]
+    };
+
+    const [first, second] = await Promise.all([
+      new VerificationEvidenceLifecycle(firstJournal, {
+        now: () => new Date("2026-09-24T11:31:01.000Z")
+      }).recordEvidence("j1-evidence-001", "create-marker", observation),
+      new VerificationEvidenceLifecycle(secondJournal, {
+        now: () => new Date("2026-09-24T11:31:02.000Z")
+      }).recordEvidence("j1-evidence-001", "create-marker", observation)
+    ]);
+
+    assert.equal(first.revision, 3);
+    assert.equal(second.revision, 3);
+    assert.equal(first.verificationEvidence.length, 1);
+    assert.equal(second.verificationEvidence.length, 1);
+
+    const durable = await new FileExecutionJournal(directory).load("j1-evidence-001");
+    assert.equal(durable?.revision, 3);
+    assert.deepEqual(durable?.steps[0]?.verificationEvidenceIds, ["ev-concurrent"]);
+    assert.equal(durable?.verificationEvidence.length, 1);
+    assert.equal(durable?.verificationEvidence[0]?.evidenceId, "ev-concurrent");
+  });
+});
+
 test("J1 evidence identity cannot be reused for a different verdict or context", async () => {
   await withJournalDirectory(async (directory) => {
     const journal = new FileExecutionJournal(directory);
