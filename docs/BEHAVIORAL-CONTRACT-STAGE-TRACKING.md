@@ -1,6 +1,6 @@
 # Stage-tracking BehavioralContract
 
-Status: **first business reference contract; proposed logical contract, not proof of the current Grist document**.
+Status: **accepted follow-up semantics; partially observed reference binding; critical access/UI evidence pending**.
 
 Purpose: define the first end-to-end business scenario that the future Builder must satisfy after J0/J1 execution semantics exist.
 
@@ -8,99 +8,61 @@ This contract deliberately uses **logical identities** rather than assuming curr
 
 ## 1. Scenario objective
 
-Starting from an existing stage-tracking application, add a new capability for recording stage visits while preserving:
+Starting from the existing stage-tracking application, make the call/visit contact date available within the Stage follow-up trace, while preserving:
 
-- existing stage/student/teacher/period business data;
-- existing observations and legitimate human changes;
-- the application's LinkKey-based teacher isolation policy;
-- existing relevant UI behavior;
+- existing Stage/Student/Teacher/Period business data and current follow-up fields;
+- legitimate human changes;
+- the application's LinkKey-based teacher isolation;
+- the existing teacher-facing follow-up flow;
 - safe interruption/recovery semantics inherited from J0/J1.
 
-The reference transformation is intentionally cross-cutting: it changes schema, relations, access behavior and UI, and therefore exercises the Builder as an application transformer rather than a table editor.
+The reference document “suivi des stages chatgpt” has already received a `Date_du_contact` column through direct maintenance. That manual edit is fixture state, **not** evidence that J2 has built or executed a safe cross-cutting Builder transformation. A controlled J2 fixture/run must still prove schema, access, UI, human-change preservation, concurrency and recovery as applicable. This scenario must not hardcode stage tracking into the generic product.
 
 ## 2. Contract authority
 
-Until individually accepted, business rules in this document are classified as either:
+Business semantics accepted by the user are recorded in [J2 accepted semantics](J2-STAGE-TRACKING-ACCEPTED-SEMANTICS.md). Observed physical facts and unverified ACL/UI bindings are recorded in [J2 reference binding](J2-STAGE-TRACKING-REFERENCE-BINDING.md).
 
-- **ACCEPTED BASELINE** — directly established by the validated product vision / audit scenario;
-- **PROPOSED** — a precise interpretation needed for an executable fixture but requiring confirmation before it becomes an immutable J2 criterion;
-- **UNKNOWN** — must not be guessed.
+Each property is classified as:
 
-The Builder may propose resolutions for `PROPOSED` or `UNKNOWN` items. It may not mark them accepted by itself.
+- **ACCEPTED BASELINE** — accepted behavior and product invariants;
+- **OBSERVED BINDING** — a fact read from the current fixture, not a universal Grist model;
+- **UNKNOWN** — a required fact or outcome that still needs direct evidence.
 
-Once accepted for a J2 run, the exact contract version is immutable for that run.
+The Builder cannot turn an `UNKNOWN` into an accepted policy on its own. The exact accepted contract version remains immutable for a J2 run.
 
 ## 3. Logical application identities
 
-### Actors
+Actors: `ApplicationOwner`, `Teacher`, `AnonymousOrInvalidLinkVisitor`, and `BuilderPrincipal`. The privileged BuilderPrincipal cannot stand in for a teacher in LinkKey access tests.
 
-```text
-ApplicationOwner
-Teacher
-AnonymousOrInvalidLinkVisitor
-BuilderPrincipal
-```
+Existing logical entities: `Student`, `Stage`, `Teacher`, `Period`.
 
-The `BuilderPrincipal` is the privileged identity used to transform the application. It is not an application user and must not be used as evidence that Teacher LinkKey isolation works.
+The J2 follow-up trace is **part of Stage**, not a separate logical/physical Visit record. The trace has a contact type (call/visit), actual contact date, implication, punctuality and comments. The contact date is distinct from placement start/end dates. One editable set of follow-up values per Stage is sufficient for the accepted workflow; no independent per-contact history is required.
 
-### Existing logical entities
+On the reference fixture the observed columns are `Stages.Type_de_contact`, `Stages.Date_du_contact`, `Stages.Implication`, `Stages.Ponctuel`, `Stages.Commentaire`. These IDs are binding facts only. The optionality of historical rows must be preserved; J2 must not invent dates.
 
-```text
-Student
-Stage
-Teacher
-Period
-```
-
-The exact current Grist IDs are fixture/application bindings, not part of the logical contract.
-
-### New logical entity for J2
-
-```text
-Visit
-```
-
-Minimum intended semantics:
-
-```text
-Visit
-  -> belongs to exactly one Stage
-  -> records a visit date or equivalent temporal fact
-  -> records an observation/content field
-```
-
-Whether additional fields such as author, visit type or status are needed is outside the minimum J2 contract unless explicitly accepted.
+`Stages.Suivi_par` is the teacher **assigned** to conduct the call/visit and, in this workflow without reassignment, the attributed business author of the follow-up trace. This attribution does not prove who entered or last edited a cell. A technical author audit or a future requirement to preserve multiple contact events requires a distinct accepted decision.
 
 ## 4. Responsibility predicate
 
-The contract uses a logical predicate:
+`responsible(T, S)` means the current assignment: Stage S references teacher T in the observed `Stages.Suivi_par` relation.
 
-```text
-responsible(Teacher, Stage)
-```
-
-It means that the teacher is currently authorized by the stage-tracking business model to manage/record visits for that stage.
-
-J2 must bind this predicate to the real existing model rather than inventing a duplicate responsibility model merely for the test.
-
-The binding may be a direct relation, a set/list relation, an assignment table or another supported representation. If the current application state cannot establish the predicate exactly, the related critical guarantees remain `UNKNOWN` and J2 cannot claim readiness.
+This establishes business responsibility, not effective browser authorization by itself. The owner reports that a teacher-specific URL from `Enseignants` passes a LinkKey and that Grist ACLs restrict the teacher's adapted interface to assigned Stages. The exact LinkKey attribute, rule source and negative access behavior still require controlled observation. The Builder must bind the predicate to each tested application's real model and must not invent another responsibility relation merely for the test.
 
 ## 5. Managed scope
 
-Initial proposed management modes for J2:
+Proposed scope for the controlled J2 transformation; exact targets require a pre-run binding and accepted plan:
 
 | Property | Mode | Rationale |
 |---|---|---|
-| `Visit` schema introduced by J2 | `MANAGED` | Builder-created capability |
-| relation from `Visit` to `Stage` | `MANAGED` | required semantic link |
-| access rules required for `Visit` | `MANAGED` | confidentiality invariant |
-| new Visit UI/widgets introduced by J2 | `MANAGED` | Builder-created UI |
-| layout of existing human-maintained pages | `SHARED` | human adjustments must be reconciled/preserved |
-| existing Stage/Student/Teacher/Period schema not targeted by plan | `OBSERVED` | preserve unless explicit migration accepted |
-| existing business records | `OBSERVED` | normal business evolution, not configuration to reconverge |
-| existing widget code/integrations not targeted by plan | `OBSERVED` or `SHARED` after dependency analysis | do not silently rewrite |
+| required contact-date field and any narrowly targeted follow-up schema delta | `MANAGED` | explicit Builder change in an isolated fixture |
+| exact access rule change, only if the bound policy needs it | `MANAGED` | preserve current-responsibility isolation |
+| exact teacher-facing UI element needed to expose the date | `MANAGED` or `SHARED`, as accepted | prevent unintended layout overwrite |
+| other existing Stage/Student/Teacher/Period schema | `OBSERVED` | preserve unrelated structure |
+| business rows, including old follow-up traces | `OBSERVED` | business evolution is not configuration drift |
+| human-maintained page layout | `SHARED` | reconcile/preserve unrelated edits |
+| untargeted widgets and integrations | `OBSERVED` or `SHARED` after dependency analysis | no silent rewrite |
 
-The final J2 binding may refine this table but may not silently broaden `MANAGED` scope.
+The J2 plan must not silently broaden `MANAGED` scope or recreate the already present date field on the live reference. A repeat run on unchanged managed state must converge without duplicate structural objects.
 
 ## 6. Criticality vocabulary
 
@@ -120,148 +82,128 @@ The Builder cannot downgrade criticality by itself.
 
 ## 7. Business behavioral properties
 
-### STAGE-B1 — visit belongs to a stage
-
-**Criticality:** CRITICAL  
-**Authority:** ACCEPTED BASELINE for the reference scenario.
-
-Every J2-created `Visit` record must reference exactly one existing `Stage` according to the supported logical model.
-
-A Visit must not silently become orphaned because of a Builder migration.
-
-### STAGE-B2 — responsible teacher can record a visit
-
-**Criticality:** CRITICAL  
-**Authority:** ACCEPTED BASELINE from the reference scenario.
-
-Given teacher `T` and stage `S` where `responsible(T, S)` is true, the teacher-facing application path must allow `T` to record the minimum Visit information required by the accepted UI/behavior contract.
-
-The proof must exercise the same user-facing LinkKey/browser path relied on in production when LinkKey is part of the policy.
-
-### STAGE-B3 — non-responsible teacher cannot access another teacher's protected visit data
+### STAGE-B1 — follow-up belongs to its Stage
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-Given distinct teachers `A` and `B`, and stage `SA` for which `responsible(A, SA)` is true and `responsible(B, SA)` is false, the LinkKey/browser path for B must not expose Visit information protected for A/SA.
+Exactly one mutable call/visit trace is held in the existing Stage row. Entering, replacing, correcting or clearing its fields must not create a second Stage or a separate contact-history record, or orphan/delete the Stage. The previous values need not be retained as an application-level contact history.
 
-The exact protected fields are determined by the bound AccessModel. The test must not use a privileged owner account as a substitute for B.
-
-### STAGE-B4 — invalid LinkKey follows the accepted denial policy
+### STAGE-B2 — responsible teacher can record a contact
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-A missing/invalid LinkKey must produce the application's accepted denied/limited behavior and must not expose protected Visit/Stage information.
+For `responsible(T, S)`, the supported teacher-facing path must allow T to enter, correct and clear the authorized Stage follow-up fields: contact type (`Appel`/`Visite`), contact date, implication, punctuality and comments. A completed new contact records its actual date; historic blank dates are not fabricated. This must be proven through the supported LinkKey/browser path when that policy applies.
 
-### STAGE-B5 — revoked LinkKey loses corresponding access
-
-**Criticality:** CRITICAL  
-**Authority:** ACCEPTED BASELINE.
-
-After a LinkKey is revoked according to the application's supported policy, the corresponding browser path must no longer provide the protected access previously granted by that key.
-
-### STAGE-B6 — relationship tampering cannot broaden access
+### STAGE-B3 — other teachers cannot access protected follow-up
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-A teacher must not be able to gain access to another protected Stage/Visit domain merely by changing a writable relation or crafted request available through the application path.
+With teacher B's distinct valid LinkKey, B cannot read or edit protected follow-up data for Stage S assigned to A through any reachable teacher browser page or Raw Data view. The exact protected fields and link mapping are determined by the observed AccessModel, not by owner API calls. This tests isolation between links, not the real-world identity of whoever holds A's URL.
 
-The fixture must include at least one attempted reassignment/tampering case relevant to the actual model.
-
-### STAGE-B7 — adding Visit preserves existing business records
+### STAGE-B4 — invalid LinkKey follows accepted denial
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-The J2 transformation must not delete, duplicate or rewrite existing Stage, Student, Teacher, Period or observation records except for a migration explicitly listed in the accepted plan.
+A missing/invalid LinkKey must not expose protected Stage follow-up data.
 
-Counts alone are insufficient evidence when stable identities can be compared.
-
-### STAGE-B8 — repeated transformation does not duplicate structural objects
+### STAGE-B5 — revoked LinkKey loses access
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-After J2 has successfully reached its accepted desired state, running the same accepted intent again against an unchanged environment must not create a second Visit table, duplicate managed columns, duplicate managed access rules or duplicate managed UI widgets.
+A revoked key cannot retain protected access previously granted by that key.
 
-### STAGE-B9 — new periods do not create duplicate stages
+### STAGE-B6 — relation tampering cannot broaden access
 
-**Criticality:** IMPORTANT (candidate CRITICAL if period generation is touched by J2)  
-**Authority:** ACCEPTED baseline business example, but its direct relevance to the first Visit-only J2 change depends on the bound impact graph.
+**Criticality:** CRITICAL  
+**Authority:** ACCEPTED BASELINE.
 
-If J2 does not affect period/stage generation and the ImpactGraph confirms no dependency, this property need not block the Visit change. If affected, it must be verified according to the existing application rule.
+A teacher cannot acquire another protected Stage's follow-up by changing `Suivi_par` or another writable relation, or by crafting requests available through the application.
 
-### STAGE-B10 — reassignment preserves existing observations/visits
+### STAGE-B7 — transformation preserves business records
 
-**Criticality:** CRITICAL if reassignment logic is affected by the change; otherwise IMPORTANT regression property.  
-**Authority:** ACCEPTED BASELINE for preservation of existing observations.
+**Criticality:** CRITICAL  
+**Authority:** ACCEPTED BASELINE.
 
-Reassigning responsibility for a Stage must not delete the Stage's existing observations or Visit records merely because the responsible teacher changes.
+The J2 transformation must not delete, duplicate or rewrite existing Stage, Student, Teacher, Period or follow-up records except for a migration explicitly listed in the accepted plan. Compare stable identities where possible; counts alone are insufficient.
 
-**Open semantic decision:** whether the previous teacher retains historical visibility after reassignment or visibility immediately follows current responsibility. J2 must not guess this. The AccessModel must resolve it before any corresponding guarantee is marked `VERIFIED`.
+### STAGE-B8 — repeat transformation is convergent
+
+**Criticality:** CRITICAL  
+**Authority:** ACCEPTED BASELINE.
+
+Re-running the same accepted intent against unchanged managed state does not duplicate a contact-date field, access rule, UI widget, Stage row or follow-up trace.
+
+### STAGE-B9 — new periods do not duplicate stages
+
+**Criticality:** IMPORTANT, CRITICAL if period generation is touched.  
+**Authority:** ACCEPTED baseline business example.
+
+If period/stage generation is outside the confirmed impact graph, it need not block the follow-up change. If affected, verify against the existing application rule.
+
+### STAGE-B10 — assignment remains stable through follow-up
+
+**Criticality:** CRITICAL when assignment or access logic is affected.  
+**Authority:** ACCEPTED BASELINE.
+
+There is no Stage reassignment in this accepted follow-up workflow. Recording, correcting or clearing the contact trace, and executing the J2 transformation, must not change an existing `Suivi_par` assignment or introduce a teacher-facing reassignment path. Teacher relation tampering is denied by STAGE-B6.
 
 ## 8. AccessModel properties
 
-### STAGE-A1 — Visit inherits the required protection domain
+### STAGE-A1 — follow-up remains in the protected domain
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-Adding the Visit entity must not create an unprotected table outside the existing LinkKey isolation model.
-
-The exact Grist access-rule implementation may differ from other tables, but the effective tested policy must be equivalent to the accepted application behavior.
+The contact date and trace fields in `Stages` must follow the observed teacher LinkKey isolation. Adding or exposing a field must not bypass the protected Stage policy.
 
 ### STAGE-A2 — protected intermediate states are forbidden
 
 **Criticality:** CRITICAL  
 **Authority:** fixed product vision.
 
-The transformation must not populate sensitive Visit data into a state that is temporarily exposed before required access protection exists.
-
-If the actual Grist primitives cannot make the in-place sequence safe, J2 must use an effectively isolated preparation path or refuse the unsafe in-place mode.
+The transformation cannot expose protected follow-up data in an intermediate schema/UI/access state. If in-place Grist primitives cannot establish the safety guarantee, use an effectively isolated preparation path or refuse that mode.
 
 ### STAGE-A3 — builder privilege is not user-policy proof
 
 **Criticality:** CRITICAL  
 **Authority:** fixed product vision.
 
-Successful API calls made with the Builder/owner identity do not prove LinkKey user isolation.
+Successful owner/Builder API calls do not prove teacher access restrictions.
 
-### STAGE-A4 — browser verification is required for LinkKey guarantees
+### STAGE-A4 — browser verification is required
 
 **Criticality:** CRITICAL  
 **Authority:** fixed product vision.
 
-Where `user.LinkKey` behavior depends on the Grist web client and is unavailable in ordinary API evaluation, critical isolation verdicts require controlled browser scenarios with the relevant links/identities.
+When the effective policy depends on the Grist web client's `user.LinkKey`, controlled browser scenarios with distinct assigned and unassigned teachers, valid, invalid and revoked keys are required. Schema/API observations alone cannot establish those verdicts.
 
 ## 9. UI behavioral properties
 
-### STAGE-U1 — teacher can reach the Visit function through the intended UI
+### STAGE-U1 — teacher can reach the follow-up date
 
-**Criticality:** IMPORTANT  
-**Authority:** ACCEPTED BASELINE in principle; exact UI is PROPOSED until bound.
+**Criticality:** IMPORTANT for reachability; CRITICAL if its absence prevents an impacted access or business requirement.  
+**Authority:** ACCEPTED BASELINE.
 
-The new Visit capability must be reachable through an intentional teacher-facing UI flow rather than existing only as a table reachable by owners.
-
-The Builder may choose a native Grist UI or, in later product versions, a custom widget only after applying the product's maintainability/ergonomics/security decision process.
+The assigned teacher can reach the existing “Suivi des stages” flow and see/edit the authorized follow-up trace, including the actual contact date. The owner reports that the date was added to the follow-up sheet. This does not prove that the assigned teacher sees or can edit it through the actual LinkKey URL.
 
 ### STAGE-U2 — unrelated human layout changes are preserved
 
 **Criticality:** IMPORTANT  
 **Authority:** fixed product vision.
 
-If an existing `SHARED` page layout is changed by a human after the Builder's last accepted state, J2 must not silently restore the earlier Builder layout while adding the Visit capability.
+If a human changes a `SHARED` layout after the Builder's last accepted state, J2 preserves or reconciles that change, or suspends under the accepted conflict policy rather than silently restoring old layout.
 
-The system must preserve, reconcile or suspend according to the accepted conflict policy.
-
-### STAGE-U3 — new managed UI is convergent
+### STAGE-U3 — managed UI converges
 
 **Criticality:** IMPORTANT  
 **Authority:** fixed product vision.
 
-Reapplying the same desired Visit UI to an unchanged managed state does not duplicate widgets/pages.
+Reapplying the accepted UI intent to unchanged managed state creates no duplicate fields, widgets or pages.
 
 ## 10. Concurrency properties
 
@@ -305,32 +247,31 @@ If current observable state cannot distinguish safe continuation from a duplicat
 
 ### STAGE-H1 — business evolution is not drift
 
-New ordinary Stage/Visit/observation rows created by application users are not automatically reverted because they differ from a previously accepted snapshot.
+New ordinary Stage rows and edits to follow-up traces by application users are not automatically reverted because they differ from a previous snapshot.
 
 ### STAGE-H2 — untargeted schema/configuration is preserved
 
-J2 does not remove or rewrite existing structures outside its managed transformation merely because they are absent from its DesiredState.
+J2 does not remove or rewrite existing structures outside its managed transformation merely because they are absent from DesiredState.
 
 ### STAGE-H3 — changed MANAGED state is reconciled, not silently reset
 
-A human edit to a managed property produces a reconciliation/conflict decision according to the property's conflict policy.
+A human edit to a managed property produces reconciliation/conflict handling according to that property's policy.
 
 ## 13. Logical identity and binding requirements
 
-Before J2 runs against a fixture/application, record bindings for at least:
+Before J2 runs against a fixture/application, record at least:
 
 ```text
-Student logical identity -> Grist table/column IDs needed by scenario
-Stage -> exact table ID and stable relevant columns
-Teacher -> exact table ID / identity relation
-Period -> exact table ID if relevant
-Visit -> desired stable logical identity and proposed Grist ID
-responsible(T, S) -> exact relation/formula/table semantics
-LinkKey attribute/policy -> exact tested rule source
-teacher-facing page/widget -> exact current IDs when pre-existing
+Student -> relevant table/column identities
+Stage -> table identity and stable follow-up field identities
+Teacher -> identity relation
+Period -> table identity if relevant
+responsible(T, S) -> actual current-assignment relation
+LinkKey attribute/policy -> exact tested rule source and relevant identities
+teacher-facing page/widget -> current IDs, visible field mapping and editor capabilities
 ```
 
-A rename between accepted states updates mappings rather than automatically creating a new logical component.
+In the current reference the partially observed mapping is `Stages.Suivi_par` → `Enseignants`, and `Stages.Date_du_contact` is an editable Date field. The accompanying binding document records page/widget observations, the owner's confirmation of the sheet display and outstanding teacher-specific ACL/UI evidence. A rename between accepted states updates mappings rather than creating a duplicate logical component.
 
 ## 14. Known/possible dependency graph required for J2
 
@@ -369,33 +310,36 @@ Evidence is invalidated when the ImpactGraph shows that a relevant dependency ch
 
 ## 16. Minimum browser acceptance matrix
 
-The exact fixture names are synthetic.
+The exact fixture names are synthetic; tests must use controlled identities and no real student rows.
 
 | Test | Context | Expected result |
 |---|---|---|
-| BROW-A | Teacher A valid link, Stage A assigned to A | A can access the allowed Stage/Visit flow |
-| BROW-B | Teacher B valid link, Stage A not assigned to B | B cannot see A-protected Visit data |
-| BROW-C | invalid/missing key | denied/limited according to accepted policy; no protected data |
-| BROW-D | revoked key | previously granted protected access is gone |
-| BROW-E | Teacher B attempts relation tampering toward Stage A | no unintended access expansion |
-| BROW-F | new Visit table/views after transformation | same required isolation as accepted application model |
+| BROW-A | Teacher A valid link, Stage A assigned to A | A can enter, replace/correct and clear the authorized fields including contact date; the same Stage holds the single trace throughout |
+| BROW-B | Teacher B valid link, Stage A assigned to A | B cannot read or edit A's protected trace on the follow-up page, other reachable pages or Raw Data |
+| BROW-C | missing/invalid key | denied/limited according to policy; no protected data |
+| BROW-D | revoked key | previously granted protected access gone |
+| BROW-E | Teacher B attempts relation tampering | no access expansion |
+| BROW-F | Stage A remains assigned to A after follow-up entry/correction | A still sees the trace, B still cannot access it and `Suivi_par` stays unchanged |
+| BROW-G | “Suivi des stages” page | contact date appears in the intended teacher-facing sheet and is editable where authorized |
 
-These tests prove only their contextualized scenarios, not all possible ACL properties.
+These tests establish contextual scenarios, not universal ACL correctness.
 
 ## 17. Minimum transformation acceptance sequence
 
 A J2 reference run should demonstrate:
 
-1. observe and bind the existing synthetic stage application;
-2. propose the managed scope and exact Visit transformation;
-3. build an ImpactGraph sufficient for the touched elements;
-4. establish/validate the required safe execution mode;
-5. execute schema/access/UI steps through J1 execution semantics;
-6. inject at least one controlled interruption and resume/suspend correctly;
-7. perform browser LinkKey acceptance scenarios;
+1. prepare and bind two isolated synthetic starting states with the relevant LinkKey rules and UI mapping: one without the contact-date field for the actual Builder change, and one with the already-added field and a human-maintained layout for reconciliation; document any difference from the live reference;
+2. accept an exact managed scope and plan for the Stage follow-up date/access/UI behavior;
+3. build an ImpactGraph for touched elements;
+4. establish the safe execution mode;
+5. execute needed schema/access/UI effects through the J1 execution engine, without duplicating existing elements;
+6. inject a controlled interruption and resume/suspend correctly;
+7. perform the browser acceptance matrix with controlled identities;
 8. verify preservation of pre-existing business identities/data;
 9. inject a relevant concurrent human UI/configuration change and prove preservation/conflict handling;
-10. re-run the same accepted intent and demonstrate convergence without structural duplication.
+10. rerun the accepted intent and demonstrate convergence without duplication.
+
+The date field manually added to the live reference is input fixture state. It does not count as step 5 or substitute for controlled engine evidence.
 
 ## 18. Critical delivery gate
 
@@ -403,20 +347,13 @@ The J2 change cannot be declared ready when an impacted `CRITICAL` property is `
 
 A critical unknown outside the dependency closure of the J2 change does not automatically block J2.
 
-## 19. Explicit open decisions before executable J2
+## 19. Resolved choices and outstanding observations
 
-The following are intentionally not invented by this document and must be bound/accepted before the corresponding tests become normative:
+Human-accepted choices: exactly one modifiable follow-up trace on the existing Stage row is sufficient; `Suivi_par` is the assigned teacher and attributed business author of that trace; there is no reassignment in this workflow; the trace has type, actual contact date, implication, punctuality and comments; entry, replacement, correction and clearing are allowed. No separate Visit table, contact history or technical author-audit field is mandated.
 
-1. exact existing Grist table/column identities;
-2. exact representation of `responsible(Teacher, Stage)`;
-3. exact LinkKey attribute and current access rules;
-4. whether a teacher may edit/delete an existing Visit after creation;
-5. whether historical visibility remains with a former teacher after reassignment or follows current responsibility immediately;
-6. whether Visit author identity must be stored independently of current responsibility;
-7. exact teacher-facing UI flow and which existing layout regions are `SHARED`;
-8. whether any existing custom widget is in the dependency closure of Visit/responsibility/access behavior.
+Observed binding: the named reference Grist document has `Stages.Suivi_par` (`Ref:Enseignants`), `Type_de_contact` (`Appel`/`Visite`), `Implication`, `Ponctuel`, `Commentaire`, and the newly added editable Date `Date_du_contact`. The “Suivi des stages” page uses widgets 31 and 37 on `Stages`; `Enseignants.Lien_Stages` links there with `LinkKey_Token`. The owner reports that the date is now in the sheet and teacher-specific links filter the displayed Stages through Grist ACLs; those effects still need controlled tests.
 
-Until resolved, these items remain `PROPOSED` or `UNKNOWN`; the Builder cannot silently choose the convenient answer.
+Still `UNKNOWN` until direct controlled evidence: exact Grist ACL rules and `user.LinkKey` attributes; the teacher-specific URL's resolved date field mapping; effective teacher read/write/clear permissions, invalid/revoked LinkKey behavior and unchanged assignment; managed/shared UI regions and dependency closure. No technical author/editor audit field or per-contact history is established. These facts must not be fabricated from owner API access.
 
 ## 20. J2 exit criteria
 
@@ -434,6 +371,6 @@ The stage-tracking reference scenario is complete only when:
 
 ## 21. Role in product validation
 
-Passing this contract proves that the architecture can transform one realistic application across schema, access, UI and recovery boundaries.
+Passing this contract on a controlled fixture proves that the architecture can maintain one realistic application across schema, access, UI and recovery boundaries.
 
 It does **not** prove generality of the Builder. A second materially different reference application (for example import + calculations + analysis + restitution) remains required before broad native-Builder generalization.
