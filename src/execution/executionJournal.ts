@@ -141,6 +141,32 @@ export class ExecutionJournalCorruptError extends Error {
   }
 }
 
+const EXECUTION_STATUSES: readonly ExecutionStatus[] = [
+  "PLANNED",
+  "RUNNING",
+  "SUSPENDED",
+  "COMPLETED"
+];
+const STEP_STATUSES: readonly ExecutionStepStatus[] = [
+  "PENDING",
+  "RUNNING",
+  "EFFECT_RECORDED",
+  "VERIFIED",
+  "SUSPENDED"
+];
+const EFFECT_STATES: readonly ExecutionEffectState[] = [
+  "NOT_DISPATCHED",
+  "CONFIRMED",
+  "PARTIALLY_CONFIRMED",
+  "UNCERTAIN"
+];
+const CRITICALITIES: readonly PropertyCriticality[] = ["CRITICAL", "NON_CRITICAL"];
+const VERDICTS: readonly VerificationVerdict[] = [
+  "VERIFIED",
+  "FAILED",
+  "INCONCLUSIVE"
+];
+
 const MAX_ID_LENGTH = 200;
 const MAX_STEPS = 100;
 const MAX_BUDGET_DIMENSIONS = 32;
@@ -155,6 +181,14 @@ function nonEmpty(value: string, label: string): string {
     throw new Error(`${label} exceeds the maximum supported length.`);
   }
   return normalized;
+}
+
+function assertOneOf<T extends string>(
+  value: T,
+  allowed: readonly T[],
+  label: string
+): void {
+  if (!allowed.includes(value)) throw new Error(`${label} has an unsupported value.`);
 }
 
 function nonNegativeInteger(value: number, label: string): number {
@@ -255,6 +289,7 @@ function validateDefinition(definition: ExecutionPlanDefinition): void {
   const propertyIds = new Set<string>();
   for (const property of definition.criticalProperties) {
     const propertyId = nonEmpty(property.propertyId, "propertyId");
+    assertOneOf(property.criticality, CRITICALITIES, `criticality for ${propertyId}`);
     if (propertyIds.has(propertyId)) {
       throw new Error(`Duplicate critical property "${propertyId}".`);
     }
@@ -289,6 +324,7 @@ function validateMutableState(
   definition: ExecutionPlanDefinition,
   state: ExecutionJournalMutableState
 ): void {
+  assertOneOf(state.status, EXECUTION_STATUSES, "execution status");
   if (state.steps.length !== definition.steps.length) {
     throw new Error("Journal step state must match the immutable plan step set exactly.");
   }
@@ -297,6 +333,8 @@ function validateMutableState(
     if (stepState.stepId !== definitionStep.stepId) {
       throw new Error("Journal step state must preserve immutable step order and IDs.");
     }
+    assertOneOf(stepState.status, STEP_STATUSES, `steps[${index}].status`);
+    assertOneOf(stepState.effectState, EFFECT_STATES, `steps[${index}].effectState`);
     nonNegativeInteger(
       stepState.confirmedEffect.confirmedItems,
       `steps[${index}].confirmedEffect.confirmedItems`
@@ -337,6 +375,8 @@ function validateMutableState(
       throw new Error(`Duplicate verification evidence ID "${evidenceId}".`);
     }
     evidenceIds.add(evidenceId);
+    assertOneOf(evidence.criticality, CRITICALITIES, `criticality for ${evidenceId}`);
+    assertOneOf(evidence.verdict, VERDICTS, `verdict for ${evidenceId}`);
     const property = propertyDefinitions.get(evidence.propertyId);
     if (!property || property.criticality !== evidence.criticality) {
       throw new Error(
@@ -372,10 +412,9 @@ function validateMutableState(
     }
   }
 
-  const knownEvidenceIds = evidenceIds;
   for (const step of state.steps) {
     for (const evidenceId of step.verificationEvidenceIds) {
-      if (!knownEvidenceIds.has(evidenceId)) {
+      if (!evidenceIds.has(evidenceId)) {
         throw new Error(
           `Step "${step.stepId}" references unknown verification evidence "${evidenceId}".`
         );
@@ -427,12 +466,13 @@ export interface FileExecutionJournalOptions {
  * Durable journal for the isolated J1 controlled environment.
  *
  * Records are written as one JSON file per execution. File contents are fsync'd
- * before an atomic publish/replace. The implementation assumes one active
- * writer process for a journal directory; `compareAndSet` protects against
- * stale revisions within that contract but is not a distributed lock.
+ * before an atomic publish/replace. The implementation serializes mutations
+ * within one process and assumes that process is the sole writer for the
+ * directory; it is not a distributed lock or production multi-writer store.
  */
 export class FileExecutionJournal implements ExecutionJournal {
   private readonly now: () => Date;
+  private readonly writeChains = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly directory: string,
@@ -501,33 +541,46 @@ export class FileExecutionJournal implements ExecutionJournal {
   ): Promise<ExecutionJournalRecord> {
     nonEmpty(executionId, "executionId");
     nonNegativeInteger(expectedRevision, "expectedRevision");
-    const current = await this.load(executionId);
-    if (!current) throw new ExecutionJournalNotFoundError(executionId);
-    if (current.revision !== expectedRevision) {
-      throw new ExecutionJournalRevisionError(
-        executionId,
-        expectedRevision,
-        current.revision
-      );
-    }
-    validateMutableState(current.definition, nextState);
+    return this.serializeWrite(executionId, async () => {
+      const current = await this.load(executionId);
+      if (!current) throw new ExecutionJournalNotFoundError(executionId);
+      if (current.revision !== expectedRevision) {
+        throw new ExecutionJournalRevisionError(
+          executionId,
+          expectedRevision,
+          current.revision
+        );
+      }
+      validateMutableState(current.definition, nextState);
 
-    const next: ExecutionJournalRecord = {
-      definition: clone(current.definition),
-      revision: current.revision + 1,
-      createdAt: current.createdAt,
-      updatedAt: this.now().toISOString(),
-      ...clone(nextState)
-    };
-    const path = this.recordPath(executionId);
-    const tempPath = await this.writeTemp(path, next);
-    try {
-      await rename(tempPath, path);
-    } finally {
-      await unlink(tempPath).catch(() => undefined);
-    }
-    await this.syncDirectory();
-    return clone(next);
+      const next: ExecutionJournalRecord = {
+        definition: clone(current.definition),
+        revision: current.revision + 1,
+        createdAt: current.createdAt,
+        updatedAt: this.now().toISOString(),
+        ...clone(nextState)
+      };
+      const path = this.recordPath(executionId);
+      const tempPath = await this.writeTemp(path, next);
+      try {
+        await rename(tempPath, path);
+      } finally {
+        await unlink(tempPath).catch(() => undefined);
+      }
+      await this.syncDirectory();
+      return clone(next);
+    });
+  }
+
+  private serializeWrite<T>(executionId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.writeChains.get(executionId) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(operation);
+    this.writeChains.set(executionId, current);
+    return current.finally(() => {
+      if (this.writeChains.get(executionId) === current) {
+        this.writeChains.delete(executionId);
+      }
+    });
   }
 
   private recordPath(executionId: string): string {
