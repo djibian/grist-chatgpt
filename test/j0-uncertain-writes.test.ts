@@ -48,10 +48,7 @@ function mcpBody(error: unknown): Record<string, unknown> {
 
 test("J0 T0: first ambiguous batch is uncertain rather than a generic failure", async () => {
   const grist = serviceWithCreate(async () => {
-    throw new GristTransportError(
-      "response lost after possible dispatch",
-      "UNCERTAIN"
-    );
+    throw new GristTransportError("response lost after possible dispatch", "UNCERTAIN");
   });
 
   await assert.rejects(
@@ -89,10 +86,7 @@ test("J0 T1: confirmed created IDs survive a later uncertain batch", async () =>
     if (calls === 1) {
       return { records: [{ id: 701 }, { id: 702 }] };
     }
-    throw new GristTransportError(
-      "response lost after possible dispatch",
-      "UNCERTAIN"
-    );
+    throw new GristTransportError("response lost after possible dispatch", "UNCERTAIN");
   });
 
   await assert.rejects(
@@ -172,13 +166,10 @@ test("Grist client classifies a mutating transport failure as uncertain", async 
   try {
     const grist = new GristClient({
       baseUrl: "https://grist.example.org",
-      apiKey: "secret"
+      apiKey: "test-api-key"
     });
     await assert.rejects(
-      () =>
-        grist.createRecords("doc", "Table1", [
-          { fields: { n: 1 } }
-        ]),
+      () => grist.createRecords("doc", "Table1", [{ fields: { n: 1 } }]),
       (error: unknown) => {
         assert.ok(error instanceof GristTransportError);
         assert.equal(error.effectKnowledge, "UNCERTAIN");
@@ -200,7 +191,7 @@ test("Grist client keeps read transport failures non-mutating", async () => {
   try {
     const grist = new GristClient({
       baseUrl: "https://grist.example.org",
-      apiKey: "secret"
+      apiKey: "test-api-key"
     });
     await assert.rejects(
       () => grist.listTables("doc"),
@@ -227,13 +218,10 @@ test("mutating 5xx responses are conservatively classified as uncertain", async 
   try {
     const grist = new GristClient({
       baseUrl: "https://grist.example.org",
-      apiKey: "secret"
+      apiKey: "test-api-key"
     });
     await assert.rejects(
-      () =>
-        grist.createRecords("doc", "Table1", [
-          { fields: { n: 1 } }
-        ]),
+      () => grist.createRecords("doc", "Table1", [{ fields: { n: 1 } }]),
       (error: unknown) => {
         assert.ok(error instanceof GristApiError);
         assert.equal(error.status, 503);
@@ -247,7 +235,7 @@ test("mutating 5xx responses are conservatively classified as uncertain", async 
   }
 });
 
-test("mutating 4xx responses remain proven no-effect failures for J0 classification", async () => {
+test("mutating HTTP errors stay uncertain until endpoint semantics prove no effect", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
     new Response(JSON.stringify({ error: "invalid request" }), {
@@ -258,18 +246,15 @@ test("mutating 4xx responses remain proven no-effect failures for J0 classificat
   try {
     const grist = new GristClient({
       baseUrl: "https://grist.example.org",
-      apiKey: "secret"
+      apiKey: "test-api-key"
     });
     await assert.rejects(
-      () =>
-        grist.createRecords("doc", "Table1", [
-          { fields: { n: 1 } }
-        ]),
+      () => grist.createRecords("doc", "Table1", [{ fields: { n: 1 } }]),
       (error: unknown) => {
         assert.ok(error instanceof GristApiError);
         assert.equal(error.status, 400);
-        assert.equal(error.effectKnowledge, "NOT_APPLIED");
-        assert.equal(mcpBody(error).code, "grist_upstream");
+        assert.equal(error.effectKnowledge, "UNCERTAIN");
+        assert.equal(mcpBody(error).code, "uncertain_write");
         return true;
       }
     );
