@@ -11,6 +11,7 @@ const MAX_FINGERPRINT_NODES = 100_000;
 const MAX_FINGERPRINT_DEPTH = 32;
 const MAX_FINGERPRINT_ARRAY_ITEMS = 2_100;
 const MAX_FINGERPRINT_OBJECT_KEYS = 256;
+const MAX_FINGERPRINT_TOTAL_CHARS = 1_048_576;
 const PERMISSION_KEYS = ["create", "read", "update", "delete", "schemaEdit"] as const;
 
 type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -99,6 +100,7 @@ interface RawSnapshot {
 
 interface FingerprintState {
   nodes: number;
+  characters: number;
   complete: boolean;
 }
 
@@ -142,7 +144,11 @@ function boundedCanonicalize(
   state: FingerprintState,
   depth = 0
 ): unknown {
-  if (state.nodes >= MAX_FINGERPRINT_NODES || depth > MAX_FINGERPRINT_DEPTH) {
+  if (
+    state.nodes >= MAX_FINGERPRINT_NODES ||
+    state.characters >= MAX_FINGERPRINT_TOTAL_CHARS ||
+    depth > MAX_FINGERPRINT_DEPTH
+  ) {
     state.complete = false;
     return "__bounded_metadata__";
   }
@@ -155,9 +161,17 @@ function boundedCanonicalize(
     return "__unsupported_number__";
   }
   if (typeof value === "string") {
-    if (value.length <= MAX_METADATA_JSON_CHARS) return value;
-    state.complete = false;
-    return ["__oversized_string__", value.length];
+    if (value.length > MAX_METADATA_JSON_CHARS) {
+      state.complete = false;
+      return ["__oversized_string__", value.length];
+    }
+    if (state.characters + value.length > MAX_FINGERPRINT_TOTAL_CHARS) {
+      state.characters = MAX_FINGERPRINT_TOTAL_CHARS;
+      state.complete = false;
+      return ["__aggregate_string_limit__", value.length];
+    }
+    state.characters += value.length;
+    return value;
   }
   if (typeof value !== "object") {
     state.complete = false;
@@ -169,7 +183,10 @@ function boundedCanonicalize(
     if (value.length > MAX_FINGERPRINT_ARRAY_ITEMS) state.complete = false;
     const result: unknown[] = [];
     for (let index = 0; index < length; index += 1) {
-      if (state.nodes >= MAX_FINGERPRINT_NODES) {
+      if (
+        state.nodes >= MAX_FINGERPRINT_NODES ||
+        state.characters >= MAX_FINGERPRINT_TOTAL_CHARS
+      ) {
         state.complete = false;
         break;
       }
@@ -184,7 +201,10 @@ function boundedCanonicalize(
   const keys = rawKeys.slice(0, MAX_FINGERPRINT_OBJECT_KEYS).sort();
   const entries: Array<[string, unknown]> = [];
   for (const key of keys) {
-    if (state.nodes >= MAX_FINGERPRINT_NODES) {
+    if (
+      state.nodes >= MAX_FINGERPRINT_NODES ||
+      state.characters >= MAX_FINGERPRINT_TOTAL_CHARS
+    ) {
       state.complete = false;
       break;
     }
@@ -193,13 +213,20 @@ function boundedCanonicalize(
       entries.push(["__oversized_key__", key.length]);
       continue;
     }
+    if (state.characters + key.length > MAX_FINGERPRINT_TOTAL_CHARS) {
+      state.characters = MAX_FINGERPRINT_TOTAL_CHARS;
+      state.complete = false;
+      entries.push(["__aggregate_key_limit__", key.length]);
+      break;
+    }
+    state.characters += key.length;
     entries.push([key, boundedCanonicalize(record[key], state, depth + 1)]);
   }
   return Object.fromEntries(entries);
 }
 
 function fingerprint(snapshot: RawSnapshot): { value: string; complete: boolean } {
-  const state: FingerprintState = { nodes: 0, complete: true };
+  const state: FingerprintState = { nodes: 0, characters: 0, complete: true };
   const canonical = boundedCanonicalize(snapshot, state);
   return {
     value: createHash("sha256").update(JSON.stringify(canonical), "utf8").digest("hex"),
