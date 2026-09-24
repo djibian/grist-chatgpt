@@ -46,7 +46,7 @@ On the reference fixture the observed columns are `Stages.Type_de_contact`, `Sta
 
 `responsible(T, S)` means the current assignment: Stage S references teacher T in the observed `Stages.Suivi_par` relation.
 
-This establishes business responsibility, not effective browser authorization by itself. The LinkKey attribute, Grist access rules and current-responsibility behavior require controlled observation. The Builder must bind the predicate to each tested application's real model and must not invent another responsibility relation merely for the test.
+This establishes business responsibility, not effective browser authorization by itself. The owner reports that a teacher-specific URL from `Enseignants` passes a LinkKey and that Grist ACLs restrict the teacher's adapted interface to assigned Stages. The exact LinkKey attribute, rule source and negative/reassignment behavior still require controlled observation. The Builder must bind the predicate to each tested application's real model and must not invent another responsibility relation merely for the test.
 
 ## 5. Managed scope
 
@@ -189,7 +189,7 @@ When the effective policy depends on the Grist web client's `user.LinkKey`, cont
 **Criticality:** IMPORTANT for reachability; CRITICAL if its absence prevents an impacted access or business requirement.  
 **Authority:** ACCEPTED BASELINE.
 
-The assigned teacher can reach the existing “Suivi des stages” flow and see/edit the authorized follow-up trace, including the actual contact date. A date column in `Stages` alone does not prove the field is present in the card or available under teacher permissions.
+The assigned teacher can reach the existing “Suivi des stages” flow and see/edit the authorized follow-up trace, including the actual contact date. The owner reports that the date was added to the follow-up sheet. This does not prove that the assigned teacher sees or can edit it through the actual LinkKey URL.
 
 ### STAGE-U2 — unrelated human layout changes are preserved
 
@@ -271,7 +271,7 @@ LinkKey attribute/policy -> exact tested rule source and relevant identities
 teacher-facing page/widget -> current IDs, visible field mapping and editor capabilities
 ```
 
-In the current reference the partially observed mapping is `Stages.Suivi_par` → `Enseignants`, and `Stages.Date_du_contact` is an editable Date field. The accompanying binding document records page/widget observations and outstanding ACL/UI facts. A rename between accepted states updates mappings rather than creating a duplicate logical component.
+In the current reference the partially observed mapping is `Stages.Suivi_par` → `Enseignants`, and `Stages.Date_du_contact` is an editable Date field. The accompanying binding document records page/widget observations, the owner's confirmation of the sheet display and outstanding teacher-specific ACL/UI evidence. A rename between accepted states updates mappings rather than creating a duplicate logical component.
 
 ## 14. Known/possible dependency graph required for J2
 
@@ -351,9 +351,9 @@ A critical unknown outside the dependency closure of the J2 change does not auto
 
 Human-accepted choices: follow-up on the existing Stage row; `Suivi_par` is the assigned teacher; a call or visit trace has type, actual contact date, implication, punctuality and comments; correction/clearing is allowed; former teachers lose responsibility-derived access on reassignment while the trace remains. No separate Visit table or author-audit field is mandated.
 
-Observed binding: the named reference Grist document has `Stages.Suivi_par` (`Ref:Enseignants`), `Type_de_contact` (`Appel`/`Visite`), `Implication`, `Ponctuel`, `Commentaire`, and the newly added editable Date `Date_du_contact`. The “Suivi des stages” page uses widgets 31 and 37 on `Stages`; `Enseignants.Lien_Stages` links there with `LinkKey_Token`.
+Observed binding: the named reference Grist document has `Stages.Suivi_par` (`Ref:Enseignants`), `Type_de_contact` (`Appel`/`Visite`), `Implication`, `Ponctuel`, `Commentaire`, and the newly added editable Date `Date_du_contact`. The “Suivi des stages” page uses widgets 31 and 37 on `Stages`; `Enseignants.Lien_Stages` links there with `LinkKey_Token`. The owner reports that the date is now in the sheet and teacher-specific links filter the displayed Stages through Grist ACLs; those effects still need controlled tests.
 
-Still `UNKNOWN` until direct controlled evidence: exact Grist ACL rules and `user.LinkKey` attributes; whether widget 37's explicit field layout contains the new date; effective teacher read/write/clear permissions, invalid/revoked/reassigned behavior; managed/shared UI regions and dependency closure. No author identity field or per-contact history is established. These facts must not be fabricated from owner API access.
+Still `UNKNOWN` until direct controlled evidence: exact Grist ACL rules and `user.LinkKey` attributes; the teacher-specific URL's resolved date field mapping; effective teacher read/write/clear permissions, invalid/revoked/reassigned behavior; managed/shared UI regions and dependency closure. No author identity field or per-contact history is established. These facts must not be fabricated from owner API access.
 
 ## 20. J2 exit criteria
 

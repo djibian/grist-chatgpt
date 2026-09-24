@@ -22,7 +22,9 @@ On reassignment from A to B, A loses access derived solely from current responsi
 
 ## 3. Teacher-facing behavior
 
-The intended teacher can use the existing “Suivi des stages” flow for assigned Stages to view and edit the authorized fields. The date of the call or visit must be reachable there alongside the other trace fields. Preserve existing human-maintained layout unless the accepted transformation explicitly manages a specific part. The current card's visible fields and access behavior still require browser verification.
+The intended teacher can use the existing “Suivi des stages” flow for assigned Stages to view and edit the authorized fields. The date of the call or visit must be reachable there alongside the other trace fields. Preserve existing human-maintained layout unless the accepted transformation explicitly manages a specific part. The document owner reports having added the date to the visible follow-up sheet. Whether the same date is available to an assigned teacher through the LinkKey URL, and whether the ACL permits only the intended edits, still require a controlled browser test.
+
+The teacher receives a specific follow-up URL from the `Enseignants` table. Its LinkKey and the application's ACL rules are intended to present an adapted interface containing only the Stages assigned to that teacher. J2 must preserve and verify this existing access path instead of replacing it with owner-level API access or a newly invented ACL.
 
 ## 4. Author attribution
 
@@ -36,8 +38,8 @@ The reference acceptance matrix must show, with controlled teacher identities an
 - another teacher cannot read or write protected follow-up data outside current responsibility;
 - reassignment revokes the former teacher's responsibility-derived access while preserving the trace;
 - missing, invalid and revoked LinkKeys deny the protected path according to the observed policy;
-- the follow-up date is present in the intended teacher-facing view;
+- the follow-up date appears in the teacher's actual LinkKey flow and is editable only with the intended permissions;
 - repeating the accepted transformation does not duplicate fields, widgets, rules or records;
 - the J1 execution engine handles protected effects, interruption, uncertainty and recovery.
 
-Schema and page/widget IDs are partly observed, but the actual ACL rule source, browser permissions, card field mapping and dependency closure are not yet verified. These are fixture observations, not permission to invent a new policy or declare J2 complete. A controlled browser session and an isolated test fixture are required before those critical verdicts can pass. Direct maintenance of the reference document's date column is **not** a J2 execution-engine proof.
+Schema and page/widget IDs are partly observed, and the document owner reports that the date is now visible in the follow-up sheet. The actual ACL rule source, teacher browser permissions, resolved widget field mapping and dependency closure are not yet independently verified. These are fixture observations, not permission to invent a new policy or declare J2 complete. A controlled browser session using the teacher-specific URLs and an isolated test fixture are required before those critical verdicts can pass. Direct maintenance of the reference document's date column is **not** a J2 execution-engine proof.

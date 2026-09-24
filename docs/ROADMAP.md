@@ -59,7 +59,7 @@ Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       
                                                                     -> J3 -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency. Its Stage follow-up business semantics are accepted, and a partial reference schema/page binding is recorded; critical LinkKey ACL and teacher-facing UI behavior remain unverified. J2 implementation is blocked on those observations and a controlled fixture, not on a choice to create a separate Visit entity. The Builder may not invent missing bindings. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 and J1 have both passed exact-main integrated completion reviews, and J1's finite contractual-execution proof is exhausted. J2 is now the next product dependency. Its Stage follow-up business semantics are accepted, and a partial reference schema/page binding is recorded; critical LinkKey ACL and teacher-specific UI behavior remain unverified, although the owner reports adding the date to the follow-up sheet and confirms that teacher links in `Enseignants` use LinkKeys with ACL-based filtering. J2 implementation is blocked on those observations and a controlled fixture, not on a choice to create a separate Visit entity. The Builder may not invent missing bindings. J3-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -531,13 +531,13 @@ No generalized Builder planner, ACL authoring, browser LinkKey suite or durable 
 
 ### J2 — stage-tracking reference application
 
-**Status: BLOCKED by unverified reference ACL/UI binding and controlled fixture**
+**Status: BLOCKED by unverified teacher LinkKey/ACL behavior and controlled fixture**
 
 Goal: demonstrate one realistic cross-cutting application transformation covering schema, access policy, UI, human-change preservation, concurrency and recovery.
 
 Authoritative behavioral specification: `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md`. Accepted business decisions: `docs/J2-STAGE-TRACKING-ACCEPTED-SEMANTICS.md`. Partial observed fixture binding: `docs/J2-STAGE-TRACKING-REFERENCE-BINDING.md`.
 
-The teacher assigned in `Stages.Suivi_par` makes an `Appel` or `Visite` and leaves the contact date, implication, punctuality and comments on that Stage. `Suivi_par` is not an author audit. The reference document now has editable `Stages.Date_du_contact`, added through direct maintenance; this is not a J2 engine proof. J2 requires no new Visit table. Before effectful J2 implementation, verify the real LinkKey access rules, teacher-facing card/date visibility and edit permissions, dependency closure and a controlled synthetic fixture. The Builder cannot turn unobserved ACL/UI facts into accepted policy.
+The teacher assigned in `Stages.Suivi_par` makes an `Appel` or `Visite` and leaves the contact date, implication, punctuality and comments on that Stage. `Suivi_par` is not an author audit. The reference document now has editable `Stages.Date_du_contact`, added through direct maintenance; this is not a J2 engine proof. J2 requires no new Visit table. Before effectful J2 implementation, verify the real LinkKey access rules, date visibility and edit permissions through the teacher-specific URLs, dependency closure and a controlled synthetic fixture. The owner confirms that the date is now visible in the follow-up sheet; this is not yet a controlled teacher/ACL verdict. The Builder cannot turn unobserved ACL/UI facts into accepted policy.
 
 Exit requires all impacted critical properties to be contextually `VERIFIED`, including real supported browser-path LinkKey tests where the policy depends on `user.LinkKey`.
 
