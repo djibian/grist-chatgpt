@@ -59,7 +59,7 @@ Q0 DONE                   C4 -> C5 -> C6           P1 / P2 / P3 / P4 DONE       
                                                               -> J4 -> J5 -> J6
 ```
 
-Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 has passed its exact-main integrated completion review, and J1 is ACTIVE: PR #130 integrated immutable execution/plan/contract identity plus the durable controlled-environment `ExecutionJournal` foundation on exact `main` `54f742ccd97bb0c53994d4d4b36414a0616c40d1`; the remaining finite committed J1 work is recorded below. J2-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
+Q0 established the post-audit runtime trust baseline. The frozen Agentic Builder vision is integrated, J0 has passed its exact-main integrated completion review, and J1 is ACTIVE: PR #130 integrated immutable execution/plan/contract identity plus the durable controlled-environment `ExecutionJournal` foundation, and independently reviewed PR #133 integrated the write-ahead lifecycle/restart semantics on exact `main` `8568a8cbca55d0da7b15dcca5c4e48c65fb57c68`; the remaining finite committed J1 work is recorded below. J2-J6 remain dependency-gated exactly as defined below; old deferred P5/P6 ideas do not become eligible merely because the Builder program exists.
 
 OpenAI does not provide a pre-review eligibility determination for this case. Public-directory approval therefore remains review-dependent, but that review-time classification no longer blocks bounded reviewer/submission preparation. It does not block private ChatGPT Developer Mode use, Codex use, product-capability development or production-quality platform engineering that is independently useful.
 
@@ -511,17 +511,17 @@ Authoritative specification: `docs/EXECUTION-ENGINE-J0-J1.md`, J1 sections.
 Integrated J1 foundation:
 
 1. **immutable execution/plan/contract identity** — PR #130, integrated on exact `main` `54f742ccd97bb0c53994d4d4b36414a0616c40d1`;
-2. **`ExecutionJournal` abstraction plus one durable controlled-environment implementation** — PR #130, including restart persistence, bounded contractual state vocabulary, same-process CAS protection and explicit one-writer-process filesystem limitation.
+2. **`ExecutionJournal` abstraction plus one durable controlled-environment implementation** — PR #130, including restart persistence, bounded contractual state vocabulary, same-process CAS protection and explicit one-writer-process filesystem limitation;
+3. **write-ahead step lifecycle and restart uncertainty** — PR #133, independently reviewed and integrated on exact `main` `8568a8cbca55d0da7b15dcca5c4e48c65fb57c68`, including immutable bounded effect-intent identity, durable `RUNNING` preparation before any dispatch, retained confirmed effect evidence and pessimistic `UNCERTAIN` + `SUSPENDED` restart semantics without blind replay.
 
 Committed remaining J1 work:
 
-1. write-ahead step lifecycle and restart semantics;
-2. cumulative per-plan budget enforcement;
-3. authorization re-check before resumed/new effects;
-4. executable contextual property-evidence transitions;
-5. capability-specific recovery/suspension and convergence rules required by the first scenario;
-6. one deterministic synthetic transformation with crash/fault injection at the specified boundaries;
-7. integrated J1 completion review.
+1. cumulative per-plan budget enforcement;
+2. authorization re-check before resumed/new effects;
+3. executable contextual property-evidence transitions;
+4. capability-specific recovery/suspension and convergence rules required by the first scenario;
+5. one deterministic synthetic transformation with crash/fault injection at the specified boundaries;
+6. integrated J1 completion review.
 
 J1 exit criteria are the complete criteria in `docs/EXECUTION-ENGINE-J0-J1.md`: persistent write-ahead execution, cumulative budgets, authority re-check, multidimensional effect knowledge, retained partial results, uncertainty after crash, capability-specific recovery, suspension on unsafe ambiguity, durable contextual evidence, convergence without duplicate effect where supported, and no new generic Grist escape hatch.
 
