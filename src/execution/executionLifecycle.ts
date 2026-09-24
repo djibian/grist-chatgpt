@@ -76,10 +76,11 @@ function hasConfirmedEffect(evidence: ConfirmedEffectEvidence): boolean {
 /**
  * Small J1 lifecycle layer above the durable journal.
  *
- * This class deliberately does not dispatch Grist effects. A caller must first
- * await prepareEffect(), then and only then invoke the external effect. This
- * makes the durable RUNNING record a write-ahead barrier rather than an
- * after-the-fact audit entry.
+ * This class deliberately does not dispatch Grist effects. prepareEffect()
+ * establishes only the durable RUNNING write-ahead prerequisite. It is not a
+ * dispatch authorization: a future J1 coordinator must also satisfy the frozen
+ * preconditions, cumulative budget check/reservation and current authority /
+ * mandate re-check before any external effect is invoked.
  *
  * Recovery is intentionally pessimistic. After restart, a durable RUNNING step
  * without persisted result knowledge is converted to UNCERTAIN and the
