@@ -23,7 +23,8 @@
     "check:oauth-deployment": "tsx tools/oauth-deployment-preflight.ts",
     "smoke:oauth-deployment": "tsx tools/oauth-operational-smoke.ts",
     "j2:observe-fixture": "node --import tsx tools/j2-access-observe.ts",
-    "j2:provision-synthetic-access": "node --import tsx tools/j2-synthetic-access-provision.ts"
+    "j2:provision-synthetic-access": "node --import tsx tools/j2-synthetic-access-provision.ts",
+    "j2:verify-browser": "node --import tsx tools/j2-browser-verify.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",
