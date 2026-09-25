@@ -37,7 +37,23 @@ The explicit alternate-view and Raw Data checks are deliberate negative controls
 
 ## Evidence semantics
 
-Evidence contains only bounded identifiers and outcomes: fixture identity/revision marker, Grist version, contract version, scenario/property IDs, expected/observed booleans or ALLOW/DENY/UNKNOWN values, completeness, verdict and timestamp.
+The accepted evidence version is fixed in code as `j2-stage-tracking-accepted-v1`. Callers cannot relabel the fixed oracle with an arbitrary contract version.
+
+Each scenario evidence record contains only bounded, non-secret provenance and outcomes:
+
+- fixture identity and revision marker;
+- Grist version;
+- accepted contract version;
+- scenario and property IDs;
+- acting/tested LinkKey context from the fixed oracle;
+- accepted criticality for every referenced property;
+- the bounded evidence inputs used by that scenario, including required negative controls;
+- expected and observed ALLOW/DENY/UNKNOWN or boolean outcomes;
+- completeness, verdict, reason codes, method and timestamp.
+
+The acting context, criticality and evidence-input descriptors are derived from the accepted oracle/contract, never from browser content. They contain no LinkKey values, URLs, cookies or business-row contents.
+
+Verdict rules:
 
 - any definite mismatch is `VIOLATED`;
 - browser/session uncertainty, unsupported state or incomplete closure is `UNKNOWN`;
