@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION,
   J2StageTrackingControlledBrowserVerifier,
   type J2BrowserSessionKind,
   type J2BrowserStageObservation,
@@ -75,10 +76,10 @@ const context = Object.freeze({
   fixtureId: "fixture-j2-stage-tracking",
   fixtureRevision: "fixture-rev-2026-09-25",
   gristVersion: "1.7.3",
-  contractVersion: "stage-tracking-v1"
+  contractVersion: J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION
 });
 
-test("J2-C verifier executes the fixed browser oracle and emits bounded verified evidence", async () => {
+test("J2-C verifier executes the fixed browser oracle and emits contextualized verified evidence", async () => {
   const factory = new FakeFactory();
   const verifier = new J2StageTrackingControlledBrowserVerifier(() => 1_790_331_200_000);
 
@@ -93,6 +94,28 @@ test("J2-C verifier executes the fixed browser oracle and emits bounded verified
   assert.ok(report.evidence.every((item) => item.completeness === "COMPLETE"));
   assert.ok(report.evidence.every((item) => item.method === "CONTROLLED_BROWSER"));
   assert.ok(report.evidence.every((item) => item.checkedAt === 1_790_331_200_000));
+  assert.ok(
+    report.evidence.every(
+      (item) => item.contractVersion === J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION
+    )
+  );
+  assert.ok(report.evidence.every((item) => item.actingContext.length > 0));
+  assert.ok(
+    report.evidence.every(
+      (item) =>
+        item.propertyCriticality.length === item.propertyIds.length &&
+        item.propertyCriticality.every(
+          (property, index) => property.propertyId === item.propertyIds[index]
+        )
+    )
+  );
+  assert.ok(
+    report.evidence.every(
+      (item) =>
+        item.evidenceInputs.includes("J2_STAGE_TRACKING_BROWSER_ORACLE") &&
+        item.evidenceInputs.some((input) => input.startsWith("controlled-browser:"))
+    )
+  );
   assert.ok(factory.sessions.length >= 8, "missing and invalid keys must be separate sessions");
   assert.ok(factory.sessions.every((session) => session.closed));
 
@@ -100,6 +123,15 @@ test("J2-C verifier executes the fixed browser oracle and emits bounded verified
   assert.ok(browB);
   assert.equal(browB.observed.protectedRead, "DENY");
   assert.equal(browB.observed.traceRemainsOnSameStage, true);
+  assert.ok(browB.evidenceInputs.includes("raw-data-negative-control"));
+  assert.ok(browB.evidenceInputs.includes("alternate-view-negative-control"));
+
+  const browG = report.evidence.find((item) => item.scenarioId === "BROW-G");
+  assert.ok(browG);
+  assert.deepEqual(browG.propertyCriticality, [
+    { propertyId: "STAGE-U1", criticality: "IMPORTANT" },
+    { propertyId: "STAGE-B2", criticality: "CRITICAL" }
+  ]);
 });
 
 test("J2-C negative controls fail when Raw Data exposes a protected Stage", async () => {
@@ -142,6 +174,17 @@ test("J2-C rejects unbounded context markers before opening any browser session"
   await assert.rejects(
     verifier.verify(factory, { ...context, fixtureId: "https://example.invalid/doc/secret" }),
     /bounded identifier/
+  );
+  assert.equal(factory.sessions.length, 0);
+});
+
+test("J2-C refuses evidence labeled with any contract version other than the accepted oracle version", async () => {
+  const factory = new FakeFactory();
+  const verifier = new J2StageTrackingControlledBrowserVerifier();
+
+  await assert.rejects(
+    verifier.verify(factory, { ...context, contractVersion: "caller-selected-version" as never }),
+    /accepted stage-tracking contract/
   );
   assert.equal(factory.sessions.length, 0);
 });
