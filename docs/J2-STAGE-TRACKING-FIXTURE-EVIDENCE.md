@@ -20,7 +20,7 @@ The controlled fixture was provisioned with the minimum currently reachable synt
 - fictional stage B assigned to teacher B with an empty trace;
 - a `Suivi des stages` page backed by `Stages`, with a record widget and a selected single-record follow-up widget.
 
-During the controlled run, an `Auteur_du_contact -> Enseignants` column was initially added too early. Re-checking the independent fixture oracle showed that `date-present-human-modified` requires `historicalAuthorBindingPresent: false`; the synthetic column was empty and was therefore explicitly removed before this evidence was finalized. This correction is important: J2-D must demonstrate addition/reconciliation of the historical-author binding rather than receiving it pre-provisioned.
+During the controlled run, an `Auteur_du_contact -> Enseignants` column was initially added and then explicitly removed because it was empty and outside the starting fixture shape. The subsequent owner clarification removed reassignment from this workflow: J2-D no longer requires adding a historical-author binding. This preserves the observed sequence while updating the expected transformation.
 
 Post-correction inspection/reads verified:
 
@@ -40,7 +40,7 @@ No real teacher/student data was copied into the fixture.
 
 The two `Token_Stages` cells remain empty. No actual LinkKey value, token URL, cookie, credential, or access-rule literal was supplied through the model-facing connector or recorded in repository evidence.
 
-Future synthetic LinkKeys must be injected through a server-side controlled path and must remain absent from model output, repository files, and ordinary audit payloads.
+Future synthetic LinkKeys must be injected through a server-side controlled path and must remain absent from model output, repository files, and ordinary audit payloads. The currently connected fixture can be read by the model-facing bridge; it must be isolated and a controlled negative read must pass before any key is inserted.
 
 ## What this does **not** prove
 
@@ -64,7 +64,6 @@ Until those items are evidenced, access-related bindings remain `UNKNOWN`; owner
 | `Stage.table` | PROVISIONED |
 | `Stage.currentTeacherRelation` | PROVISIONED (`Suivi_par`) |
 | `Stage.followUpFields` | PROVISIONED for the date-present starting state |
-| `Stage.historicalContactAuthorBinding` | ABSENT BY DESIGN in this starting state; J2-D target |
 | `Teacher.table` | PROVISIONED |
 | `Teacher.linkKeyAttribute` | PLACEHOLDER ONLY; no secret key injected |
 | `AccessModel.stageProtection` | UNKNOWN |

@@ -2,8 +2,8 @@ export type J2InitialFixtureStateId = "date-absent" | "date-present-human-modifi
 export type J2FixtureStateId = J2InitialFixtureStateId | "managed-rerun";
 export type J2TeacherId = "teacher-a" | "teacher-b";
 export type J2StageId = "stage-a" | "stage-b";
-export type J2AccessExpectation = "ALLOW" | "DENY" | "NOT_APPLICABLE";
-export type J2PolicyKnowledge = "ACCEPTED" | "UNKNOWN_POLICY";
+export type J2AccessExpectation = "ALLOW" | "DENY";
+export type J2PolicyKnowledge = "ACCEPTED";
 
 export interface J2SyntheticTeacher {
   id: J2TeacherId;
@@ -25,14 +25,12 @@ export interface J2SyntheticStage {
     implication: string | null;
     punctuality: string | null;
     comment: string | null;
-    historicalAuthor: J2TeacherId | null;
   };
 }
 
 export interface J2FixtureState {
   id: J2FixtureStateId;
   contactDateFieldPresent: boolean;
-  historicalAuthorBindingPresent: boolean;
   humanLayoutMarker: string | null;
   teachers: readonly J2SyntheticTeacher[];
   stages: readonly J2SyntheticStage[];
@@ -48,17 +46,10 @@ export interface J2BrowserExpectation {
     assignmentWrite: J2AccessExpectation;
     traceRemainsOnSameStage: boolean;
     currentAssignmentAfter?: J2TeacherId;
-    historicalAuthorAfter?: J2TeacherId;
     contactDateReachable?: boolean;
-    postReassignmentAccess?: Readonly<Record<J2TeacherId, {
-      protectedRead: J2AccessExpectation;
-      protectedWrite: J2AccessExpectation;
-    }>>;
+    otherTeacherReadAfter?: J2AccessExpectation;
+    otherTeacherWriteAfter?: J2AccessExpectation;
   };
-  /**
-   * UNKNOWN_POLICY is reserved for a scenario with an accepted outcome whose
-   * authorization/attribution policy is deliberately unresolved.
-   */
   policyKnowledge: J2PolicyKnowledge;
   notes: string;
 }
@@ -69,11 +60,10 @@ export interface J2TransformationExpectation {
   propertyIds: readonly string[];
   expected: {
     contactDateFieldCount: 1;
-    historicalAuthorBindingCount: 1;
+    addedHistoricalAuthorFieldCount: 0;
     preserveBusinessRows: true;
     preserveUntargetedSchema: true;
     preserveHumanLayout: boolean;
-    inventLegacyAuthors: false;
     duplicateStageOrTrace: false;
   };
 }
@@ -101,8 +91,7 @@ const dateAbsentStages = Object.freeze([
       contactDate: null,
       implication: "Satisfaisante",
       punctuality: "Oui",
-      comment: "Trace synthétique A",
-      historicalAuthor: null
+      comment: "Trace synthétique A"
     })
   }),
   Object.freeze({
@@ -114,8 +103,7 @@ const dateAbsentStages = Object.freeze([
       contactDate: null,
       implication: null,
       punctuality: null,
-      comment: null,
-      historicalAuthor: null
+      comment: null
     })
   })
 ]);
@@ -130,8 +118,7 @@ const datePresentStages = Object.freeze([
       contactDate: "2026-09-15",
       implication: "Très satisfaisante",
       punctuality: "Oui",
-      comment: "Modification humaine synthétique à préserver",
-      historicalAuthor: null
+      comment: "Modification humaine synthétique à préserver"
     })
   }),
   Object.freeze({
@@ -143,8 +130,7 @@ const datePresentStages = Object.freeze([
       contactDate: null,
       implication: null,
       punctuality: null,
-      comment: null,
-      historicalAuthor: null
+      comment: null
     })
   })
 ]);
@@ -154,7 +140,6 @@ export const J2_STAGE_TRACKING_FIXTURE_STATES: Readonly<Record<J2FixtureStateId,
     "date-absent": Object.freeze({
       id: "date-absent" as const,
       contactDateFieldPresent: false,
-      historicalAuthorBindingPresent: false,
       humanLayoutMarker: null,
       teachers,
       stages: dateAbsentStages
@@ -162,7 +147,6 @@ export const J2_STAGE_TRACKING_FIXTURE_STATES: Readonly<Record<J2FixtureStateId,
     "date-present-human-modified": Object.freeze({
       id: "date-present-human-modified" as const,
       contactDateFieldPresent: true,
-      historicalAuthorBindingPresent: false,
       humanLayoutMarker: "fixture-human-layout-v1",
       teachers,
       stages: datePresentStages
@@ -170,7 +154,6 @@ export const J2_STAGE_TRACKING_FIXTURE_STATES: Readonly<Record<J2FixtureStateId,
     "managed-rerun": Object.freeze({
       id: "managed-rerun" as const,
       contactDateFieldPresent: true,
-      historicalAuthorBindingPresent: true,
       humanLayoutMarker: "fixture-human-layout-v1",
       teachers,
       stages: datePresentStages
@@ -245,32 +228,23 @@ export const J2_STAGE_TRACKING_BROWSER_ORACLE: readonly J2BrowserExpectation[] =
       traceRemainsOnSameStage: true
     }),
     policyKnowledge: "ACCEPTED" as const,
-    notes: "Relation tampering must not broaden access; this is distinct from an authorized reassignment."
+    notes: "Relation tampering must not broaden access or change the assigned teacher."
   }),
   Object.freeze({
     id: "BROW-F" as const,
-    propertyIds: Object.freeze(["STAGE-B10", "STAGE-A1", "STAGE-A4"]),
-    actingContext: "separate-authorized-reassignment-after-teacher-a-contact",
+    propertyIds: Object.freeze(["STAGE-B10", "STAGE-B1", "STAGE-A4"]),
+    actingContext: "teacher-a-corrects-then-clears-contact-on-stage-a",
     expected: Object.freeze({
-      protectedRead: "NOT_APPLICABLE" as const,
-      protectedWrite: "NOT_APPLICABLE" as const,
-      assignmentWrite: "ALLOW" as const,
+      protectedRead: "ALLOW" as const,
+      protectedWrite: "ALLOW" as const,
+      assignmentWrite: "DENY" as const,
       traceRemainsOnSameStage: true,
-      currentAssignmentAfter: "teacher-b" as const,
-      historicalAuthorAfter: "teacher-a" as const,
-      postReassignmentAccess: Object.freeze({
-        "teacher-a": Object.freeze({
-          protectedRead: "DENY" as const,
-          protectedWrite: "DENY" as const
-        }),
-        "teacher-b": Object.freeze({
-          protectedRead: "ALLOW" as const,
-          protectedWrite: "ALLOW" as const
-        })
-      })
+      currentAssignmentAfter: "teacher-a" as const,
+      otherTeacherReadAfter: "DENY" as const,
+      otherTeacherWriteAfter: "DENY" as const
     }),
-    policyKnowledge: "UNKNOWN_POLICY" as const,
-    notes: "The reassignment outcome is accepted, but the exact actor authorized to perform it is intentionally unresolved. B's later edit-attribution policy is also unresolved."
+    policyKnowledge: "ACCEPTED" as const,
+    notes: "Correction and clearing preserve the Stage and its assigned teacher; B's separate link remains denied."
   }),
   Object.freeze({
     id: "BROW-G" as const,
@@ -296,11 +270,10 @@ export const J2_STAGE_TRACKING_TRANSFORMATION_ORACLE: readonly J2TransformationE
       propertyIds: Object.freeze(["STAGE-B7", "STAGE-B8", "STAGE-H1", "STAGE-H2"]),
       expected: Object.freeze({
         contactDateFieldCount: 1 as const,
-        historicalAuthorBindingCount: 1 as const,
+        addedHistoricalAuthorFieldCount: 0 as const,
         preserveBusinessRows: true as const,
         preserveUntargetedSchema: true as const,
         preserveHumanLayout: true,
-        inventLegacyAuthors: false as const,
         duplicateStageOrTrace: false as const
       })
     }),
@@ -310,11 +283,10 @@ export const J2_STAGE_TRACKING_TRANSFORMATION_ORACLE: readonly J2TransformationE
       propertyIds: Object.freeze(["STAGE-B7", "STAGE-U2", "STAGE-H1", "STAGE-H2", "STAGE-H3"]),
       expected: Object.freeze({
         contactDateFieldCount: 1 as const,
-        historicalAuthorBindingCount: 1 as const,
+        addedHistoricalAuthorFieldCount: 0 as const,
         preserveBusinessRows: true as const,
         preserveUntargetedSchema: true as const,
         preserveHumanLayout: true,
-        inventLegacyAuthors: false as const,
         duplicateStageOrTrace: false as const
       })
     }),
@@ -324,26 +296,19 @@ export const J2_STAGE_TRACKING_TRANSFORMATION_ORACLE: readonly J2TransformationE
       propertyIds: Object.freeze(["STAGE-B8", "STAGE-U3"]),
       expected: Object.freeze({
         contactDateFieldCount: 1 as const,
-        historicalAuthorBindingCount: 1 as const,
+        addedHistoricalAuthorFieldCount: 0 as const,
         preserveBusinessRows: true as const,
         preserveUntargetedSchema: true as const,
         preserveHumanLayout: true,
-        inventLegacyAuthors: false as const,
         duplicateStageOrTrace: false as const
       })
     })
   ]);
 
-export const J2_STAGE_TRACKING_UNRESOLVED_POLICIES = Object.freeze({
-  reassignmentAuthority: "UNKNOWN_POLICY" as const,
-  replacementByNewTeacherChangesHistoricalAuthor: "UNKNOWN_POLICY" as const
-});
-
 export const J2_STAGE_TRACKING_REQUIRED_BINDINGS = Object.freeze([
   "Stage.table",
   "Stage.currentTeacherRelation",
   "Stage.followUpFields",
-  "Stage.historicalContactAuthorBinding",
   "Teacher.table",
   "Teacher.linkKeyAttribute",
   "AccessModel.stageProtection",

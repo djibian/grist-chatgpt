@@ -15,8 +15,8 @@ test("J2-B rerun starts from an already managed structural post-state", () => {
 
   const state = J2_STAGE_TRACKING_FIXTURE_STATES[rerun.startingState];
   assert.equal(state.contactDateFieldPresent, true);
-  assert.equal(state.historicalAuthorBindingPresent, true);
-  assert.equal(state.stages[0]!.trace.historicalAuthor, null);
+  assert.equal(rerun.expected.contactDateFieldCount, 1);
+  assert.equal(rerun.expected.addedHistoricalAuthorFieldCount, 0);
   assert.equal(state.humanLayoutMarker, "fixture-human-layout-v1");
 });
 
@@ -26,6 +26,6 @@ test("J2-B managed rerun preserves the human-modified business state", () => {
 
   assert.deepEqual(managedRerun.stages, humanModified.stages);
   assert.equal(managedRerun.humanLayoutMarker, humanModified.humanLayoutMarker);
-  assert.equal(humanModified.historicalAuthorBindingPresent, false);
-  assert.equal(managedRerun.historicalAuthorBindingPresent, true);
+  assert.equal(humanModified.contactDateFieldPresent, true);
+  assert.equal(managedRerun.contactDateFieldPresent, true);
 });
