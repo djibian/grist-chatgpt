@@ -221,14 +221,14 @@ test("J2-B refuses to overwrite a non-pristine unknown AccessModel", async () =>
   assert.equal(client.observedActions.length, 0);
 });
 
-test("J2-B requires the date-present initial state to leave historical author binding absent", async () => {
+test("J2-B rejects an author field outside the date-present fixture shape", async () => {
   const client = new FixtureClient();
   client.includeHistoricalAuthor = true;
   const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
 
   await assert.rejects(
     () => provisioner.provision(AUTHORITY),
-    /must not pre-provision the historical author binding/
+    /unexpected historical author field/
   );
   assert.equal(client.observedActions.length, 0);
 });

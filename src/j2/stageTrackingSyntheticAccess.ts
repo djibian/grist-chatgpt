@@ -189,7 +189,7 @@ function validateFixtureSchema(stageColumns: Map<string, string>, teacherColumns
   requireColumn(stageColumns, "Commentaire", "Text");
   if (stageColumns.has("Auteur_du_contact")) {
     throw new Error(
-      "date-present-human-modified must not pre-provision the historical author binding."
+      "date-present-human-modified has an unexpected historical author field."
     );
   }
 

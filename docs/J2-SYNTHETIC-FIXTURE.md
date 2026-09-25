@@ -4,6 +4,8 @@ Status: **J2-B fixture/oracle foundation; disposable Grist provisioning and pari
 
 This document defines the synthetic data states and independent expected-outcome matrix used by the stage-tracking reference scenario. It does not claim that a Grist fixture with the reference AccessModel has already been provisioned, and it does not derive business expectations from observed ACL rules.
 
+The currently connected fixture is readable through the model-facing bridge. Do not provision LinkKeys there until it is isolated and a controlled negative read probe verifies the exact bridge configuration.
+
 ## Independent oracle
 
 `src/j2/stageTrackingFixture.ts` is the executable fixture/oracle manifest. Its expected outcomes come from the accepted `docs/BEHAVIORAL-CONTRACT-STAGE-TRACKING.md` and `docs/J2-STAGE-TRACKING-ACCEPTED-SEMANTICS.md`.
@@ -30,20 +32,18 @@ Two committed **initial** states are represented:
 ### `date-absent`
 
 - contact-date field absent;
-- historical contact-author binding absent;
 - two fictional teachers with distinct LinkKey handles;
-- a synthetic Stage assigned to A with an existing follow-up trace whose historical author is unknown;
-- no date or historical author is invented for that legacy trace.
+- a synthetic Stage assigned to A with an existing follow-up trace;
+- no date is invented for that legacy trace.
 
 This state is intended to exercise the actual Builder addition when J2-D becomes eligible.
 
 ### `date-present-human-modified`
 
 - contact-date field already present;
-- historical contact-author binding still absent;
 - existing synthetic contact date and follow-up content present;
 - a human-layout marker represents unrelated/shared UI state that must be preserved;
-- historical author remains unknown until a new contact is captured under the accepted rule.
+- assignment A remains unchanged during contact editing.
 
 This state exercises reconciliation with an already-satisfied structural property and legitimate human changes.
 
@@ -52,11 +52,10 @@ This state exercises reconciliation with an already-satisfied structural propert
 The manifest also contains a derived post-transformation verification state used only for the convergence/rerun oracle:
 
 - contact-date field already present exactly once;
-- historical contact-author binding already present exactly once;
 - the human-modified business rows and layout marker are unchanged;
-- the legacy trace's historical author remains unknown rather than being fabricated.
+- no additional author field is introduced.
 
-`TRANSFORM-RERUN` starts from this already managed state. It therefore tests a genuine second application of the same accepted intent, rather than accidentally testing the first addition of the historical-author binding again.
+`TRANSFORM-RERUN` starts from this already managed state. It tests a second application of the accepted intent without requiring another schema change.
 
 ## Browser matrix
 
@@ -69,15 +68,10 @@ The manifest fixes BROW-A through BROW-G before any browser run:
 | BROW-C | missing/invalid LinkKey exposes no protected trace |
 | BROW-D | revoked key loses protected access |
 | BROW-E | teacher self-assignment/relation tampering is denied and cannot broaden access |
-| BROW-F | after A records a contact, a separately authorized A → B reassignment preserves the single trace and author A; responsibility/access moves from A to B |
+| BROW-F | A records, corrects and clears a contact; the Stage and assignment A persist and B's separate link stays denied |
 | BROW-G | the contact date is reachable/editable in the assigned teacher's intended follow-up UI |
 
-BROW-F deliberately records two unresolved policies without weakening the accepted outcome:
-
-- the exact actor/role authorized to initiate reassignment;
-- whether a later B correction/replacement changes attribution of A's existing trace.
-
-Those remain `UNKNOWN_POLICY`. The fixture does not invent answers.
+BROW-F verifies that trace editing leaves `Suivi_par` unchanged. It does not require an author-history column.
 
 ## Transformation matrix
 
@@ -87,7 +81,7 @@ The manifest fixes expected transformation behavior for:
 - date-present/human-modified initial state;
 - a true rerun from the derived managed post-state.
 
-Each expects exactly one contact-date field and one historical-author binding after the applicable transformation, no duplicated Stage/trace, no fabricated legacy author, preservation of business rows and untargeted schema, and preservation/reconciliation of the human layout.
+Each expects exactly one contact-date field after the applicable transformation, no additional author field, no duplicated Stage/trace, preservation of business rows and untargeted schema, and preservation/reconciliation of the human layout.
 
 ## Binding requirements
 
@@ -96,7 +90,6 @@ Before a provisioned Grist fixture can claim parity for this scenario, it must b
 - Stage table;
 - current teacher relation;
 - follow-up fields;
-- historical contact-author binding;
 - Teacher table;
 - LinkKey user attribute;
 - Stage AccessModel protection;

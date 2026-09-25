@@ -6,7 +6,7 @@ The reference document is the existing Grist document named “suivi des stages 
 
 ## 1. Follow-up responsibility and trace
 
-`Stages.Suivi_par` designates the teacher assigned to contact the student's placement host, either by telephone or during a visit. When that teacher records the contact, the teacher is the attributed **business author** of the trace. The author of that contact must remain the same if the Stage is later reassigned. This attribution does not independently prove which person entered or last edited each cell.
+`Stages.Suivi_par` designates the teacher assigned to contact the student's placement host, either by telephone or during a visit. When that teacher records the contact, the teacher is the attributed **business author** of the trace. The accepted workflow does not reassign the Stage. This attribution does not independently prove which person entered or last edited each cell.
 
 The teacher's follow-up trace belongs to the **existing Stage record**. Its current fields are `Type_de_contact` (choices `Appel` and `Visite`), `Date_du_contact` (date of the call or visit), `Implication`, `Ponctuel`, and `Commentaire`. The date is a contact date, distinct from the start/end dates of the placement. Existing rows may have no date; no historical date may be fabricated. A completed new follow-up records the contact date together with the relevant trace fields.
 
@@ -18,7 +18,7 @@ No physical `Visit` table, row, relation or page is required for this reference 
 
 `responsible(T, S)` means that Stage S currently references teacher T through `Stages.Suivi_par`. Authorization for the teacher-facing flow must additionally be established from the real Grist LinkKey policy; this relation alone is not a proof of ACL enforcement.
 
-Entering or correcting a contact and executing a J2 transformation must not silently reassign `Suivi_par`. A later administrative reassignment from teacher A to B is a distinct event: A remains the historical author of the contact A performed, the single existing trace remains on the Stage, and current responsibility/teacher-facing access moves to B. A teacher must not be able to change the assignment relation merely to acquire another Stage's protected information. The authority permitted to initiate reassignment remains a separate open policy choice.
+Entering, correcting or clearing a contact and executing a J2 transformation must leave `Suivi_par` unchanged. There is no reassignment scenario in this accepted workflow. A teacher must not be able to change the assignment relation merely to acquire another Stage's protected information.
 
 ## 3. Teacher-facing behavior
 
@@ -28,9 +28,9 @@ The teacher receives a specific follow-up URL from the `Enseignants` table. Its 
 
 ## 4. Author attribution
 
-At the time of a contact, its business author is the then-assigned teacher. Because `Suivi_par` is mutable current responsibility, it cannot alone retain the historical author A after reassignment to B. J2 must bind a durable historical contact-author identity on the same Stage record, creating a narrowly managed field only if the observed fixture has no equivalent. It must capture the assigned teacher at the actual contact event, preserve that identity through reassignment, and avoid inventing authors for old rows whose provenance is unknown. The exact Grist capture/ACL mechanism requires a safe accepted plan. The observed schema currently has no separate author field.
+The teacher assigned in `Suivi_par` is the business author when that teacher records the contact. Because the accepted workflow has no reassignment, J2 does not need to create an additional historical contact-author field. Do not claim knowledge of who recorded old traces when their provenance is unknown.
 
-A teacher-specific LinkKey URL grants access to its holder under the observed ACLs; it does not prove which person actually typed in a cell. This business attribution is not a technical edit audit. How attribution changes if B later corrects or replaces A's trace is still an explicit open decision; no implementation may silently choose it.
+A teacher-specific LinkKey URL grants access to its holder under the observed ACLs; it does not prove which person actually typed in a cell. This business attribution is not a technical edit audit.
 
 ## 5. J2 evidence and remaining gate
 
@@ -38,10 +38,10 @@ The reference acceptance matrix must show, with controlled teacher identities an
 
 - an assigned teacher can enter, correct, replace and clear the single contact trace on the same Stage, including its date, without creating another Stage or a contact-history record;
 - another teacher cannot read or write protected follow-up data outside their assignment or change `Suivi_par` to acquire access;
-- contact entry, correction, clearing and J2 execution do not themselves change `Suivi_par`; after a separate authorized reassignment A → B, A remains the historical author of A's existing contact and the trace survives;
-- after reassignment A → B, A loses access derived solely from current responsibility and B gains only the permitted current-responsibility access; missing, invalid and revoked LinkKeys deny the protected path according to the observed policy;
+- contact entry, correction, clearing and J2 execution preserve `Suivi_par` and the same Stage; B's distinct teacher link cannot access A's protected Stage;
+- missing, invalid and revoked LinkKeys deny the protected path according to the observed policy;
 - the follow-up date appears in the teacher's actual LinkKey flow and is editable only with the intended permissions;
 - repeating the accepted transformation does not duplicate fields, widgets, rules or records;
 - the J1 execution engine handles protected effects, interruption, uncertainty and recovery.
 
-Schema and page/widget IDs are partly observed, and the document owner reports that the date is now visible in the follow-up sheet. The current Stage schema has no historical contact-author column, so author retention after reassignment is an unimplemented fixture/model gap, not a proven feature. The actual ACL rule source, teacher browser permissions, resolved widget field mapping and dependency closure are not yet independently verified. These are fixture observations, not permission to invent a new policy or declare J2 complete. A controlled browser session using the teacher-specific URLs and an isolated test fixture are required before those critical verdicts can pass. Direct maintenance of the reference document's date column is **not** a J2 execution-engine proof.
+Schema and page/widget IDs are partly observed, and the document owner reports that the date is now visible in the follow-up sheet. The actual ACL rule source, teacher browser permissions, resolved widget field mapping and dependency closure are not yet independently verified. These are fixture observations, not permission to invent a new policy or declare J2 complete. A controlled browser session using the teacher-specific URLs and an isolated test fixture are required before those critical verdicts can pass. Direct maintenance of the reference document's date column is **not** a J2 execution-engine proof.
