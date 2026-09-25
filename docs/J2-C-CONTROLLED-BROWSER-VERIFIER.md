@@ -1,80 +1,66 @@
-# J2-C controlled browser verifier core
+# J2-C controlled browser verifier
 
-Status: **implementation foundation only; no live browser evidence yet**.
+Status: **bounded implementation present; live browser evidence still gated by J2-B fixture isolation/provisioning**.
 
-This component implements the bounded evidence/orchestration core for roadmap slice J2-C. It does not expose browser control through MCP or GPT Actions and it does not claim that the stage-tracking fixture has passed BROW-A through BROW-G.
+This slice implements both the fixed BROW-A…BROW-G evidence/orchestration core and an internal Grist/Chromium adapter. It does not expose browser control through MCP or GPT Actions and it does not claim that the stage-tracking fixture has passed the browser matrix.
 
 ## Boundary
 
-`src/j2/stageTrackingBrowserVerifier.ts` accepts only a restricted server-side `J2ControlledBrowserSessionFactory`. The verifier itself never accepts or returns:
+`src/j2/stageTrackingBrowserVerifier.ts` accepts only a restricted server-side `J2ControlledBrowserSessionFactory`. The verifier never accepts or returns arbitrary URLs/origins, LinkKeys/cookies/API keys, caller-supplied JavaScript/selectors, generic browser commands, screenshots or business-row contents.
 
-- arbitrary URLs or origins;
-- LinkKeys, cookies, bearer tokens or API keys;
-- JavaScript snippets;
-- CSS/XPath selectors;
-- generic browser commands;
-- screenshots or business row contents.
+`src/j2/stageTrackingGristBrowserAdapter.ts` implements that port for exactly one operator-configured synthetic fixture. Its configuration is bounded to one Grist origin, one exact document ID/path, one teacher page reference, one alternate page reference and the reviewed selector profile `grist-core-b393db7`. Unsupported selector profiles fail closed.
 
-A future concrete Grist browser adapter must receive those operational details from protected server-side configuration, bind them to one configured synthetic fixture, and implement only the narrow session operations declared by this port.
+`src/j2/chromiumCdpPipe.ts` launches a fresh headless Chromium profile on `about:blank` and controls it only through a private `--remote-debugging-pipe`. Secret Grist URLs are sent after process launch through that pipe, so LinkKeys are not placed in Chromium argv. The transport exposes only navigation, fixed-expression evaluation, bounded text insertion and a tiny fixed-key set to the J2 adapter; it is not a generic model-facing browser capability.
 
-Mutating session methods return **both** the browser access decision and a checked application postcondition. `ALLOW + APPLIED` means the intended deterministic trace mutation was persisted (including the expected correction, clearing or contact-date value); `DENY + NOT_APPLIED` means a definitive refusal and confirmed non-application. An allowed click or HTTP response without an exact postcondition is `application: UNKNOWN`, and cannot produce `VERIFIED`. This allows negative scenarios to establish unchanged Stage/assignment state without requiring a forbidden protected read merely to prove non-mutation. The concrete adapter must verify postconditions through the permitted fixture authority without leaking protected content to a different browser principal.
+Mutating session methods return **both** the browser access decision and a checked application postcondition. `ALLOW + APPLIED` means the intended deterministic trace mutation was persisted; `DENY + NOT_APPLIED` means a definitive UI refusal/non-reachability plus a confirmed unchanged fixture state. Unverifiable effects remain `UNKNOWN`. Postconditions are checked through the owner-authorized fixture API, never by leaking protected content into another browser principal.
 
-The test-only `revokeTeacherALinkKey()` operation is bounded to the configured isolated fixture and the same server-held key used by the positive `teacher-a` and post-revocation `revoked-key` sessions. It may return `APPLIED` only after an exact revocation postcondition; response loss or ambiguity returns `UNKNOWN` without a blind retry. The verifier runs BROW-D **last**, first observing that this same key could read Stage A, then revoking it and checking denial through a new browser session. Evidence remains in the oracle's BROW-A…G order. This order keeps the earlier teacher A positive controls meaningful. The eventual adapter must bind the pre/post observations and relevant fixture revision to the same key and fail closed if it cannot do so.
+The test-only `revokeTeacherALinkKey()` is a one-shot owner effect. It verifies the exact precondition, sends at most one update, then resolves even an ambiguous response by one post-read. It never blindly retries. The old server-held key is retained only in memory for the later `revoked-key` browser session.
+
+## Operator command and mandatory preconditions
+
+`npm run j2:verify-browser` runs `tools/j2-browser-verify.ts`. It requires protected operator configuration including:
+
+- `J2_OWNER_AUTHORIZED=YES`;
+- exact fixture document ID and Grist origin/path;
+- owner Grist API key distinct from the model-facing bridge key;
+- dedicated synthetic LinkKey seed;
+- teacher and alternate page refs;
+- Chromium executable;
+- bounded Grist version marker;
+- `J2_GRIST_BROWSER_SELECTOR_PROFILE=grist-core-b393db7`.
+
+Before deriving any synthetic LinkKey or launching Chromium, the command reconstructs the deployed model-facing bridge resource policy and executes the strongest model-facing read probe against the fixture. The verdict must be freshly `DENIED`. `READABLE` or `UNKNOWN` refuses execution. The command then requires the fixture to contain the exact already-provisioned server-held synthetic keys and active teacher identities.
+
+This means the currently documented READABLE fixture cannot be exercised by this command. The environment must first satisfy the J2-B isolation gate and then rerun bounded synthetic access provisioning.
 
 ## Fixed scenarios
 
-The core consumes the independent `J2_STAGE_TRACKING_BROWSER_ORACLE`; it cannot rewrite expected outcomes from observed browser behavior.
+The core consumes the independent `J2_STAGE_TRACKING_BROWSER_ORACLE`; observed browser behavior cannot rewrite expectations.
 
-It orchestrates:
-
-- BROW-A: assigned teacher A can read/write the protected trace while assignment writes remain denied;
-- BROW-B: teacher B is denied on the teacher flow, an alternate reachable view, and Raw Data;
-- BROW-C: missing and invalid LinkKeys are tested in separate sessions and both must deny;
-- BROW-D: a previously valid LinkKey, explicitly revoked on the isolated fixture, must then deny;
-- BROW-E: relation/self-assignment tampering remains denied;
-- BROW-F: A enters, corrects and clears the trace on the same Stage with `Suivi_par` unchanged, then B remains denied;
+- BROW-A: assigned A can read/write the protected trace while assignment writes remain denied.
+- BROW-B: B is denied on the teacher flow, an alternate reachable view and Raw Data.
+- BROW-C: missing and invalid LinkKeys are tested in separate sessions and both deny.
+- BROW-D: the same A key is observed working, revoked server-side, then denied in a fresh session.
+- BROW-E: relation/self-assignment tampering remains denied.
+- BROW-F: A enters, corrects and clears a trace on the same Stage with `Suivi_par` unchanged, then B remains denied.
 - BROW-G: the contact date is reachable/editable in A's teacher flow while assignment writes remain denied.
 
-The explicit alternate-view and Raw Data checks are deliberate negative controls: merely observing a filtered teacher sheet is not enough to prove isolation.
+The alternate-view and Raw Data checks are deliberate negative controls: a filtered teacher sheet alone is insufficient evidence of isolation.
 
 ## Evidence semantics
 
-The accepted evidence version is fixed in code as `j2-stage-tracking-accepted-v1`. Callers cannot relabel the fixed oracle with an arbitrary contract version.
+The accepted evidence version is fixed as `j2-stage-tracking-accepted-v1`. Evidence contains only bounded non-secret provenance and outcomes: fixture identity/revision fingerprint, Grist version, scenario/property IDs, fixed acting context, accepted criticality, expected/observed ALLOW/DENY/UNKNOWN values, completeness, reason codes and timestamp.
 
-Each scenario evidence record contains only bounded, non-secret provenance and outcomes:
-
-- fixture identity and revision marker;
-- Grist version;
-- accepted contract version;
-- scenario and property IDs;
-- acting/tested LinkKey context from the fixed oracle;
-- accepted criticality for every referenced property;
-- the bounded evidence inputs used by that scenario, including required negative controls;
-- for BROW-D, an observed positive before revocation and a confirmed server-side revocation effect;
-- expected and observed ALLOW/DENY/UNKNOWN or boolean outcomes;
-- completeness, verdict, reason codes, method and timestamp.
-
-The acting context, criticality and evidence-input descriptors are derived from the accepted oracle/contract, never from browser content. They contain no LinkKey values, URLs, cookies or business-row contents.
-
-Verdict rules:
-
-- any definite mismatch is `VIOLATED`;
-- a definite contrary access observation takes precedence over uncertainty in another session or view;
-- browser/session uncertainty, unsupported state or incomplete closure is `UNKNOWN`;
-- `VERIFIED` requires every expected comparison and required denial control to complete successfully;
-- after the first `UNKNOWN` or `VIOLATED` scenario, later scenarios are not executed against a potentially changed fixture and receive `UNKNOWN` with `PRIOR_SCENARIO_NOT_VERIFIED`;
-- exceptions are intentionally discarded rather than copied into evidence, because browser errors may contain secret URLs or tokens.
-
-Closing a browser session is part of completeness. A close failure cannot silently produce complete evidence.
+Any definite mismatch is `VIOLATED`; uncertainty is `UNKNOWN`; `VERIFIED` requires every fixed comparison and negative control to complete. After the first `UNKNOWN` or `VIOLATED` scenario, later scenarios are not executed against a potentially changed fixture. Exceptions are intentionally collapsed to non-secret failure states rather than copied into evidence.
 
 ## Remaining J2-C work
 
-This foundation is necessary but not sufficient for J2-C completion. A later reviewable slice must add the concrete internal Grist browser adapter and operator command, bound to a configured isolated fixture and server-held synthetic links. That adapter must fail closed on selector/version ambiguity and must not become a model-facing generic browser tool.
+Implementation is reviewable, but J2-C is not complete until the real disposable fixture can produce fresh accepted browser evidence. That live run is blocked by the current J2-B environmental isolation gate, not by missing generic browser capability.
 
-Only after J2-B has fresh isolation/provisioning evidence may the concrete verifier be run against the synthetic fixture. A local fixture pass still does not by itself prove the DINUM/reference teacher path.
+A successful isolated synthetic-fixture pass still does not by itself prove the DINUM/reference teacher path; reference parity remains a separate evidence question.
 
 ## Reference review
 
 Reference classification: **REIMPLEMENT**.
 
-The design was checked against the official `gristlabs/grist-core` browser-test conventions. In particular, Grist's own nbrowser tests exercise Raw Data through a dedicated `.test-tools-raw` UI control and use test-oriented DOM markers. Those conventions support using a real browser for the negative/control path, but no Grist test-helper implementation is copied here. The future adapter should reuse stable supported/test markers only where they are confirmed for the target Grist version and otherwise return `UNKNOWN`.
+The adapter was checked against `gristlabs/grist-core` at commit `b393db7ba2e45ecb47fb8734c2d9d185152ce20d`. Grist documents `LinkKey_NAME` URL parameters as `NAME_`, assigns browser link parameters to `user.LinkKey`, and its nbrowser suite uses `.test-tools-raw`, `.test-raw-data-*`, `.g_record_detail_*`, `.g-column-label`, `.gridview_row` and `.field_clip` markers for the relevant UI paths. The implementation reuses those reviewed conventions but copies no Grist browser-helper implementation. Selector/profile mismatch or UI ambiguity fails to `UNKNOWN` rather than manufacturing proof.

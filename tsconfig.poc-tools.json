@@ -12,6 +12,7 @@
     "tools/plugin-submission-annotations.ts",
     "tools/oauth-deployment-preflight.ts",
     "tools/oauth-operational-smoke.ts",
-    "tools/j2-access-observe.ts"
+    "tools/j2-access-observe.ts",
+    "tools/j2-browser-verify.ts"
   ]
 }
