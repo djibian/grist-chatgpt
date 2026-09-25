@@ -42,6 +42,24 @@ The two `Token_Stages` cells remain empty. No actual LinkKey value, token URL, c
 
 Future synthetic LinkKeys must be injected through a server-side controlled path and must remain absent from model output, repository files, and ordinary audit payloads. The currently connected fixture can be read by the model-facing bridge; it must be isolated and a controlled negative read must pass before any key is inserted.
 
+## Fresh model-facing isolation observation — 2026-09-25
+
+Controller recovery against exact repository `main` `ce71a68be2dbdf724326823a0996010c0fb0f94b` rechecked the disposable fixture through the connected model-facing Grist Community surface.
+
+Observed fixture identity:
+
+- workspace: `ChatGPT`;
+- document: `J2-stage-tracking-fixture`;
+- document ID: `ejwdJoXmDVuZWbo8mtwCAq`.
+
+The model-facing document discovery surface listed that exact fixture as available, and a bounded `query_records` call against `Enseignants` succeeded and returned the synthetic `teacher-a` row. Therefore the current model-facing path is **READABLE**, not isolated. This is a definitive negative result for the provisioning precondition: no synthetic LinkKey seed may be evaluated and no LinkKey/ACL provisioning may proceed while this bridge configuration can address and read the fixture.
+
+A model-facing attempt to query `_grist_ACLRules` was rejected by the bridge's internal-metadata boundary. That rejection is the expected public-surface behavior and does **not** satisfy J2-A: owner-scoped normalized AccessModel observation still requires the dedicated internal owner-authorized observer/operator path.
+
+The next admissible J2-B step is environmental, not a model-facing mutation: place the fixture outside the deployed model-facing resource boundary exactly as required by `docs/J2-MODEL-FACING-ISOLATION-PROBE.md` (separate test origin, or a same-origin document-only allowlist configuration that statically excludes this exact document with no workspace allowlist), then run the protected operator command and obtain a fresh `DENIED` isolation verdict before provisioning secrets or ACLs.
+
+No LinkKey, API key, cookie, token URL, ACL literal, or non-synthetic business data was read or recorded by this observation.
+
 ## What this does **not** prove
 
 This step does not complete J2-B and does not unlock a parity claim.
