@@ -80,11 +80,13 @@ export function fingerprintJ2ModelFacingBridgeConfig(config: Pick<
  * DENIED is returned only when the target is statically outside the bridge:
  * - the fixture lives on a different Grist origin; or
  * - the bridge uses only explicit document allowlisting and the fixture ID is
- *   absent from that allowlist.
+ *   absent from that allowlist, while the actual strongest read path also
+ *   fails to read it.
  *
- * Otherwise the same AuthorizedGristService record-read path is exercised.
- * A successful read is READABLE. Every error is UNKNOWN, including local
- * authorization errors, upstream ACL/auth failures and transport failures.
+ * For every same-origin case the same AuthorizedGristService record-read path
+ * is exercised first. A successful read is READABLE. An error becomes DENIED
+ * only when the static document-only exclusion independently proves that the
+ * target cannot cross the resource boundary; otherwise it remains UNKNOWN.
  */
 export class J2ModelFacingIsolationProbe implements J2SyntheticModelFacingIsolationProbe {
   private readonly bridgeOrigin: string;
@@ -123,15 +125,17 @@ export class J2ModelFacingIsolationProbe implements J2SyntheticModelFacingIsolat
       return { ...base, verdict: "DENIED" };
     }
 
-    if (!this.hasWorkspaceAllowlist && !this.allowedDocumentIds.has(target)) {
-      return { ...base, verdict: "DENIED" };
-    }
+    const staticallyExcluded =
+      !this.hasWorkspaceAllowlist && !this.allowedDocumentIds.has(target);
 
     try {
       await this.service.queryRecords(target, FIXTURE_TABLE, { limit: 1 });
       return { ...base, verdict: "READABLE" };
     } catch {
-      return { ...base, verdict: "UNKNOWN" };
+      return {
+        ...base,
+        verdict: staticallyExcluded ? "DENIED" : "UNKNOWN"
+      };
     }
   }
 }
