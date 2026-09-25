@@ -1,10 +1,12 @@
 # J2 model-facing fixture isolation probe
 
-Status: **internal J2-B operator path; not a public MCP capability.**
+Status: **internal diagnostic/provisioner path; not a universal J2 prerequisite or public MCP capability.**
 
-J2 must not write synthetic LinkKeys into a fixture that any model-facing bridge path can read with the bridge's server-held Grist credential. The synthetic provisioner already fails closed unless a recent `DENIED` verdict is supplied for the exact fixture and bridge configuration. This document defines the concrete operator-side implementation of that verdict.
+J2 must never write synthetic LinkKeys into a test application that any model-facing bridge path can read with the bridge's server-held Grist credential. That invariant remains mandatory. This document describes the stricter static `DENIED` contract implemented by the existing synthetic provisioner; using this particular provisioner still requires that verdict. The compressed J2 roadmap does **not** require every valid test setup to use this provisioner or this static proof shape.
 
-## What counts as `DENIED`
+Prefer a separate test Grist origin with no model-facing bridge. A same-origin test may be acceptable only under the stronger whole-window conditions in `docs/ROADMAP.md` and the BehavioralContract: stable/exclusive configuration, strongest-path negative evidence before token creation, no return to model-facing reach while tokens exist, verified token cleanup, and a final negative read. The current probe does not implement that dynamic window protocol, so such a setup must not pretend that a momentary failure satisfies this probe.
+
+## What counts as `DENIED` for this probe
 
 `J2ModelFacingIsolationProbe` is deliberately stricter than ordinary error handling. A runtime refusal is not permission evidence.
 
@@ -17,9 +19,9 @@ Those facts do not depend on upstream ACL behavior or successful authentication 
 
 For a different-origin fixture, no bridge read can address that Grist instance because the product has one fixed configured Grist origin. For every **same-origin** case, the operator command also constructs a deliberately strongest model-facing read principal with every configured document/workspace grant plus `doc:read` and attempts one bounded `Enseignants` read through the same `AuthorizedGristService.queryRecords` path used by public record reads.
 
-A successful same-origin read is always `READABLE`, even if the separately supplied static boundary description claimed exclusion. An error becomes `DENIED` only when the document-only static exclusion independently proves that the target is outside the bridge; otherwise **every error is `UNKNOWN`**, including local authorization refusal, upstream HTTP/ACL denial, authentication failure, transport failure and missing-table behavior. None of those ambiguous errors can authorize provisioning.
+A successful same-origin read is always `READABLE`, even if the separately supplied static boundary description claimed exclusion. An error becomes `DENIED` only when the document-only static exclusion independently proves that the target is outside the bridge; otherwise **every error is `UNKNOWN`**, including local authorization refusal, upstream HTTP/ACL denial, authentication failure, transport failure and missing-table behavior. None of those ambiguous errors can authorize this provisioner.
 
-This is intentionally conservative. In particular, a same-origin bridge with a workspace allowlist does not obtain `DENIED` merely because the fixture is currently outside an allowed workspace; workspace membership can change. Use a separate test origin or a document-only allowlist that statically excludes the fixture.
+This is intentionally conservative. In particular, a same-origin bridge with a workspace allowlist does not obtain `DENIED` merely because the fixture is currently outside an allowed workspace; workspace membership can change. Use a separate test origin or a document-only allowlist that statically excludes the fixture when using this command.
 
 ## Configuration fingerprint
 
@@ -64,4 +66,10 @@ The command first proves the exact disposable fixture identity with the dedicate
 
 After isolation is proven, the existing J2 provisioner applies its bounded ACL-before-token action batch and exact-postcondition/no-blind-replay logic.
 
-A successful command is J2-B fixture provisioning evidence only. It does not establish teacher-browser behavior, reference-fixture parity or J2 completion; J2-C and the remaining J2 evidence are still required.
+## Role after J2 design compression
+
+A successful command proves only that this synthetic provisioning path ran under its own isolation contract. It does **not** prove that the installed synthetic ACL policy matches the reference application's relevant policy, and running the command is no longer a prerequisite to J2-T1.
+
+The preferred compressed path is to use a sanitized realistic copy that preserves the relevant existing policy/UI and to execute the actual J1-backed date/UI transformation there. If the existing synthetic provisioner is useful for diagnostics, it may still be run under the strict rules above, but its fixed policy must not be used as evidence of reference-policy preservation.
+
+Teacher-browser behavior, reference/copy parity and J2 completion remain separate evidence obligations under the current roadmap.
