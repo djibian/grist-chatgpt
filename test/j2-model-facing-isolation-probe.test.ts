@@ -72,13 +72,13 @@ test("different Grist origin proves DENIED without touching the model-facing rea
   assert.equal(called, false);
 });
 
-test("same-origin document-only allowlist proves DENIED when fixture ID is excluded", async () => {
+test("same-origin document-only exclusion requires a negative strongest-path read", async () => {
   let called = false;
   const probe = new J2ModelFacingIsolationProbe(
     {
       async queryRecords() {
         called = true;
-        return { records: [] };
+        throw new Error("bridge resource policy refused target");
       }
     } as never,
     boundary({ allowedDocumentIds: ["allowed-doc"], allowedWorkspaceIds: [] }),
@@ -87,7 +87,22 @@ test("same-origin document-only allowlist proves DENIED when fixture ID is exclu
   );
 
   assert.equal((await probe.checkFixtureRead("fixture123")).verdict, "DENIED");
-  assert.equal(called, false);
+  assert.equal(called, true);
+});
+
+test("same-origin static exclusion cannot hide a contradictory successful read", async () => {
+  const probe = new J2ModelFacingIsolationProbe(
+    {
+      async queryRecords() {
+        return { records: [] };
+      }
+    } as never,
+    boundary({ allowedDocumentIds: ["allowed-doc"], allowedWorkspaceIds: [] }),
+    FINGERPRINT,
+    () => 1750
+  );
+
+  assert.equal((await probe.checkFixtureRead("fixture123")).verdict, "READABLE");
 });
 
 test("reachable same-origin fixture is READABLE", async () => {
