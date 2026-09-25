@@ -1,9 +1,11 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { AuthorizationError } from "../auth/authorizationService.js";
-import type { AuthorizedGristService } from "../grist/authorizedService.js";
 import type { Config } from "../config.js";
-import type { J2SyntheticLinkKeyVault, J2SyntheticModelFacingIsolationProbe } from "./stageTrackingSyntheticAccess.js";
+import type { AuthorizedGristService } from "../grist/authorizedService.js";
+import type {
+  J2SyntheticLinkKeyVault,
+  J2SyntheticModelFacingIsolationProbe
+} from "./stageTrackingSyntheticAccess.js";
 
 const FIXTURE_TABLE = "Enseignants";
 const FIXTURE_ID_PATTERN = /^[A-Za-z0-9_-]{8,96}$/;
@@ -15,6 +17,10 @@ export interface J2ModelFacingBridgeFingerprintInput {
   gristBaseUrl: string;
   allowedDocumentIds: readonly string[];
   allowedWorkspaceIds: readonly string[];
+}
+
+export interface J2ModelFacingIsolationBoundary extends J2ModelFacingBridgeFingerprintInput {
+  fixtureBaseUrl: string;
 }
 
 function sortedUnique(values: readonly string[]): string[] {
@@ -42,10 +48,9 @@ function boundedFingerprint(value: string): string {
 
 /**
  * Fingerprint only non-secret model-facing bridge facts that determine whether
- * a document can cross the bridge deployment-resource boundary. A negative
- * verdict from J2ModelFacingIsolationProbe is accepted only for a local
- * AuthorizationError, before the Grist API is called, so the upstream API key
- * identity is deliberately not part of this fingerprint.
+ * a document can cross the bridge deployment-resource boundary. A DENIED
+ * verdict is based only on static origin/resource-policy exclusion, so the
+ * upstream API key identity is deliberately not part of this fingerprint.
  */
 export function fingerprintJ2ModelFacingBridge(
   input: J2ModelFacingBridgeFingerprintInput
@@ -68,20 +73,36 @@ export function fingerprintJ2ModelFacingBridgeConfig(config: Pick<
 }
 
 /**
- * Tests the same AuthorizedGristService boundary used by model-facing tools,
- * with a deliberately strongest resource grant supplied by the caller.
+ * Proves that the disposable fixture cannot cross the configured model-facing
+ * bridge boundary without turning ambiguous runtime errors into permission
+ * evidence.
  *
- * Only a bridge-local AuthorizationError proves DENIED. Upstream 401/403,
- * transport failures, missing tables, authentication failures and every other
- * error remain UNKNOWN; none of them can authorize LinkKey provisioning.
+ * DENIED is returned only when the target is statically outside the bridge:
+ * - the fixture lives on a different Grist origin; or
+ * - the bridge uses only explicit document allowlisting and the fixture ID is
+ *   absent from that allowlist.
+ *
+ * Otherwise the same AuthorizedGristService record-read path is exercised.
+ * A successful read is READABLE. Every error is UNKNOWN, including local
+ * authorization errors, upstream ACL/auth failures and transport failures.
  */
 export class J2ModelFacingIsolationProbe implements J2SyntheticModelFacingIsolationProbe {
+  private readonly bridgeOrigin: string;
+  private readonly fixtureOrigin: string;
+  private readonly allowedDocumentIds: ReadonlySet<string>;
+  private readonly hasWorkspaceAllowlist: boolean;
+
   constructor(
     private readonly service: J2ModelFacingReadSurface,
+    boundary: J2ModelFacingIsolationBoundary,
     private readonly bridgeConfigFingerprint: string,
     private readonly now: () => number = Date.now
   ) {
     boundedFingerprint(bridgeConfigFingerprint);
+    this.bridgeOrigin = normalizedOrigin(boundary.gristBaseUrl);
+    this.fixtureOrigin = normalizedOrigin(boundary.fixtureBaseUrl);
+    this.allowedDocumentIds = new Set(sortedUnique(boundary.allowedDocumentIds));
+    this.hasWorkspaceAllowlist = sortedUnique(boundary.allowedWorkspaceIds).length > 0;
   }
 
   async checkFixtureRead(documentId: string): Promise<{
@@ -92,21 +113,25 @@ export class J2ModelFacingIsolationProbe implements J2SyntheticModelFacingIsolat
   }> {
     const target = boundedFixtureId(documentId);
     const checkedAt = this.now();
+    const base = {
+      documentId: target,
+      checkedAt,
+      bridgeConfigFingerprint: this.bridgeConfigFingerprint
+    };
+
+    if (this.fixtureOrigin !== this.bridgeOrigin) {
+      return { ...base, verdict: "DENIED" };
+    }
+
+    if (!this.hasWorkspaceAllowlist && !this.allowedDocumentIds.has(target)) {
+      return { ...base, verdict: "DENIED" };
+    }
+
     try {
       await this.service.queryRecords(target, FIXTURE_TABLE, { limit: 1 });
-      return {
-        documentId: target,
-        verdict: "READABLE",
-        checkedAt,
-        bridgeConfigFingerprint: this.bridgeConfigFingerprint
-      };
-    } catch (error: unknown) {
-      return {
-        documentId: target,
-        verdict: error instanceof AuthorizationError ? "DENIED" : "UNKNOWN",
-        checkedAt,
-        bridgeConfigFingerprint: this.bridgeConfigFingerprint
-      };
+      return { ...base, verdict: "READABLE" };
+    } catch {
+      return { ...base, verdict: "UNKNOWN" };
     }
   }
 }
