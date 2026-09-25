@@ -10,6 +10,14 @@ J2 needs a semantic description of the Grist access policy that can be compared 
 
 The first adapter is `src/grist/accessModelObserver.ts`.
 
+## Owner-scoped fixture probe
+
+`npm run j2:observe-fixture` is an internal, read-only entry point for exercising that adapter. Supply `J2_GRIST_BASE_URL` (HTTPS origin, or local HTTP loopback), `J2_FIXTURE_DOCUMENT_ID` (plain ID, not a URL) and `J2_GRIST_OWNER_API_KEY` through a protected runtime environment. The key must belong to the disposable fixture's owner and must never be placed in the command line, repository, logs or model input. The script does not use the public MCP operation or the bridge's shared development credential.
+
+Before any internal table read, it discovers the document with that credential and requires exactly one match named `J2-stage-tracking-fixture` in workspace `ChatGPT` with `owners` access. It then permits hidden, capped reads only of the four metadata tables below and the exact fixture ID. The JSON output contains normalized AccessModel data, completeness/issues, a metadata fingerprint and a digest of the document ID; it omits the raw document ID, rule formulas, literal secrets and LinkKeys. Error output does not include upstream response bodies or URLs. A failure is not an instruction to fall back to a public `_grist_*` query.
+
+The probe has not been run against Grist from this repository execution: no dedicated fixture-owner credential is available in this environment. Its local tests verify target/owner preflight, internal read bounds and secret-free output, but cannot certify the remote version, effective teacher permissions, sharing, or fixture/reference parity. After an authorized run, record its bounded result and Grist version if available; keep raw secrets and document identifiers outside repository evidence.
+
 ## Upstream reference review
 
 Bounded reference review used Grist's current public `grist-core` implementation:
