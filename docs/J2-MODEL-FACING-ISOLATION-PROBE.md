@@ -8,14 +8,16 @@ J2 must not write synthetic LinkKeys into a fixture that any model-facing bridge
 
 `J2ModelFacingIsolationProbe` is deliberately stricter than ordinary error handling. A runtime refusal is not permission evidence.
 
-`DENIED` is returned only when the fixture is statically outside the deployed model-facing bridge boundary:
+`DENIED` can be established only from static facts that put the fixture outside the deployed model-facing bridge boundary:
 
 - the disposable fixture is on a different Grist origin from `GRIST_BASE_URL`; or
 - the bridge and fixture share an origin, the bridge uses no workspace allowlist, and the exact fixture document ID is absent from the explicit document allowlist.
 
 Those facts do not depend on upstream ACL behavior or successful authentication and cannot be changed by a Grist row-level rule.
 
-When static exclusion is not provable, the operator command constructs a deliberately strongest model-facing read principal with every configured document/workspace grant plus `doc:read` and attempts one bounded `Enseignants` read through the same `AuthorizedGristService.queryRecords` path used by public record reads. A successful read is `READABLE`. **Every error is `UNKNOWN`**, including local authorization refusal, upstream HTTP/ACL denial, authentication failure, transport failure and missing-table behavior. None of those errors can authorize provisioning.
+For a different-origin fixture, no bridge read can address that Grist instance because the product has one fixed configured Grist origin. For every **same-origin** case, the operator command also constructs a deliberately strongest model-facing read principal with every configured document/workspace grant plus `doc:read` and attempts one bounded `Enseignants` read through the same `AuthorizedGristService.queryRecords` path used by public record reads.
+
+A successful same-origin read is always `READABLE`, even if the separately supplied static boundary description claimed exclusion. An error becomes `DENIED` only when the document-only static exclusion independently proves that the target is outside the bridge; otherwise **every error is `UNKNOWN`**, including local authorization refusal, upstream HTTP/ACL denial, authentication failure, transport failure and missing-table behavior. None of those ambiguous errors can authorize provisioning.
 
 This is intentionally conservative. In particular, a same-origin bridge with a workspace allowlist does not obtain `DENIED` merely because the fixture is currently outside an allowed workspace; workspace membership can change. Use a separate test origin or a document-only allowlist that statically excludes the fixture.
 
@@ -58,7 +60,7 @@ J2_SYNTHETIC_LINKKEY_SEED=<server-held secret, at least 32 characters>
 
 The ordinary bridge environment (`GRIST_BASE_URL`, `GRIST_API_KEY`, allowed document/workspace IDs and the normal auth configuration required by `loadConfig`) must describe the deployed model-facing bridge being tested. Do not replace those values with fixture-owner settings merely to obtain a negative result.
 
-The command first proves the exact disposable fixture identity with the dedicated owner client, then evaluates model-facing isolation. If static isolation cannot be proven and the fixture is readable, the run refuses. If the strongest read path errors in an otherwise ambiguous configuration, the result remains `UNKNOWN` and the run also refuses. The HMAC vault is not called and no ACL or LinkKey is written unless a fresh `DENIED` result is established.
+The command first proves the exact disposable fixture identity with the dedicated owner client, then evaluates model-facing isolation. If the same-origin strongest path can read the fixture, the run refuses. If it errors in a configuration where static exclusion is not independently proven, the result remains `UNKNOWN` and the run also refuses. The HMAC vault is not called and no ACL or LinkKey is written unless a fresh `DENIED` result is established.
 
 After isolation is proven, the existing J2 provisioner applies its bounded ACL-before-token action batch and exact-postcondition/no-blind-replay logic.
 
