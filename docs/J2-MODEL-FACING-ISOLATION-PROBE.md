@@ -6,28 +6,29 @@ J2 must not write synthetic LinkKeys into a fixture that any model-facing bridge
 
 ## What counts as `DENIED`
 
-`J2ModelFacingIsolationProbe` uses the same `AuthorizedGristService.queryRecords` boundary as model-facing record reads. The operator command constructs a deliberately strongest model-facing read principal with:
+`J2ModelFacingIsolationProbe` is deliberately stricter than ordinary error handling. A runtime refusal is not permission evidence.
 
-- every document ID allowed by the deployed bridge resource policy;
-- every workspace ID allowed by that policy;
-- `doc:read`, even if a deployed client has narrower capabilities.
+`DENIED` is returned only when the fixture is statically outside the deployed model-facing bridge boundary:
 
-The probe attempts one bounded read of `Enseignants` for the exact synthetic fixture document ID.
+- the disposable fixture is on a different Grist origin from `GRIST_BASE_URL`; or
+- the bridge and fixture share an origin, the bridge uses no workspace allowlist, and the exact fixture document ID is absent from the explicit document allowlist.
 
-Only a bridge-local `AuthorizationError` is classified as `DENIED`. This proves that the deployment resource boundary rejects the target before the Grist API is called. A successful read is `READABLE`. Upstream HTTP errors, ACL denial, authentication failure, transport failure, missing-table behavior or any other exception are `UNKNOWN`; they cannot authorize provisioning.
+Those facts do not depend on upstream ACL behavior or successful authentication and cannot be changed by a Grist row-level rule.
 
-This is intentionally conservative. It proves exclusion from the configured bridge resource boundary, not correctness of Grist ACLs.
+When static exclusion is not provable, the operator command constructs a deliberately strongest model-facing read principal with every configured document/workspace grant plus `doc:read` and attempts one bounded `Enseignants` read through the same `AuthorizedGristService.queryRecords` path used by public record reads. A successful read is `READABLE`. **Every error is `UNKNOWN`**, including local authorization refusal, upstream HTTP/ACL denial, authentication failure, transport failure and missing-table behavior. None of those errors can authorize provisioning.
+
+This is intentionally conservative. In particular, a same-origin bridge with a workspace allowlist does not obtain `DENIED` merely because the fixture is currently outside an allowed workspace; workspace membership can change. Use a separate test origin or a document-only allowlist that statically excludes the fixture.
 
 ## Configuration fingerprint
 
-The isolation evidence carries a SHA-256 fingerprint over non-secret configuration facts that determine this resource boundary:
+The isolation evidence carries a SHA-256 fingerprint over non-secret model-facing bridge facts:
 
 - normalized Grist origin;
 - sorted allowed document IDs;
 - sorted allowed workspace IDs;
 - the probe contract/version and `doc:read` capability.
 
-The upstream API key is deliberately not fingerprinted. A `DENIED` verdict is accepted only when the bridge rejected the document locally before an upstream request, so API-key identity is not part of that proof. The provisioner already requires the probe fingerprint to match the fingerprint supplied for the current run and rejects stale evidence after 60 seconds.
+The upstream API key is deliberately not fingerprinted. A `DENIED` verdict depends only on static origin/resource-policy exclusion, so credential identity is not part of that proof. The provisioner already requires the probe fingerprint to match the fingerprint supplied for the current run and rejects stale evidence after 60 seconds.
 
 ## Synthetic LinkKey derivation
 
@@ -57,6 +58,8 @@ J2_SYNTHETIC_LINKKEY_SEED=<server-held secret, at least 32 characters>
 
 The ordinary bridge environment (`GRIST_BASE_URL`, `GRIST_API_KEY`, allowed document/workspace IDs and the normal auth configuration required by `loadConfig`) must describe the deployed model-facing bridge being tested. Do not replace those values with fixture-owner settings merely to obtain a negative result.
 
-The command first proves the exact disposable fixture identity with the dedicated owner client, then evaluates the model-facing denial. If the fixture is reachable through the deployment allowlist, the run refuses before the HMAC vault is called and before any ACL or LinkKey write. If isolation is proven, the existing J2 provisioner applies its bounded ACL-before-token action batch and exact-postcondition/no-blind-replay logic.
+The command first proves the exact disposable fixture identity with the dedicated owner client, then evaluates model-facing isolation. If static isolation cannot be proven and the fixture is readable, the run refuses. If the strongest read path errors in an otherwise ambiguous configuration, the result remains `UNKNOWN` and the run also refuses. The HMAC vault is not called and no ACL or LinkKey is written unless a fresh `DENIED` result is established.
+
+After isolation is proven, the existing J2 provisioner applies its bounded ACL-before-token action batch and exact-postcondition/no-blind-replay logic.
 
 A successful command is J2-B fixture provisioning evidence only. It does not establish teacher-browser behavior, reference-fixture parity or J2 completion; J2-C and the remaining J2 evidence are still required.
