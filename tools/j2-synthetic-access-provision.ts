@@ -84,6 +84,7 @@ async function buildStrongestModelFacingReadService() {
 
   return {
     service: await contextFactory.create(principal),
+    config,
     fingerprint: fingerprintJ2ModelFacingBridgeConfig(config)
   };
 }
@@ -98,8 +99,17 @@ async function main(): Promise<void> {
   const ownerMandateId = requiredEnv("J2_OWNER_MANDATE_ID");
   const seed = requiredEnv("J2_SYNTHETIC_LINKKEY_SEED");
 
-  const { service, fingerprint } = await buildStrongestModelFacingReadService();
-  const isolationProbe = new J2ModelFacingIsolationProbe(service, fingerprint);
+  const { service, config, fingerprint } = await buildStrongestModelFacingReadService();
+  const isolationProbe = new J2ModelFacingIsolationProbe(
+    service,
+    {
+      gristBaseUrl: config.gristBaseUrl,
+      fixtureBaseUrl: ownerOrigin,
+      allowedDocumentIds: config.allowedDocumentIds,
+      allowedWorkspaceIds: config.allowedWorkspaceIds
+    },
+    fingerprint
+  );
   const vault = new J2HmacSyntheticLinkKeyVault(seed, documentId);
   const ownerClient = new GristClient({ baseUrl: ownerOrigin, apiKey: ownerApiKey });
   const provisioner = new J2StageTrackingSyntheticAccessProvisioner(
@@ -124,7 +134,7 @@ async function main(): Promise<void> {
         secretHandles: result.secretHandles,
         aclResourceCount: result.aclResourceCount,
         aclRuleCount: result.aclRuleCount,
-        isolationEvidence: "DENIED_BY_MODEL_FACING_RESOURCE_BOUNDARY"
+        isolationEvidence: "DENIED_BY_STATIC_MODEL_FACING_BOUNDARY"
       },
       null,
       2
@@ -135,7 +145,7 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const status = error instanceof GristApiError ? ` (HTTP ${error.status})` : "";
   process.stderr.write(
-    `J2-B synthetic access provisioning refused or failed${status}; verify explicit owner authorization, isolated fixture identity, bridge resource-policy denial and dedicated test credentials.\n`
+    `J2-B synthetic access provisioning refused or failed${status}; verify explicit owner authorization, isolated fixture identity, static bridge resource-policy exclusion and dedicated test credentials.\n`
   );
   process.exitCode = 1;
 });
