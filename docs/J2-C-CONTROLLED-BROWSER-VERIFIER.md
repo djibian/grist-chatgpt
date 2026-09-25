@@ -17,6 +17,8 @@ This component implements the bounded evidence/orchestration core for roadmap sl
 
 A future concrete Grist browser adapter must receive those operational details from protected server-side configuration, bind them to one configured synthetic fixture, and implement only the narrow session operations declared by this port.
 
+For mutating session methods, `DENY` has a strict meaning: the adapter observed a definitive denial **and confirmed that the attempted mutation did not apply**. If the browser state or postcondition cannot establish that, the adapter must return `UNKNOWN`. This allows negative scenarios to establish unchanged Stage/assignment state without requiring a forbidden protected read merely to prove non-mutation.
+
 ## Fixed scenarios
 
 The core consumes the independent `J2_STAGE_TRACKING_BROWSER_ORACLE`; it cannot rewrite expected outcomes from observed browser behavior.

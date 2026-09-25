@@ -27,6 +27,10 @@ export interface J2BrowserStageObservation {
  * Deliberately narrow browser port. Concrete adapters may drive a real browser,
  * but callers cannot provide URLs, JavaScript, selectors, arbitrary commands or
  * credentials through this interface.
+ *
+ * A returned DENY from a mutating method means the adapter observed a definitive
+ * denial and confirmed that the attempted mutation did not apply. Ambiguous UI
+ * state or an unverifiable postcondition must be returned as UNKNOWN instead.
  */
 export interface J2ControlledBrowserSession {
   observeStage(stageId: J2StageId): Promise<J2BrowserStageObservation>;
@@ -122,6 +126,14 @@ function aggregateBoolean(values: readonly (boolean | null | undefined)[]): bool
 function sameStage(before: J2BrowserStageObservation, after: J2BrowserStageObservation): boolean | null {
   if (!before.stageIdentity || !after.stageIdentity) return null;
   return before.stageIdentity === "stage-a" && after.stageIdentity === "stage-a";
+}
+
+function deniedMutationsPreserveStage(
+  protectedWrite: J2ObservedAccess,
+  assignmentWrite: J2ObservedAccess
+): boolean | null {
+  if (protectedWrite === "UNKNOWN" || assignmentWrite === "UNKNOWN") return null;
+  return protectedWrite === "DENY" && assignmentWrite === "DENY";
 }
 
 function emptyUnknownOutcome(): J2BrowserObservedOutcome {
@@ -237,17 +249,16 @@ async function runNegativeSession(
   kind: J2BrowserSessionKind
 ): Promise<{ outcome: J2BrowserObservedOutcome; complete: boolean }> {
   const result = await openAndRun(factory, kind, async (session) => {
-    const before = await session.observeStage("stage-a");
+    const protectedStage = await session.observeStage("stage-a");
     const write = await session.writeTrace("stage-a", "ENTER");
     const assignment = await session.attemptAssignmentChange("stage-a", "teacher-b");
     const alternate = await session.observeAlternateView("stage-a");
     const raw = await session.observeRawData("stage-a");
-    const after = await session.observeStage("stage-a");
     return {
-      protectedRead: aggregateAccess([before.protectedRead, alternate, raw], "DENY"),
+      protectedRead: aggregateAccess([protectedStage.protectedRead, alternate, raw], "DENY"),
       protectedWrite: write,
       assignmentWrite: assignment,
-      traceRemainsOnSameStage: sameStage(before, after),
+      traceRemainsOnSameStage: deniedMutationsPreserveStage(write, assignment),
       alternateViewRead: alternate,
       rawDataRead: raw
     } satisfies J2BrowserObservedOutcome;

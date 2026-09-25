@@ -24,8 +24,8 @@ class FakeSession implements J2ControlledBrowserSession {
     const allowed = this.kind === "teacher-a";
     return {
       protectedRead: allowed ? "ALLOW" : "DENY",
-      stageIdentity: "stage-a",
-      currentAssignment: "teacher-a",
+      stageIdentity: allowed ? "stage-a" : null,
+      currentAssignment: allowed ? "teacher-a" : null,
       contactDateReachable: allowed ? true : null
     };
   }
@@ -42,7 +42,7 @@ class FakeSession implements J2ControlledBrowserSession {
   }
 
   async observeRawData(_stageId: J2StageId): Promise<J2ObservedAccess> {
-    if (this.overrides.rawDataRead) return this.overrides.rawDataRead;
+    if (this.overrides.rawDataRead !== undefined) return this.overrides.rawDataRead;
     return this.kind === "teacher-a" ? "ALLOW" : "DENY";
   }
 
@@ -61,9 +61,11 @@ class FakeFactory implements J2ControlledBrowserSessionFactory {
   constructor(private readonly overrides: { teacherBRawDataRead?: J2ObservedAccess } = {}) {}
 
   async open(kind: J2BrowserSessionKind): Promise<J2ControlledBrowserSession> {
-    const session = new FakeSession(kind, {
-      rawDataRead: kind === "teacher-b" ? this.overrides.teacherBRawDataRead : undefined
-    });
+    const sessionOverrides =
+      kind === "teacher-b" && this.overrides.teacherBRawDataRead !== undefined
+        ? { rawDataRead: this.overrides.teacherBRawDataRead }
+        : {};
+    const session = new FakeSession(kind, sessionOverrides);
     this.sessions.push(session);
     return session;
   }
@@ -93,6 +95,11 @@ test("J2-C verifier executes the fixed browser oracle and emits bounded verified
   assert.ok(report.evidence.every((item) => item.checkedAt === 1_790_331_200_000));
   assert.ok(factory.sessions.length >= 8, "missing and invalid keys must be separate sessions");
   assert.ok(factory.sessions.every((session) => session.closed));
+
+  const browB = report.evidence.find((item) => item.scenarioId === "BROW-B");
+  assert.ok(browB);
+  assert.equal(browB.observed.protectedRead, "DENY");
+  assert.equal(browB.observed.traceRemainsOnSameStage, true);
 });
 
 test("J2-C negative controls fail when Raw Data exposes a protected Stage", async () => {
