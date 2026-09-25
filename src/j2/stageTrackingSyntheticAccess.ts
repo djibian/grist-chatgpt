@@ -82,6 +82,20 @@ export interface J2SyntheticLinkKeyVault {
   getOrCreate(handle: string): Promise<string>;
 }
 
+/**
+ * A test-only probe of the configured model-facing bridge, using a principal
+ * entitled to its broadest fixture read path. UNKNOWN includes unavailable
+ * probes and cannot authorize writing LinkKeys into the fixture.
+ */
+export interface J2SyntheticModelFacingIsolationProbe {
+  checkFixtureRead(documentId: string): Promise<{
+    documentId: string;
+    verdict: "DENIED" | "READABLE" | "UNKNOWN";
+    checkedAt: number;
+    bridgeConfigFingerprint: string;
+  }>;
+}
+
 export interface J2SyntheticAccessAuthority {
   documentId: string;
   principalId: string;
@@ -472,7 +486,9 @@ function buildActions(
 export class J2StageTrackingSyntheticAccessProvisioner {
   constructor(
     private readonly client: J2SyntheticAccessClient,
-    private readonly vault: J2SyntheticLinkKeyVault
+    private readonly vault: J2SyntheticLinkKeyVault,
+    private readonly isolationProbe: J2SyntheticModelFacingIsolationProbe,
+    private readonly bridgeConfigFingerprint: string
   ) {}
 
   async provision(authority: J2SyntheticAccessAuthority): Promise<J2SyntheticAccessProvisioningResult> {
@@ -495,6 +511,20 @@ export class J2StageTrackingSyntheticAccessProvisioner {
     );
     const initialTeachers = teacherRecords(initialSnapshot.teachers);
     validateSyntheticStages(initialSnapshot.stages, initialTeachers);
+    const modelFacingRead = await this.isolationProbe.checkFixtureRead(documentId);
+    if (
+      modelFacingRead.documentId !== documentId ||
+      modelFacingRead.verdict !== "DENIED" ||
+      !Number.isFinite(modelFacingRead.checkedAt) ||
+      modelFacingRead.checkedAt > Date.now() ||
+      Date.now() - modelFacingRead.checkedAt > 60_000 ||
+      !/^[a-f0-9]{64}$/.test(this.bridgeConfigFingerprint) ||
+      modelFacingRead.bridgeConfigFingerprint !== this.bridgeConfigFingerprint
+    ) {
+      throw new Error(
+        "Synthetic LinkKeys cannot be provisioned while the model-facing bridge may read the fixture."
+      );
+    }
     const secrets = await loadSecrets(this.vault);
 
     if (

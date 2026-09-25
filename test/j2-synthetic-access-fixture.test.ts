@@ -4,11 +4,13 @@ import test from "node:test";
 import {
   J2StageTrackingSyntheticAccessProvisioner,
   type J2SyntheticAccessClient,
-  type J2SyntheticLinkKeyVault
+  type J2SyntheticLinkKeyVault,
+  type J2SyntheticModelFacingIsolationProbe
 } from "../src/j2/stageTrackingSyntheticAccess.js";
 
 const SECRET_A = "A_0123456789abcdefghijklmnopqrstuvwxyz";
 const SECRET_B = "B_0123456789abcdefghijklmnopqrstuvwxyz";
+const BRIDGE_FINGERPRINT = "a".repeat(64);
 
 interface MutableRecord {
   id: number;
@@ -192,10 +194,30 @@ class FixtureClient implements J2SyntheticAccessClient {
 }
 
 class FixtureVault implements J2SyntheticLinkKeyVault {
+  calls = 0;
   async getOrCreate(handle: string): Promise<string> {
+    this.calls += 1;
     if (handle === "fixture:teacher-a-link-key") return SECRET_A;
     if (handle === "fixture:teacher-b-link-key") return SECRET_B;
     throw new Error(`unexpected handle ${handle}`);
+  }
+}
+
+class FixtureIsolationProbe implements J2SyntheticModelFacingIsolationProbe {
+  verdict: "DENIED" | "READABLE" | "UNKNOWN" = "DENIED";
+  checkedAt = Date.now();
+  bridgeConfigFingerprint = BRIDGE_FINGERPRINT;
+  documentedId: string | null = null;
+  readonly checked: string[] = [];
+
+  async checkFixtureRead(documentId: string) {
+    this.checked.push(documentId);
+    return {
+      documentId: this.documentedId ?? documentId,
+      verdict: this.verdict,
+      checkedAt: this.checkedAt,
+      bridgeConfigFingerprint: this.bridgeConfigFingerprint
+    };
   }
 }
 
@@ -208,7 +230,7 @@ const AUTHORITY = Object.freeze({
 
 test("J2-B provisions only the bounded synthetic LinkKey AccessModel and does not return secrets", async () => {
   const client = new FixtureClient();
-  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault(), new FixtureIsolationProbe(), BRIDGE_FINGERPRINT);
 
   const outcome = await provisioner.provision(AUTHORITY);
 
@@ -243,7 +265,7 @@ test("J2-B provisions only the bounded synthetic LinkKey AccessModel and does no
 test("J2-B confirms exact postcondition after an uncertain apply response without replay", async () => {
   const client = new FixtureClient();
   client.applyMode = "uncertain-after-apply";
-  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault(), new FixtureIsolationProbe(), BRIDGE_FINGERPRINT);
 
   const outcome = await provisioner.provision(AUTHORITY);
 
@@ -254,7 +276,7 @@ test("J2-B confirms exact postcondition after an uncertain apply response withou
 test("J2-B refuses to overwrite a non-pristine unknown AccessModel", async () => {
   const client = new FixtureClient();
   client.setNonPristineAcl();
-  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault(), new FixtureIsolationProbe(), BRIDGE_FINGERPRINT);
 
   await assert.rejects(
     () => provisioner.provision(AUTHORITY),
@@ -266,7 +288,7 @@ test("J2-B refuses to overwrite a non-pristine unknown AccessModel", async () =>
 test("J2-B requires the date-present initial state to leave historical author binding absent", async () => {
   const client = new FixtureClient();
   client.includeHistoricalAuthor = true;
-  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault(), new FixtureIsolationProbe(), BRIDGE_FINGERPRINT);
 
   await assert.rejects(
     () => provisioner.provision(AUTHORITY),
@@ -277,7 +299,7 @@ test("J2-B requires the date-present initial state to leave historical author bi
 
 test("J2-B requires explicit owner authority", async () => {
   const client = new FixtureClient();
-  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault(), new FixtureIsolationProbe(), BRIDGE_FINGERPRINT);
 
   await assert.rejects(
     () => provisioner.provision({ ...AUTHORITY, ownerAuthorized: false }),
@@ -288,7 +310,7 @@ test("J2-B requires explicit owner authority", async () => {
 
 test("J2-B refuses a mismatched fixture or non-owner document before any ACL write", async () => {
   const client = new FixtureClient();
-  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault());
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, new FixtureVault(), new FixtureIsolationProbe(), BRIDGE_FINGERPRINT);
 
   client.documentName = "suivi des stages chatgpt";
   await assert.rejects(() => provisioner.provision(AUTHORITY), /identity could not be established/);
@@ -298,5 +320,29 @@ test("J2-B refuses a mismatched fixture or non-owner document before any ACL wri
   client.documentAccess = "owners";
   client.setUnexpectedStage();
   await assert.rejects(() => provisioner.provision(AUTHORITY), /Stage identity or assignment/);
+  assert.equal(client.observedActions.length, 0);
+});
+
+test("J2-B refuses LinkKeys when the public bridge can read or isolation is unknown", async () => {
+  const client = new FixtureClient();
+  const vault = new FixtureVault();
+  const isolation = new FixtureIsolationProbe();
+  const provisioner = new J2StageTrackingSyntheticAccessProvisioner(client, vault, isolation, BRIDGE_FINGERPRINT);
+
+  isolation.verdict = "READABLE";
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /model-facing bridge may read/);
+  isolation.verdict = "UNKNOWN";
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /model-facing bridge may read/);
+  isolation.verdict = "DENIED";
+  isolation.documentedId = "another-fixture";
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /model-facing bridge may read/);
+  isolation.documentedId = null;
+  isolation.checkedAt = Date.now() - 120_000;
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /model-facing bridge may read/);
+  isolation.checkedAt = Date.now();
+  isolation.bridgeConfigFingerprint = "b".repeat(64);
+  await assert.rejects(() => provisioner.provision(AUTHORITY), /model-facing bridge may read/);
+  assert.deepEqual(isolation.checked, Array(5).fill(AUTHORITY.documentId));
+  assert.equal(vault.calls, 0, "no synthetic secret is fetched before the negative read proof");
   assert.equal(client.observedActions.length, 0);
 });
