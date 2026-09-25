@@ -1,6 +1,6 @@
 import { AuditLogger, type AuditEvent } from "../src/audit/auditLogger.js";
 import { createPrincipal } from "../src/auth/principal.js";
-import { loadConfig } from "../src/config.js";
+import { loadConfig, type Config } from "../src/config.js";
 import { DeploymentResourcePolicy } from "../src/grist/accessPolicy.js";
 import { GristClient, GristApiError } from "../src/grist/client.js";
 import { GristContextFactory } from "../src/grist/contextFactory.js";
@@ -49,6 +49,17 @@ function boundedOrigin(value: string): string {
     throw new Error("J2 owner Grist origin must be an HTTPS origin or a local HTTP origin.");
   }
   return parsed.origin;
+}
+
+function assertDedicatedSecrets(config: Config, ownerApiKey: string, seed: string): void {
+  const forbidden = [config.gristApiKey, config.gptActionToken, ownerApiKey];
+  if (config.mcpAuth.mode === "static") forbidden.push(config.mcpAuth.bearerToken);
+  if (ownerApiKey === config.gristApiKey) {
+    throw new Error("J2 owner credential must be distinct from the model-facing bridge Grist credential.");
+  }
+  if (forbidden.includes(seed)) {
+    throw new Error("J2 synthetic LinkKey seed must be a dedicated secret, not a bridge or Grist credential.");
+  }
 }
 
 async function buildStrongestModelFacingReadService() {
@@ -100,6 +111,8 @@ async function main(): Promise<void> {
   const seed = requiredEnv("J2_SYNTHETIC_LINKKEY_SEED");
 
   const { service, config, fingerprint } = await buildStrongestModelFacingReadService();
+  assertDedicatedSecrets(config, ownerApiKey, seed);
+
   const isolationProbe = new J2ModelFacingIsolationProbe(
     service,
     {
