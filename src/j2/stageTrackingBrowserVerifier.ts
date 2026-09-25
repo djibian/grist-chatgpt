@@ -6,6 +6,8 @@ import {
   type J2TeacherId
 } from "./stageTrackingFixture.js";
 
+export const J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION = "j2-stage-tracking-accepted-v1" as const;
+
 export type J2ObservedAccess = J2AccessExpectation | "UNKNOWN";
 export type J2BrowserVerificationVerdict = "VERIFIED" | "VIOLATED" | "UNKNOWN";
 export type J2BrowserSessionKind =
@@ -15,6 +17,7 @@ export type J2BrowserSessionKind =
   | "invalid-key"
   | "revoked-key";
 export type J2TraceMutation = "ENTER" | "CORRECT" | "CLEAR" | "CONTACT_DATE";
+export type J2PropertyCriticality = "CRITICAL" | "IMPORTANT" | "INFORMATIONAL";
 
 export interface J2BrowserStageObservation {
   protectedRead: J2ObservedAccess;
@@ -49,7 +52,7 @@ export interface J2BrowserVerificationContext {
   fixtureId: string;
   fixtureRevision: string;
   gristVersion: string;
-  contractVersion: string;
+  contractVersion: typeof J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION;
 }
 
 export interface J2BrowserObservedOutcome {
@@ -65,9 +68,17 @@ export interface J2BrowserObservedOutcome {
   rawDataRead?: J2ObservedAccess;
 }
 
+export interface J2PropertyCriticalityEvidence {
+  propertyId: string;
+  criticality: J2PropertyCriticality;
+}
+
 export interface J2BrowserScenarioEvidence {
   scenarioId: J2BrowserExpectation["id"];
   propertyIds: readonly string[];
+  propertyCriticality: readonly J2PropertyCriticalityEvidence[];
+  actingContext: J2BrowserExpectation["actingContext"];
+  evidenceInputs: readonly string[];
   verdict: J2BrowserVerificationVerdict;
   expected: J2BrowserExpectation["expected"];
   observed: J2BrowserObservedOutcome;
@@ -77,7 +88,7 @@ export interface J2BrowserScenarioEvidence {
   fixtureId: string;
   fixtureRevision: string;
   gristVersion: string;
-  contractVersion: string;
+  contractVersion: typeof J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION;
   checkedAt: number;
 }
 
@@ -89,7 +100,19 @@ export interface J2BrowserVerificationReport {
 const FIXTURE_ID_PATTERN = /^[A-Za-z0-9_-]{8,96}$/;
 const REVISION_PATTERN = /^[A-Za-z0-9._:-]{4,128}$/;
 const VERSION_PATTERN = /^[A-Za-z0-9._+:-]{1,64}$/;
-const CONTRACT_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+
+const PROPERTY_CRITICALITY: Readonly<Record<string, J2PropertyCriticality>> = Object.freeze({
+  "STAGE-B1": "CRITICAL",
+  "STAGE-B2": "CRITICAL",
+  "STAGE-B3": "CRITICAL",
+  "STAGE-B4": "CRITICAL",
+  "STAGE-B5": "CRITICAL",
+  "STAGE-B6": "CRITICAL",
+  "STAGE-B10": "CRITICAL",
+  "STAGE-A1": "CRITICAL",
+  "STAGE-A4": "CRITICAL",
+  "STAGE-U1": "IMPORTANT"
+});
 
 function validateContext(context: J2BrowserVerificationContext): void {
   if (!FIXTURE_ID_PATTERN.test(context.fixtureId)) {
@@ -101,9 +124,42 @@ function validateContext(context: J2BrowserVerificationContext): void {
   if (!VERSION_PATTERN.test(context.gristVersion)) {
     throw new Error("J2 browser Grist version must be a bounded version marker.");
   }
-  if (!CONTRACT_PATTERN.test(context.contractVersion)) {
-    throw new Error("J2 browser contract version must be a bounded identifier.");
+  if (context.contractVersion !== J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION) {
+    throw new Error("J2 browser contract version must match the accepted stage-tracking contract.");
   }
+}
+
+function criticalityFor(scenario: J2BrowserExpectation): readonly J2PropertyCriticalityEvidence[] {
+  return Object.freeze(
+    scenario.propertyIds.map((propertyId) => {
+      const criticality = PROPERTY_CRITICALITY[propertyId];
+      if (!criticality) {
+        throw new Error(`J2 browser property ${propertyId} is missing accepted criticality metadata.`);
+      }
+      return Object.freeze({ propertyId, criticality });
+    })
+  );
+}
+
+function evidenceInputsFor(scenario: J2BrowserExpectation): readonly string[] {
+  const inputs = [
+    "J2_STAGE_TRACKING_BROWSER_ORACLE",
+    "configured-fixture-identity-and-revision",
+    "target-grist-version",
+    `controlled-browser:${scenario.actingContext}`
+  ];
+
+  if (["BROW-B", "BROW-C", "BROW-D"].includes(scenario.id)) {
+    inputs.push("alternate-view-negative-control", "raw-data-negative-control");
+  }
+  if (scenario.id === "BROW-C") {
+    inputs.push("separate-missing-key-session", "separate-invalid-key-session");
+  }
+  if (scenario.id === "BROW-F") {
+    inputs.push("separate-teacher-b-postcondition-session");
+  }
+
+  return Object.freeze(inputs);
 }
 
 function aggregateAccess(
@@ -218,8 +274,6 @@ function assess(
     );
   }
 
-  // Deliberate negative controls: a filtered teacher sheet alone cannot establish
-  // isolation when an alternate reachable view or Raw Data still exposes the Stage.
   if (["BROW-B", "BROW-C", "BROW-D"].includes(scenario.id)) {
     comparisons.push(accessMatches(observed.alternateViewRead ?? "UNKNOWN", "DENY"));
     comparisons.push(accessMatches(observed.rawDataRead ?? "UNKNOWN", "DENY"));
@@ -389,6 +443,9 @@ export class J2StageTrackingControlledBrowserVerifier {
       evidence.push({
         scenarioId: scenario.id,
         propertyIds: scenario.propertyIds,
+        propertyCriticality: criticalityFor(scenario),
+        actingContext: scenario.actingContext,
+        evidenceInputs: evidenceInputsFor(scenario),
         verdict: assessment.verdict,
         expected: scenario.expected,
         observed: executed.outcome,
@@ -398,7 +455,7 @@ export class J2StageTrackingControlledBrowserVerifier {
         fixtureId: context.fixtureId,
         fixtureRevision: context.fixtureRevision,
         gristVersion: context.gristVersion,
-        contractVersion: context.contractVersion,
+        contractVersion: J2_STAGE_TRACKING_ACCEPTED_CONTRACT_VERSION,
         checkedAt: this.now()
       });
     }
