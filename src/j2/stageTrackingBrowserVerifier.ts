@@ -18,6 +18,13 @@ export type J2BrowserSessionKind =
   | "revoked-key";
 export type J2TraceMutation = "ENTER" | "CORRECT" | "CLEAR" | "CONTACT_DATE";
 export type J2PropertyCriticality = "CRITICAL" | "IMPORTANT" | "INFORMATIONAL";
+export type J2MutationApplication = "APPLIED" | "NOT_APPLIED" | "UNKNOWN";
+
+/** APPLIED / NOT_APPLIED require a checked, persisted fixture postcondition. */
+export interface J2BrowserMutationObservation {
+  access: J2ObservedAccess;
+  application: J2MutationApplication;
+}
 
 export interface J2BrowserStageObservation {
   protectedRead: J2ObservedAccess;
@@ -31,14 +38,15 @@ export interface J2BrowserStageObservation {
  * but callers cannot provide URLs, JavaScript, selectors, arbitrary commands or
  * credentials through this interface.
  *
- * A returned DENY from a mutating method means the adapter observed a definitive
- * denial and confirmed that the attempted mutation did not apply. Ambiguous UI
- * state or an unverifiable postcondition must be returned as UNKNOWN instead.
+ * Mutations must separately report the observed access decision and a checked,
+ * persisted application postcondition. A button or response alone is not proof
+ * that ENTER/CORRECT/CLEAR/CONTACT_DATE took effect, or that a denial left the
+ * Stage unchanged. Any unverifiable postcondition is UNKNOWN.
  */
 export interface J2ControlledBrowserSession {
   observeStage(stageId: J2StageId): Promise<J2BrowserStageObservation>;
-  writeTrace(stageId: J2StageId, mutation: J2TraceMutation): Promise<J2ObservedAccess>;
-  attemptAssignmentChange(stageId: J2StageId, teacherId: J2TeacherId): Promise<J2ObservedAccess>;
+  writeTrace(stageId: J2StageId, mutation: J2TraceMutation): Promise<J2BrowserMutationObservation>;
+  attemptAssignmentChange(stageId: J2StageId, teacherId: J2TeacherId): Promise<J2BrowserMutationObservation>;
   observeRawData(stageId: J2StageId): Promise<J2ObservedAccess>;
   observeAlternateView(stageId: J2StageId): Promise<J2ObservedAccess>;
   close(): Promise<void>;
@@ -46,6 +54,14 @@ export interface J2ControlledBrowserSession {
 
 export interface J2ControlledBrowserSessionFactory {
   open(kind: J2BrowserSessionKind): Promise<J2ControlledBrowserSession>;
+  /**
+   * Test-only, owner-authorized effect on the configured isolated fixture.
+   * teacher-a before revocation and revoked-key after revocation MUST use the
+   * same server-held synthetic key. APPLIED means the exact revocation
+   * postcondition was checked; uncertain effects remain UNKNOWN, never retried
+   * blindly. The verifier runs this last so A's positive tests stay valid.
+   */
+  revokeTeacherALinkKey(): Promise<"APPLIED" | "UNKNOWN">;
 }
 
 export interface J2BrowserVerificationContext {
@@ -66,6 +82,8 @@ export interface J2BrowserObservedOutcome {
   otherTeacherWriteAfter?: J2ObservedAccess;
   alternateViewRead?: J2ObservedAccess;
   rawDataRead?: J2ObservedAccess;
+  preRevocationRead?: J2ObservedAccess;
+  revocationApplied?: boolean | null;
 }
 
 export interface J2PropertyCriticalityEvidence {
@@ -82,7 +100,7 @@ export interface J2BrowserScenarioEvidence {
   verdict: J2BrowserVerificationVerdict;
   expected: J2BrowserExpectation["expected"];
   observed: J2BrowserObservedOutcome;
-  method: "CONTROLLED_BROWSER";
+  method: "CONTROLLED_BROWSER" | "NOT_EXECUTED";
   completeness: "COMPLETE" | "PARTIAL";
   reasonCodes: readonly string[];
   fixtureId: string;
@@ -111,7 +129,7 @@ const PROPERTY_CRITICALITY: Readonly<Record<string, J2PropertyCriticality>> = Ob
   "STAGE-B10": "CRITICAL",
   "STAGE-A1": "CRITICAL",
   "STAGE-A4": "CRITICAL",
-  "STAGE-U1": "IMPORTANT"
+  "STAGE-U1": "CRITICAL"
 });
 
 function validateContext(context: J2BrowserVerificationContext): void {
@@ -155,6 +173,9 @@ function evidenceInputsFor(scenario: J2BrowserExpectation): readonly string[] {
   if (scenario.id === "BROW-C") {
     inputs.push("separate-missing-key-session", "separate-invalid-key-session");
   }
+  if (scenario.id === "BROW-D") {
+    inputs.push("same-key-positive-precondition", "bounded-revocation-postcondition");
+  }
   if (scenario.id === "BROW-F") {
     inputs.push("separate-teacher-b-postcondition-session");
   }
@@ -166,11 +187,24 @@ function aggregateAccess(
   values: readonly J2ObservedAccess[],
   expected: J2AccessExpectation
 ): J2ObservedAccess {
+  const mismatch: J2AccessExpectation = expected === "ALLOW" ? "DENY" : "ALLOW";
+  if (values.some((value) => value === mismatch)) return mismatch;
   if (values.some((value) => value === "UNKNOWN")) return "UNKNOWN";
+  return expected;
+}
+
+function mutationAccess(
+  observed: J2BrowserMutationObservation,
+  expected: J2AccessExpectation
+): J2ObservedAccess {
   if (expected === "ALLOW") {
-    return values.every((value) => value === "ALLOW") ? "ALLOW" : "DENY";
+    if (observed.access === "DENY" || observed.application === "NOT_APPLIED") return "DENY";
+    if (observed.access === "UNKNOWN" || observed.application === "UNKNOWN") return "UNKNOWN";
+    return "ALLOW";
   }
-  return values.every((value) => value === "DENY") ? "DENY" : "ALLOW";
+  if (observed.access === "ALLOW" || observed.application === "APPLIED") return "ALLOW";
+  if (observed.access === "UNKNOWN" || observed.application === "UNKNOWN") return "UNKNOWN";
+  return "DENY";
 }
 
 function aggregateBoolean(values: readonly (boolean | null | undefined)[]): boolean | null {
@@ -278,6 +312,10 @@ function assess(
     comparisons.push(accessMatches(observed.alternateViewRead ?? "UNKNOWN", "DENY"));
     comparisons.push(accessMatches(observed.rawDataRead ?? "UNKNOWN", "DENY"));
   }
+  if (scenario.id === "BROW-D") {
+    comparisons.push(accessMatches(observed.preRevocationRead ?? "UNKNOWN", "ALLOW"));
+    comparisons.push(boolMatches(observed.revocationApplied, true));
+  }
 
   if (comparisons.some((result) => result === false)) {
     return {
@@ -304,8 +342,11 @@ async function runNegativeSession(
 ): Promise<{ outcome: J2BrowserObservedOutcome; complete: boolean }> {
   const result = await openAndRun(factory, kind, async (session) => {
     const protectedStage = await session.observeStage("stage-a");
-    const write = await session.writeTrace("stage-a", "ENTER");
-    const assignment = await session.attemptAssignmentChange("stage-a", "teacher-b");
+    const write = mutationAccess(await session.writeTrace("stage-a", "ENTER"), "DENY");
+    const assignment = mutationAccess(
+      await session.attemptAssignmentChange("stage-a", "teacher-b"),
+      "DENY"
+    );
     const alternate = await session.observeAlternateView("stage-a");
     const raw = await session.observeRawData("stage-a");
     return {
@@ -321,6 +362,33 @@ async function runNegativeSession(
   return { outcome: result.value ?? emptyUnknownOutcome(), complete: result.complete && !!result.value };
 }
 
+async function runRevocationScenario(
+  factory: J2ControlledBrowserSessionFactory
+): Promise<{ outcome: J2BrowserObservedOutcome; complete: boolean }> {
+  const before = await openAndRun(factory, "teacher-a", (session) => session.observeStage("stage-a"));
+  if (
+    !before.complete ||
+    before.value?.protectedRead !== "ALLOW" ||
+    before.value.stageIdentity !== "stage-a"
+  ) {
+    return { outcome: emptyUnknownOutcome(), complete: false };
+  }
+
+  let revoked: "APPLIED" | "UNKNOWN" = "UNKNOWN";
+  try {
+    revoked = await factory.revokeTeacherALinkKey();
+  } catch {
+    // An uncertain fixture effect must not be replayed to manufacture proof.
+  }
+  if (revoked !== "APPLIED") return { outcome: emptyUnknownOutcome(), complete: false };
+
+  const after = await runNegativeSession(factory, "revoked-key");
+  return {
+    complete: after.complete,
+    outcome: { ...after.outcome, preRevocationRead: "ALLOW", revocationApplied: true }
+  };
+}
+
 async function runScenario(
   scenario: J2BrowserExpectation,
   factory: J2ControlledBrowserSessionFactory
@@ -328,7 +396,7 @@ async function runScenario(
   if (scenario.id === "BROW-B" || scenario.id === "BROW-E") {
     return runNegativeSession(factory, "teacher-b");
   }
-  if (scenario.id === "BROW-D") return runNegativeSession(factory, "revoked-key");
+  if (scenario.id === "BROW-D") return runRevocationScenario(factory);
 
   if (scenario.id === "BROW-C") {
     const missing = await runNegativeSession(factory, "missing-key");
@@ -370,10 +438,13 @@ async function runScenario(
   if (scenario.id === "BROW-F") {
     const primary = await openAndRun(factory, "teacher-a", async (session) => {
       const before = await session.observeStage("stage-a");
-      const enter = await session.writeTrace("stage-a", "ENTER");
-      const correct = await session.writeTrace("stage-a", "CORRECT");
-      const clear = await session.writeTrace("stage-a", "CLEAR");
-      const assignmentWrite = await session.attemptAssignmentChange("stage-a", "teacher-b");
+      const enter = mutationAccess(await session.writeTrace("stage-a", "ENTER"), "ALLOW");
+      const correct = mutationAccess(await session.writeTrace("stage-a", "CORRECT"), "ALLOW");
+      const clear = mutationAccess(await session.writeTrace("stage-a", "CLEAR"), "ALLOW");
+      const assignmentWrite = mutationAccess(
+        await session.attemptAssignmentChange("stage-a", "teacher-b"),
+        "DENY"
+      );
       const after = await session.observeStage("stage-a");
       return {
         before,
@@ -384,7 +455,7 @@ async function runScenario(
     });
     const other = await openAndRun(factory, "teacher-b", async (session) => ({
       observation: await session.observeStage("stage-a"),
-      write: await session.writeTrace("stage-a", "ENTER")
+      write: mutationAccess(await session.writeTrace("stage-a", "ENTER"), "DENY")
     }));
 
     if (!primary.value || !other.value) {
@@ -407,8 +478,11 @@ async function runScenario(
   const result = await openAndRun(factory, "teacher-a", async (session) => {
     const before = await session.observeStage("stage-a");
     const mutation: J2TraceMutation = scenario.id === "BROW-G" ? "CONTACT_DATE" : "ENTER";
-    const write = await session.writeTrace("stage-a", mutation);
-    const assignmentWrite = await session.attemptAssignmentChange("stage-a", "teacher-b");
+    const write = mutationAccess(await session.writeTrace("stage-a", mutation), "ALLOW");
+    const assignmentWrite = mutationAccess(
+      await session.attemptAssignmentChange("stage-a", "teacher-b"),
+      "DENY"
+    );
     const after = await session.observeStage("stage-a");
     return { before, after, write, assignmentWrite };
   });
@@ -437,19 +511,39 @@ export class J2StageTrackingControlledBrowserVerifier {
     validateContext(context);
     const evidence: J2BrowserScenarioEvidence[] = [];
 
-    for (const scenario of J2_STAGE_TRACKING_BROWSER_ORACLE) {
-      const executed = await runScenario(scenario, factory);
-      const assessment = assess(scenario, executed.outcome, executed.complete);
+    // Revocation changes the synthetic A link. Run it after every A-positive
+    // scenario, then return evidence in the independent oracle's fixed order.
+    const executionOrder = [
+      ...J2_STAGE_TRACKING_BROWSER_ORACLE.filter((scenario) => scenario.id !== "BROW-D"),
+      ...J2_STAGE_TRACKING_BROWSER_ORACLE.filter((scenario) => scenario.id === "BROW-D")
+    ];
+    let suspended = false;
+    for (const scenario of executionOrder) {
+      const executed = suspended
+        ? { outcome: emptyUnknownOutcome(), complete: false }
+        : await runScenario(scenario, factory);
+      const assessment = suspended
+        ? {
+            verdict: "UNKNOWN" as const,
+            completeness: "PARTIAL" as const,
+            reasonCodes: ["PRIOR_SCENARIO_NOT_VERIFIED"]
+          }
+        : assess(scenario, executed.outcome, executed.complete);
+      if (assessment.verdict !== "VERIFIED") suspended = true;
       evidence.push({
         scenarioId: scenario.id,
         propertyIds: scenario.propertyIds,
         propertyCriticality: criticalityFor(scenario),
         actingContext: scenario.actingContext,
-        evidenceInputs: evidenceInputsFor(scenario),
+        evidenceInputs: suspended && assessment.reasonCodes.includes("PRIOR_SCENARIO_NOT_VERIFIED")
+          ? ["prior-scenario-not-verified"]
+          : evidenceInputsFor(scenario),
         verdict: assessment.verdict,
         expected: scenario.expected,
         observed: executed.outcome,
-        method: "CONTROLLED_BROWSER",
+        method: assessment.reasonCodes.includes("PRIOR_SCENARIO_NOT_VERIFIED")
+          ? "NOT_EXECUTED"
+          : "CONTROLLED_BROWSER",
         completeness: assessment.completeness,
         reasonCodes: assessment.reasonCodes,
         fixtureId: context.fixtureId,
@@ -460,12 +554,15 @@ export class J2StageTrackingControlledBrowserVerifier {
       });
     }
 
-    const verdict: J2BrowserVerificationVerdict = evidence.some((item) => item.verdict === "VIOLATED")
+    const orderedEvidence = J2_STAGE_TRACKING_BROWSER_ORACLE.map((scenario) =>
+      evidence.find((item) => item.scenarioId === scenario.id)!
+    );
+    const verdict: J2BrowserVerificationVerdict = orderedEvidence.some((item) => item.verdict === "VIOLATED")
       ? "VIOLATED"
-      : evidence.every((item) => item.verdict === "VERIFIED")
+      : orderedEvidence.every((item) => item.verdict === "VERIFIED")
         ? "VERIFIED"
         : "UNKNOWN";
 
-    return { verdict, evidence };
+    return { verdict, evidence: orderedEvidence };
   }
 }

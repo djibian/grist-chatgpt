@@ -6,8 +6,10 @@ import {
   J2StageTrackingControlledBrowserVerifier,
   type J2BrowserSessionKind,
   type J2BrowserStageObservation,
+  type J2BrowserMutationObservation,
   type J2ControlledBrowserSession,
   type J2ControlledBrowserSessionFactory,
+  type J2MutationApplication,
   type J2ObservedAccess,
   type J2TraceMutation
 } from "../src/j2/stageTrackingBrowserVerifier.js";
@@ -18,11 +20,16 @@ class FakeSession implements J2ControlledBrowserSession {
 
   constructor(
     private readonly kind: J2BrowserSessionKind,
-    private readonly overrides: { rawDataRead?: J2ObservedAccess } = {}
+    private readonly overrides: {
+      rawDataRead?: J2ObservedAccess;
+      traceApplication?: J2MutationApplication;
+      assignmentApplication?: J2MutationApplication;
+      allowed?: boolean;
+    } = {}
   ) {}
 
   async observeStage(_stageId: J2StageId): Promise<J2BrowserStageObservation> {
-    const allowed = this.kind === "teacher-a";
+    const allowed = this.overrides.allowed ?? this.kind === "teacher-a";
     return {
       protectedRead: allowed ? "ALLOW" : "DENY",
       stageIdentity: allowed ? "stage-a" : null,
@@ -31,15 +38,17 @@ class FakeSession implements J2ControlledBrowserSession {
     };
   }
 
-  async writeTrace(_stageId: J2StageId, _mutation: J2TraceMutation): Promise<J2ObservedAccess> {
-    return this.kind === "teacher-a" ? "ALLOW" : "DENY";
+  async writeTrace(_stageId: J2StageId, _mutation: J2TraceMutation): Promise<J2BrowserMutationObservation> {
+    return this.kind === "teacher-a"
+      ? { access: "ALLOW", application: this.overrides.traceApplication ?? "APPLIED" }
+      : { access: "DENY", application: "NOT_APPLIED" };
   }
 
   async attemptAssignmentChange(
     _stageId: J2StageId,
     _teacherId: J2TeacherId
-  ): Promise<J2ObservedAccess> {
-    return "DENY";
+  ): Promise<J2BrowserMutationObservation> {
+    return { access: "DENY", application: this.overrides.assignmentApplication ?? "NOT_APPLIED" };
   }
 
   async observeRawData(_stageId: J2StageId): Promise<J2ObservedAccess> {
@@ -58,17 +67,48 @@ class FakeSession implements J2ControlledBrowserSession {
 
 class FakeFactory implements J2ControlledBrowserSessionFactory {
   public readonly sessions: FakeSession[] = [];
+  public readonly opened: J2BrowserSessionKind[] = [];
+  public revocationCount = 0;
+  private revoked = false;
 
-  constructor(private readonly overrides: { teacherBRawDataRead?: J2ObservedAccess } = {}) {}
+  constructor(private readonly overrides: {
+    teacherBRawDataRead?: J2ObservedAccess;
+    missingRawDataRead?: J2ObservedAccess;
+    invalidKeyFails?: boolean;
+    traceApplication?: J2MutationApplication;
+    teacherBAssignmentApplication?: J2MutationApplication;
+    revocationResult?: "APPLIED" | "UNKNOWN";
+    denyRevocationPrecondition?: boolean;
+  } = {}) {}
 
   async open(kind: J2BrowserSessionKind): Promise<J2ControlledBrowserSession> {
-    const sessionOverrides =
-      kind === "teacher-b" && this.overrides.teacherBRawDataRead !== undefined
-        ? { rawDataRead: this.overrides.teacherBRawDataRead }
-        : {};
+    this.opened.push(kind);
+    if (kind === "invalid-key" && this.overrides.invalidKeyFails) {
+      throw new Error("Synthetic invalid-key browser failure");
+    }
+    if (kind === "revoked-key" && !this.revoked) {
+      throw new Error("Synthetic key was never revoked");
+    }
+    const sessionOverrides = {
+      rawDataRead: kind === "teacher-b" ? this.overrides.teacherBRawDataRead
+        : kind === "missing-key" ? this.overrides.missingRawDataRead : undefined,
+      traceApplication: kind === "teacher-a" ? this.overrides.traceApplication : undefined,
+      assignmentApplication: kind === "teacher-b" &&
+        this.opened.filter((item) => item === "teacher-b").length === 2
+        ? this.overrides.teacherBAssignmentApplication : undefined,
+      allowed: kind === "teacher-a" && this.overrides.denyRevocationPrecondition &&
+        this.opened.filter((item) => item === "teacher-a").length === 4 ? false : undefined
+    };
     const session = new FakeSession(kind, sessionOverrides);
     this.sessions.push(session);
     return session;
+  }
+
+  async revokeTeacherALinkKey(): Promise<"APPLIED" | "UNKNOWN"> {
+    this.revocationCount += 1;
+    if (this.overrides.revocationResult === "UNKNOWN") return "UNKNOWN";
+    this.revoked = true;
+    return "APPLIED";
   }
 }
 
@@ -118,6 +158,8 @@ test("J2-C verifier executes the fixed browser oracle and emits contextualized v
   );
   assert.ok(factory.sessions.length >= 8, "missing and invalid keys must be separate sessions");
   assert.ok(factory.sessions.every((session) => session.closed));
+  assert.equal(factory.revocationCount, 1);
+  assert.equal(factory.opened.at(-1), "revoked-key", "revocation must follow A-positive scenarios");
 
   const browB = report.evidence.find((item) => item.scenarioId === "BROW-B");
   assert.ok(browB);
@@ -129,20 +171,65 @@ test("J2-C verifier executes the fixed browser oracle and emits contextualized v
   const browG = report.evidence.find((item) => item.scenarioId === "BROW-G");
   assert.ok(browG);
   assert.deepEqual(browG.propertyCriticality, [
-    { propertyId: "STAGE-U1", criticality: "IMPORTANT" },
+    { propertyId: "STAGE-U1", criticality: "CRITICAL" },
     { propertyId: "STAGE-B2", criticality: "CRITICAL" }
   ]);
 });
 
+test("J2-C reports a definite missing-key data leak even if the invalid-key session is unavailable", async () => {
+  const factory = new FakeFactory({ missingRawDataRead: "ALLOW", invalidKeyFails: true });
+  const report = await new J2StageTrackingControlledBrowserVerifier().verify(factory, context);
+  const browC = report.evidence.find((item) => item.scenarioId === "BROW-C");
+
+  assert.ok(browC);
+  assert.equal(browC.verdict, "VIOLATED");
+  assert.equal(browC.observed.rawDataRead, "ALLOW");
+  assert.equal(report.verdict, "VIOLATED");
+});
+
+test("J2-C cannot verify revocation without a proven prior grant or confirmed same-key revocation", async () => {
+  const noPriorGrant = new FakeFactory({ denyRevocationPrecondition: true });
+  const first = await new J2StageTrackingControlledBrowserVerifier().verify(noPriorGrant, context);
+  assert.equal(first.evidence.find((item) => item.scenarioId === "BROW-D")?.verdict, "UNKNOWN");
+  assert.equal(noPriorGrant.revocationCount, 0);
+
+  const uncertainRevocation = new FakeFactory({ revocationResult: "UNKNOWN" });
+  const second = await new J2StageTrackingControlledBrowserVerifier().verify(uncertainRevocation, context);
+  assert.equal(second.evidence.find((item) => item.scenarioId === "BROW-D")?.verdict, "UNKNOWN");
+  assert.equal(uncertainRevocation.opened.includes("revoked-key"), false);
+});
+
+test("J2-C will not certify an allowed edit without a persisted trace postcondition", async () => {
+  const factory = new FakeFactory({ traceApplication: "UNKNOWN" });
+  const report = await new J2StageTrackingControlledBrowserVerifier().verify(factory, context);
+
+  for (const id of ["BROW-A", "BROW-F", "BROW-G"]) {
+    assert.equal(report.evidence.find((item) => item.scenarioId === id)?.verdict, "UNKNOWN");
+  }
+  assert.equal(report.verdict, "UNKNOWN");
+});
+
+test("J2-C detects an applied self-assignment even if the browser reports denial", async () => {
+  const factory = new FakeFactory({ teacherBAssignmentApplication: "APPLIED" });
+  const report = await new J2StageTrackingControlledBrowserVerifier().verify(factory, context);
+
+  assert.equal(report.evidence.find((item) => item.scenarioId === "BROW-E")?.verdict, "VIOLATED");
+  assert.equal(report.verdict, "VIOLATED");
+});
+
 test("J2-C negative controls fail when Raw Data exposes a protected Stage", async () => {
   const verifier = new J2StageTrackingControlledBrowserVerifier(() => 1);
-  const report = await verifier.verify(new FakeFactory({ teacherBRawDataRead: "ALLOW" }), context);
+  const factory = new FakeFactory({ teacherBRawDataRead: "ALLOW" });
+  const report = await verifier.verify(factory, context);
 
   const browB = report.evidence.find((item) => item.scenarioId === "BROW-B");
   assert.ok(browB);
   assert.equal(browB.verdict, "VIOLATED");
   assert.equal(browB.observed.rawDataRead, "ALLOW");
   assert.equal(report.verdict, "VIOLATED");
+  assert.equal(factory.opened.includes("missing-key"), false, "later mutating scenarios must suspend");
+  assert.equal(report.evidence.find((item) => item.scenarioId === "BROW-F")?.verdict, "UNKNOWN");
+  assert.equal(report.evidence.find((item) => item.scenarioId === "BROW-F")?.method, "NOT_EXECUTED");
 });
 
 test("J2-C browser failures remain UNKNOWN and do not echo secret error material", async () => {
@@ -152,6 +239,9 @@ test("J2-C browser failures remain UNKNOWN and do not echo secret error material
         throw new Error("https://fixture.invalid/?LinkKey_Token=DO-NOT-ECHO");
       }
       return new FakeSession(kind);
+    },
+    async revokeTeacherALinkKey() {
+      return "APPLIED";
     }
   };
   const verifier = new J2StageTrackingControlledBrowserVerifier(() => 2);

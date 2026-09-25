@@ -17,7 +17,9 @@ This component implements the bounded evidence/orchestration core for roadmap sl
 
 A future concrete Grist browser adapter must receive those operational details from protected server-side configuration, bind them to one configured synthetic fixture, and implement only the narrow session operations declared by this port.
 
-For mutating session methods, `DENY` has a strict meaning: the adapter observed a definitive denial **and confirmed that the attempted mutation did not apply**. If the browser state or postcondition cannot establish that, the adapter must return `UNKNOWN`. This allows negative scenarios to establish unchanged Stage/assignment state without requiring a forbidden protected read merely to prove non-mutation.
+Mutating session methods return **both** the browser access decision and a checked application postcondition. `ALLOW + APPLIED` means the intended deterministic trace mutation was persisted (including the expected correction, clearing or contact-date value); `DENY + NOT_APPLIED` means a definitive refusal and confirmed non-application. An allowed click or HTTP response without an exact postcondition is `application: UNKNOWN`, and cannot produce `VERIFIED`. This allows negative scenarios to establish unchanged Stage/assignment state without requiring a forbidden protected read merely to prove non-mutation. The concrete adapter must verify postconditions through the permitted fixture authority without leaking protected content to a different browser principal.
+
+The test-only `revokeTeacherALinkKey()` operation is bounded to the configured isolated fixture and the same server-held key used by the positive `teacher-a` and post-revocation `revoked-key` sessions. It may return `APPLIED` only after an exact revocation postcondition; response loss or ambiguity returns `UNKNOWN` without a blind retry. The verifier runs BROW-D **last**, first observing that this same key could read Stage A, then revoking it and checking denial through a new browser session. Evidence remains in the oracle's BROW-A…G order. This order keeps the earlier teacher A positive controls meaningful. The eventual adapter must bind the pre/post observations and relevant fixture revision to the same key and fail closed if it cannot do so.
 
 ## Fixed scenarios
 
@@ -28,7 +30,7 @@ It orchestrates:
 - BROW-A: assigned teacher A can read/write the protected trace while assignment writes remain denied;
 - BROW-B: teacher B is denied on the teacher flow, an alternate reachable view, and Raw Data;
 - BROW-C: missing and invalid LinkKeys are tested in separate sessions and both must deny;
-- BROW-D: a revoked LinkKey must deny;
+- BROW-D: a previously valid LinkKey, explicitly revoked on the isolated fixture, must then deny;
 - BROW-E: relation/self-assignment tampering remains denied;
 - BROW-F: A enters, corrects and clears the trace on the same Stage with `Suivi_par` unchanged, then B remains denied;
 - BROW-G: the contact date is reachable/editable in A's teacher flow while assignment writes remain denied.
@@ -48,6 +50,7 @@ Each scenario evidence record contains only bounded, non-secret provenance and o
 - acting/tested LinkKey context from the fixed oracle;
 - accepted criticality for every referenced property;
 - the bounded evidence inputs used by that scenario, including required negative controls;
+- for BROW-D, an observed positive before revocation and a confirmed server-side revocation effect;
 - expected and observed ALLOW/DENY/UNKNOWN or boolean outcomes;
 - completeness, verdict, reason codes, method and timestamp.
 
@@ -56,8 +59,10 @@ The acting context, criticality and evidence-input descriptors are derived from 
 Verdict rules:
 
 - any definite mismatch is `VIOLATED`;
+- a definite contrary access observation takes precedence over uncertainty in another session or view;
 - browser/session uncertainty, unsupported state or incomplete closure is `UNKNOWN`;
 - `VERIFIED` requires every expected comparison and required denial control to complete successfully;
+- after the first `UNKNOWN` or `VIOLATED` scenario, later scenarios are not executed against a potentially changed fixture and receive `UNKNOWN` with `PRIOR_SCENARIO_NOT_VERIFIED`;
 - exceptions are intentionally discarded rather than copied into evidence, because browser errors may contain secret URLs or tokens.
 
 Closing a browser session is part of completeness. A close failure cannot silently produce complete evidence.
