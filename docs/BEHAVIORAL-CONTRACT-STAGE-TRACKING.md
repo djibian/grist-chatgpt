@@ -30,6 +30,8 @@ Each property is classified as:
 
 The Builder cannot turn an `UNKNOWN` into an accepted policy on its own. The exact accepted contract version remains immutable for a J2 run.
 
+The accepted application properties remain broader than the proof obligation for one bounded transformation. A J2 run must verify every `CRITICAL` property reached by the transformation's confirmed/possible dependency closure; an accepted property outside that closure remains an application expectation and must not be reported as `VERIFIED` merely because the transformation passed.
+
 ## 3. Logical application identities
 
 Actors: `ApplicationOwner`, `Teacher`, `AnonymousOrInvalidLinkVisitor`, and `BuilderPrincipal`. The privileged BuilderPrincipal cannot stand in for a teacher in LinkKey access tests.
@@ -115,14 +117,14 @@ A missing/invalid LinkKey must not expose protected Stage follow-up data.
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-A revoked key cannot retain protected access previously granted by that key.
+A revoked key cannot retain protected access previously granted by that key. This remains an accepted application property. The contact-date transformation must execute a revocation transition only when its impact analysis reaches LinkKey lifecycle/revocation behavior; otherwise J2 records that property as outside the tested transformation closure rather than claiming it `VERIFIED`.
 
 ### STAGE-B6 — relation tampering cannot broaden access
 
 **Criticality:** CRITICAL  
 **Authority:** ACCEPTED BASELINE.
 
-A teacher cannot acquire another protected Stage's follow-up by changing `Suivi_par` or another writable relation, or by crafting requests available through the application. The accepted workflow contains no reassignment.
+A teacher cannot acquire another protected Stage's follow-up by changing `Suivi_par` or another writable relation, or by crafting requests available through the application. The accepted workflow contains no reassignment. A dedicated tampering probe is required for J2 when the affected teacher flow exposes that relation or the transformation's access-impact closure reaches it; otherwise the run must preserve the assignment and make no broader tampering claim.
 
 ### STAGE-B7 — transformation preserves business records
 
@@ -180,7 +182,7 @@ Successful owner/Builder API calls do not prove teacher access restrictions.
 **Criticality:** CRITICAL  
 **Authority:** fixed product vision.
 
-When the effective policy depends on the Grist web client's `user.LinkKey`, controlled browser scenarios with distinct assigned and unassigned teachers, valid, invalid and revoked keys are required. Schema/API observations alone cannot establish those verdicts.
+When an impacted guarantee depends on the Grist web client's `user.LinkKey`, controlled non-owner browser evidence is required; schema/API observations alone cannot establish that verdict. For the contact-date transformation the minimum access smoke uses a responsible teacher, a distinct unassigned teacher and a no-key session, including a Raw Data negative for the unassigned teacher. Invalid-key, revocation, relation-tampering or additional-view cases are added when the ImpactGraph reaches those properties; omitting an unimpacted case never converts that broader application property to `VERIFIED`.
 
 ## 9. UI behavioral properties
 
@@ -275,10 +277,10 @@ In the current reference the partially observed mapping is `Stages.Suivi_par` �
 
 ## 14. Known/possible dependency graph required for J2
 
-At minimum inspect dependencies from the elements J2 will touch into:
+Inspect the dependency closure reached from the exact schema/UI elements J2 will touch. Consider, where present:
 
 - formulas;
-- access rules;
+- access rules and sharing/link generation;
 - reverse relations;
 - native pages/widgets/select-by/filter behavior;
 - custom-widget mappings;
@@ -287,7 +289,7 @@ At minimum inspect dependencies from the elements J2 will touch into:
 
 Each dependency is `CONFIRMED`, `POSSIBLE` or `UNKNOWN`.
 
-A critical unknown dependency reached by the proposed change blocks the affected change until resolved or explicitly placed into a safe degraded/suspended path.
+A critical unknown dependency reached by the proposed change blocks the affected change until resolved or explicitly placed into a safe degraded/suspended path. Unknown application areas outside that closure remain reported but do not create unrelated J2 test obligations.
 
 ## 15. Evidence model
 
@@ -308,19 +310,17 @@ dependencies/evidence inputs
 
 Evidence is invalidated when the ImpactGraph shows that a relevant dependency changed.
 
-## 16. Minimum browser acceptance matrix
+## 16. Minimum browser acceptance matrix for this transformation
 
-The exact fixture names are synthetic; tests must use controlled identities and no real student rows.
+Tests use controlled fictional identities and no real student rows. The mandatory matrix is deliberately bounded to access/UI behavior affected by adding/exposing the contact date.
 
 | Test | Context | Expected result |
 |---|---|---|
-| BROW-A | Teacher A valid link, Stage A assigned to A | A can enter, replace/correct and clear the authorized fields including contact date; the same Stage holds the single trace throughout |
-| BROW-B | Teacher B valid link, Stage A assigned to A | B cannot read or edit A's protected trace on the follow-up page, other reachable pages or Raw Data |
-| BROW-C | missing/invalid key | denied/limited according to policy; no protected data |
-| BROW-D | revoked key | previously granted protected access gone |
-| BROW-E | Teacher B attempts relation tampering | no access expansion |
-| BROW-F | A records, corrects, then clears a contact | same Stage and assignment A remain; B's separate link remains denied |
-| BROW-G | “Suivi des stages” page | contact date appears in the intended teacher-facing sheet and is editable where authorized |
+| BROW-A | Teacher A valid link, Stage A assigned to A | A can reach the intended follow-up flow, enter/replace/correct/clear the authorized trace including contact date, and the same Stage and `Suivi_par` remain unchanged |
+| BROW-B | Teacher B valid link, Stage A assigned to A | B cannot read or edit A's protected trace on the affected teacher page or Raw Data |
+| BROW-C | no key | no protected Stage follow-up data is exposed |
+
+An invalid-key control may accompany BROW-C when cheap to exercise. `STAGE-B5` revocation, `STAGE-B6` relation tampering and additional alternate-view probes remain accepted application properties but are conditional J2 tests: execute them when the actual transformation or observed access dependency closure reaches them. Never report an unexecuted broader property as `VERIFIED`.
 
 These tests establish contextual scenarios, not universal ACL correctness.
 
@@ -328,18 +328,18 @@ These tests establish contextual scenarios, not universal ACL correctness.
 
 A J2 reference run should demonstrate:
 
-1. prepare and bind two isolated synthetic starting states with the relevant LinkKey rules and UI mapping: one without the contact-date field for the actual Builder change, and one with the already-added field and a human-maintained layout for reconciliation; document any difference from the live reference;
-2. accept an exact managed scope and plan for Stage follow-up date, access and UI behavior, leaving `Suivi_par` unchanged;
-3. build an ImpactGraph for touched elements;
-4. establish the safe execution mode;
-5. execute needed schema/access/UI effects through the J1 execution engine, without duplicating existing elements;
-6. inject a controlled interruption and resume/suspend correctly;
-7. perform the browser acceptance matrix with controlled identities;
-8. verify preservation of pre-existing business identities/data;
-9. inject a relevant concurrent human UI/configuration change and prove preservation/conflict handling;
-10. rerun the accepted intent and demonstrate convergence without duplication.
+1. with owner authority, bind only the touched schema/UI, stable business identities and relevant access/share/link dependencies; prepare one sanitized controlled realistic application whose relevant policy/UI corresponds to the reference, or record reference-specific parity as `UNKNOWN`;
+2. prepare two independent initial checkpoints of that controlled application: one without `Date_du_contact`, and one where a human has already created the date plus unrelated legitimate layout/data changes; neither checkpoint may be derived by treating a prior Builder-created date as the independent human-start state;
+3. accept an exact managed scope and plan for the Stage follow-up date and teacher-facing placement, leaving `Suivi_par`, business rows and ACLs unchanged when the observed policy already protects the new field;
+4. execute the date-absent schema/UI transformation through the J1 execution engine with durable preconditions, authority, write-ahead intent and exact postconditions; if the bound policy actually requires an ACL write, specify and review that necessary effect separately rather than installing a synthetic replacement policy;
+5. verify stable business identities/data, relevant access/share/link facts and UI mapping, then run BROW-A/B/C before/after as needed to prove the impacted browser-only guarantees;
+6. restore the independently prepared date-present/human-edited checkpoint and run the same intent as its first Builder run; adopt the existing field and preserve legitimate edits rather than duplicating or resetting them;
+7. inject one lost-response/restart case and one relevant concurrent human layout/configuration edit; reconcile from durable J1 state or suspend on ambiguity/conflict without blind replay;
+8. rerun the accepted intent on an already managed result and demonstrate convergence without duplicate field, widget, record or trace.
 
-The date field manually added to the live reference is input fixture state. It does not count as step 5 or substitute for controlled engine evidence.
+The secret-bearing test application must remain unreachable from every model-facing bridge read path for the whole lifetime of test LinkKeys. Prefer a separate test origin with no bridge. A same-origin run is admissible only in a controlled exclusive window with stable access configuration, a strongest-path negative read before token creation, no move back into bridge reach while tokens exist, verified token cleanup, and a final negative read. A momentary denial, authentication failure or `UNKNOWN` probe is not isolation evidence. The currently bridge-readable fixture must not receive LinkKeys.
+
+The date field manually added to the live reference is input fixture state. It does not count as the transformation effect or substitute for controlled engine evidence.
 
 ## 18. Critical delivery gate
 
@@ -353,7 +353,7 @@ Human-accepted choices: one modifiable follow-up trace on the existing Stage row
 
 Observed binding: the named reference Grist document has `Stages.Suivi_par` (`Ref:Enseignants`), `Type_de_contact` (`Appel`/`Visite`), `Implication`, `Ponctuel`, `Commentaire`, and the newly added editable Date `Date_du_contact`. The “Suivi des stages” page uses widgets 31 and 37 on `Stages`; `Enseignants.Lien_Stages` links there with `LinkKey_Token`. The owner reports that the date is now in the sheet and teacher-specific links filter the displayed Stages through Grist ACLs; those effects still need controlled tests.
 
-Still `UNKNOWN` until direct controlled evidence: exact Grist ACL rules and `user.LinkKey` attributes; teacher-specific date access; effective permissions and denial of relation tampering; managed/shared UI regions and dependency closure. No technical edit audit or per-contact history is established. These facts must not be fabricated from owner API access.
+Still `UNKNOWN` until direct controlled evidence: exact relevant Grist ACL rules and `user.LinkKey` attributes; teacher-specific date access; effective permissions on the affected teacher flow; managed/shared UI regions and dependency closure. Broader revocation or relation-tampering behavior remains `UNKNOWN` unless separately tested. No technical edit audit or per-contact history is established. These facts must not be fabricated from owner API access.
 
 ## 20. J2 exit criteria
 
@@ -361,12 +361,12 @@ The stage-tracking reference scenario is complete only when:
 
 - all impacted critical properties are `VERIFIED` against contextualized evidence;
 - no existing business record identity is unintentionally lost or duplicated;
-- LinkKey isolation is tested through the real supported browser path;
+- impacted LinkKey isolation is tested through the real supported browser path with the bounded A/B/no-key controls above;
 - unsafe intermediate exposure is absent by construction/test;
 - relevant human concurrent changes are protected, reconciled or cause suspension rather than silent overwrite;
 - a controlled interruption demonstrates J1 recovery semantics;
-- repeating the accepted transformation on unchanged managed state creates no duplicates;
-- unknowns and evidence scope are reported explicitly;
+- the independent date-present/human-edited first run and a true rerun preserve legitimate changes and create no duplicates;
+- unknowns, untested broader application properties and evidence scope are reported explicitly rather than promoted to `VERIFIED`;
 - the same execution engine used by J0/J1 is used rather than introducing business-specific replay logic.
 
 ## 21. Role in product validation
